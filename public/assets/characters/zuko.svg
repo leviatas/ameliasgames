@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 256" width="128" height="256">
+  <!-- Shadow -->
+  <ellipse cx="64" cy="252" rx="26" ry="6" fill="rgba(0,0,0,0.3)"/>
+
+  <!-- Feet/Paws -->
+  <ellipse cx="46" cy="242" rx="15" ry="9" fill="#4A2E70"/>
+  <ellipse cx="82" cy="242" rx="15" ry="9" fill="#4A2E70"/>
+
+  <!-- Legs -->
+  <rect x="38" y="216" width="18" height="32" rx="9" fill="#6040A0"/>
+  <rect x="72" y="216" width="18" height="32" rx="9" fill="#6040A0"/>
+
+  <!-- Body -->
+  <ellipse cx="64" cy="200" rx="35" ry="28" fill="#7B5EA7"/>
+
+  <!-- Belly lighter -->
+  <ellipse cx="64" cy="204" rx="22" ry="18" fill="#9B7EC8" opacity="0.6"/>
+
+  <!-- Stars on body -->
+  <polygon points="64,196 66,202 72,202 67,206 69,212 64,208 59,212 61,206 56,202 62,202" fill="#FFC000" opacity="0.55"/>
+
+  <!-- Left arm -->
+  <ellipse cx="26" cy="196" rx="13" ry="21" transform="rotate(-18, 26, 196)" fill="#6040A0"/>
+  <!-- Right arm -->
+  <ellipse cx="102" cy="196" rx="13" ry="21" transform="rotate(18, 102, 196)" fill="#6040A0"/>
+
+  <!-- Neck -->
+  <rect x="55" y="170" width="18" height="20" rx="8" fill="#7B5EA7"/>
+
+  <!-- Ears before head -->
+  <!-- Left ear outer -->
+  <ellipse cx="33" cy="60" rx="18" ry="57" transform="rotate(-10, 33, 60)" fill="#7B5EA7"/>
+  <!-- Left ear inner -->
+  <ellipse cx="33" cy="63" rx="10" ry="43" transform="rotate(-10, 33, 63)" fill="#C4A0D8"/>
+
+  <!-- Right ear outer -->
+  <ellipse cx="95" cy="60" rx="18" ry="57" transform="rotate(10, 95, 60)" fill="#7B5EA7"/>
+  <!-- Right ear inner -->
+  <ellipse cx="95" cy="63" rx="10" ry="43" transform="rotate(10, 95, 63)" fill="#C4A0D8"/>
+
+  <!-- Crescent moon on left ear -->
+  <path d="M28 18 A12 12 0 1 1 40 18 A8 8 0 1 0 28 18 Z" fill="#FFC000" opacity="0.7"/>
+
+  <!-- Head -->
+  <circle cx="64" cy="130" r="52" fill="#7B5EA7"/>
+
+  <!-- Eyes white -->
+  <circle cx="45" cy="125" r="16" fill="white"/>
+  <circle cx="83" cy="125" r="16" fill="white"/>
+  <!-- Iris golden yellow -->
+  <circle cx="45" cy="127" r="11" fill="#B88000"/>
+  <circle cx="83" cy="127" r="11" fill="#B88000"/>
+  <!-- Inner pupil -->
+  <circle cx="45" cy="127" r="5" fill="#1A0A00"/>
+  <circle cx="83" cy="127" r="5" fill="#1A0A00"/>
+  <!-- Main shine -->
+  <circle cx="39" cy="121" r="4" fill="white" opacity="0.9"/>
+  <circle cx="77" cy="121" r="4" fill="white" opacity="0.9"/>
+  <!-- Glow rim on iris -->
+  <circle cx="45" cy="127" r="10" fill="none" stroke="#FFD060" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="83" cy="127" r="10" fill="none" stroke="#FFD060" stroke-width="1.5" opacity="0.7"/>
+
+  <!-- Nose -->
+  <ellipse cx="64" cy="144" rx="5" ry="3.5" fill="#4A1060"/>
+
+  <!-- Blush (purple toned) -->
+  <ellipse cx="32" cy="141" rx="12" ry="7" fill="#9060B0" opacity="0.4"/>
+  <ellipse cx="96" cy="141" rx="12" ry="7" fill="#9060B0" opacity="0.4"/>
+
+  <!-- Mouth background -->
+  <path d="M38 152 Q64 174 90 152 L90 161 Q64 183 38 161 Z" fill="#380050"/>
+  <!-- Teeth: 4 pointed, slightly yellowed for eerie look -->
+  <path d="M40 152 L46 142 L52 152 Z" fill="#FFFFF0"/>
+  <path d="M53 152 L59 142 L65 152 Z" fill="#FFFFF0"/>
+  <path d="M66 152 L72 142 L78 152 Z" fill="#FFFFF0"/>
+  <path d="M79 152 L85 142 L88 152 Z" fill="#FFFFF0"/>
+  <!-- Mouth outline -->
+  <path d="M38 152 Q64 174 90 152" stroke="#200030" stroke-width="1.5" fill="none"/>
+</svg>

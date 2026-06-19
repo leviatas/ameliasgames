@@ -1,0 +1,17 @@
+name: avatarclone
+
+services:
+  avatarclone:
+    build: .
+    container_name: avatarclone
+    ports:
+      - "5173:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

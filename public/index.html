@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Avatar World</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+  <!-- Loading -->
+  <div id="loading">
+    Cargando<span class="loader-dot">.</span><span class="loader-dot">.</span><span class="loader-dot">.</span>
+  </div>
+
+  <!-- Rotate-to-landscape prompt (shown in portrait on phones) -->
+  <div id="rotate-overlay">
+    <div class="rotate-icon">📱</div>
+    <div class="rotate-text">Girá tu dispositivo</div>
+    <div class="rotate-sub">Este juego se ve mejor en horizontal</div>
+  </div>
+
+  <!-- Game chooser (main menu) -->
+  <div id="hub-screen">
+    <h1 class="select-title">Elegí un juego</h1>
+    <div class="hub-grid">
+      <button class="hub-card world" data-game="world">
+        <div class="hub-emoji">🌍</div>
+        <div class="hub-name">Mi Mundo</div>
+        <div class="hub-desc">Explorá, personalizá y jugá</div>
+      </button>
+      <button class="hub-card runner" data-game="runner">
+        <div class="hub-emoji">💜</div>
+        <div class="hub-name">Corre Labubu corre</div>
+        <div class="hub-desc">Corré, saltá y esquivá</div>
+      </button>
+      <button class="hub-card cocina" data-game="cocina">
+        <div class="hub-emoji">🍳</div>
+        <div class="hub-name">Cocina con Labubu</div>
+        <div class="hub-desc">Buscá ingredientes y cociná</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Character / customization screen -->
+  <div id="select-screen" class="hidden">
+    <button id="select-back" class="corner-back">← Juegos</button>
+    <h1 class="select-title">Mi Mundo</h1>
+    <p class="select-subtitle">Personaliza tu personaje</p>
+
+    <div class="characters-grid">
+      <div class="character-card katara">
+        <canvas class="char-preview" width="120" height="210"></canvas>
+        <div class="char-name">Tu personaje</div>
+      </div>
+    </div>
+
+    <div class="start-buttons">
+      <button id="customize-btn" class="ghost-btn">🎨 Personalizar</button>
+      <button id="play-btn">▶ Jugar</button>
+    </div>
+    <p class="select-hint">Tu progreso se guarda automáticamente</p>
+  </div>
+
+  <!-- HUD (shown during gameplay) -->
+  <div id="hud" class="hidden">
+    <div id="char-info">
+      <canvas id="char-portrait" width="48" height="92"></canvas>
+      <div id="char-details">
+        <div id="char-hud-name"></div>
+        <div id="char-hud-element"></div>
+      </div>
+    </div>
+    <div id="controls-hint">
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Mover &nbsp;|&nbsp;
+      <kbd>Shift</kbd> Correr &nbsp;|&nbsp; <kbd>Clic</kbd> en casa para entrar &nbsp;|&nbsp;
+      <kbd>Clic</kbd> en el personaje para gestos
+    </div>
+    <button id="back-btn">← Menú</button>
+    <button id="time-btn" title="Día / Noche">🌙</button>
+    <button id="cust-btn" title="Personalizar">🎨</button>
+  </div>
+
+  <!-- Customization panel -->
+  <div id="cust-panel" class="hidden">
+    <div class="wardrobe-header"><span>Personalizar</span><button id="cust-close">×</button></div>
+
+    <div class="wardrobe-section">
+      <div class="wardrobe-label">Peinado</div>
+      <div class="style-row">
+        <div class="style-btn cust-opt" data-cat="hair" data-value="buns">Rodetes</div>
+        <div class="style-btn cust-opt" data-cat="hair" data-value="corto">Corto</div>
+        <div class="style-btn cust-opt" data-cat="hair" data-value="largo">Largo</div>
+        <div class="style-btn cust-opt" data-cat="hair" data-value="coleta">Coleta</div>
+      </div>
+      <div class="color-row" style="margin-top:8px">
+        <div class="color-swatch cust-color" data-cat="hairColor" data-color="#EDEDED" style="background:#EDEDED"></div>
+        <div class="color-swatch cust-color" data-cat="hairColor" data-color="#2A1A10" style="background:#2A1A10"></div>
+        <div class="color-swatch cust-color" data-cat="hairColor" data-color="#7B3F00" style="background:#7B3F00"></div>
+        <div class="color-swatch cust-color" data-cat="hairColor" data-color="#D4A044" style="background:#D4A044"></div>
+        <div class="color-swatch cust-color" data-cat="hairColor" data-color="#C03060" style="background:#C03060"></div>
+        <div class="color-swatch cust-color" data-cat="hairColor" data-color="#3060C0" style="background:#3060C0"></div>
+        <div class="color-swatch cust-color" data-cat="hairColor" data-color="#8030C0" style="background:#8030C0"></div>
+      </div>
+    </div>
+
+    <div class="wardrobe-section">
+      <div class="wardrobe-label">Ropa</div>
+      <div class="style-row">
+        <div class="style-btn cust-opt" data-cat="outfit" data-value="pop">Remera+short</div>
+        <div class="style-btn cust-opt" data-cat="outfit" data-value="vestido">Vestido</div>
+        <div class="style-btn cust-opt" data-cat="outfit" data-value="casual">Remera+pantalón</div>
+      </div>
+      <div class="wardrobe-label" style="margin-top:8px">Color principal</div>
+      <div class="color-row" data-cat="topColor">
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#F2A7BB" style="background:#F2A7BB"></div>
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#56C0A6" style="background:#56C0A6"></div>
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#E08020" style="background:#E08020"></div>
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#9030C0" style="background:#9030C0"></div>
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#C02020" style="background:#C02020"></div>
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#2080D0" style="background:#2080D0"></div>
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#F0F0F0" style="background:#F0F0F0;border:1px solid #ccc"></div>
+        <div class="color-swatch cust-color" data-cat="topColor" data-color="#202020" style="background:#202020"></div>
+      </div>
+      <div class="wardrobe-label" style="margin-top:8px">Color inferior</div>
+      <div class="color-row" data-cat="bottomColor">
+        <div class="color-swatch cust-color" data-cat="bottomColor" data-color="#AEDCEC" style="background:#AEDCEC"></div>
+        <div class="color-swatch cust-color" data-cat="bottomColor" data-color="#3F5C8C" style="background:#3F5C8C"></div>
+        <div class="color-swatch cust-color" data-cat="bottomColor" data-color="#604030" style="background:#604030"></div>
+        <div class="color-swatch cust-color" data-cat="bottomColor" data-color="#204020" style="background:#204020"></div>
+        <div class="color-swatch cust-color" data-cat="bottomColor" data-color="#502060" style="background:#502060"></div>
+        <div class="color-swatch cust-color" data-cat="bottomColor" data-color="#181818" style="background:#181818"></div>
+      </div>
+    </div>
+
+    <div class="wardrobe-section">
+      <div class="wardrobe-label">Accesorio</div>
+      <div class="style-row">
+        <div class="style-btn cust-opt" data-cat="accessory" data-value="none">Ninguno</div>
+        <div class="style-btn cust-opt" data-cat="accessory" data-value="moño">Moño</div>
+        <div class="style-btn cust-opt" data-cat="accessory" data-value="lentes">Lentes</div>
+        <div class="style-btn cust-opt" data-cat="accessory" data-value="corona">Corona</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gesture menu (opens when you tap the character) -->
+  <div id="gesture-menu" class="hidden">
+    <button class="gesture-btn" data-gesture="sing"><span class="g-emoji">🎤</span>Cantar</button>
+    <button class="gesture-btn" data-gesture="dance"><span class="g-emoji">💃</span>Bailar</button>
+    <button class="gesture-btn" data-gesture="wave"><span class="g-emoji">👋</span>Saludar</button>
+    <button id="gesture-close" title="Cerrar">✕</button>
+  </div>
+
+  <!-- Dog runner mini-game controls -->
+  <div id="runner-ui" class="hidden">
+    <button id="runner-exit" title="Salir">✕</button>
+    <button id="runner-duck" class="runner-btn" title="Agacharse">⬇</button>
+    <button id="runner-jump" class="runner-btn" title="Saltar">⬆</button>
+  </div>
+
+  <!-- Cooking mini-game controls -->
+  <div id="cocina-ui" class="hidden">
+    <button id="cocina-exit" title="Salir">✕</button>
+    <div id="cocina-hint">Tocá para mover · llevá los ingredientes a las estaciones</div>
+  </div>
+
+  <!-- Canvas inserted by JS -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- App version (bumped on every change) -->
+  <div id="app-version">v1.1.0</div>
+
+  <script type="module" src="/js/game.js"></script>
+</body>
+</html>
