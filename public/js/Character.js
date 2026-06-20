@@ -19,54 +19,22 @@ export function onSpriteReady(cb) { SPRITE_READY ? cb() : _readyCbs.push(cb); }
 
 const RAW = new Image();
 RAW.onload = () => { try { processSprite(); } catch(e){ console.error(e); } SPRITE_READY = true; _readyCbs.splice(0).forEach(c => c()); };
-RAW.src = '/assets/base.jpg';
+RAW.src = '/assets/chibi_sprite.png';
 
 function processSprite() {
+  // chibi_sprite.png already has a pre-computed alpha mask (GrabCut), just trim
   const TW = 320, TH = Math.round(RAW.naturalHeight * TW / RAW.naturalWidth);
   const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
   const cx = cv.getContext('2d'); cx.drawImage(RAW, 0, 0, TW, TH);
   const im = cx.getImageData(0, 0, TW, TH); const d = im.data;
-  const isbg = i => { const r=d[i],g=d[i+1],b=d[i+2]; const mn=Math.min(r,g,b),mx=Math.max(r,g,b); return mn>232 && (mx-mn)<16; };
-  // flood-fill the white background from the borders
-  const seen = new Uint8Array(TW*TH); const st = [];
-  for (let x=0;x<TW;x++){ st.push(x); st.push((TH-1)*TW+x); }
-  for (let y=0;y<TH;y++){ st.push(y*TW); st.push(y*TW+TW-1); }
-  while (st.length) {
-    const p = st.pop(); if (seen[p]) continue; seen[p]=1;
-    const i=p*4; if (!isbg(i)) continue;
-    d[i+3]=0;
-    const px=p%TW, py=(p/TW)|0;
-    if (px>0) st.push(p-1); if (px<TW-1) st.push(p+1);
-    if (py>0) st.push(p-TW); if (py<TH-1) st.push(p+TW);
-  }
-  cx.putImageData(im, 0, 0);
-  // trim
+  // trim to bounding box of opaque pixels
   let minx=TW,miny=TH,maxx=0,maxy=0;
   for (let p=0;p<TW*TH;p++){ if (d[p*4+3]>10){ const px=p%TW,py=(p/TW)|0; if(px<minx)minx=px;if(px>maxx)maxx=px;if(py<miny)miny=py;if(py>maxy)maxy=py; } }
   const w=maxx-minx+1, h=maxy-miny+1;
   const sc=document.createElement('canvas'); sc.width=w; sc.height=h;
   sc.getContext('2d').drawImage(cv, minx,miny,w,h, 0,0,w,h);
   SPRITE = sc;
-  // anchors from row extents
-  const td = sc.getContext('2d').getImageData(0,0,w,h).data;
-  const L=new Int32Array(h), R=new Int32Array(h), C=new Int32Array(h);
-  for (let y=0;y<h;y++){ let l=w,r=-1,c=0; for(let x=0;x<w;x++){ if(td[(y*w+x)*4+3]>10){ if(x<l)l=x; if(x>r)r=x; c++; } } L[y]=l;R[y]=r;C[y]=c; }
-  let neck=Math.round(0.5*h), best=1e9;
-  for (let y=Math.round(0.34*h); y<Math.round(0.64*h); y++){ if (C[y]<best){ best=C[y]; neck=y; } }
-  let headMaxW=0, cxSum=0, cnt=0;
-  for (let y=0;y<neck;y++){ if(C[y]>headMaxW)headMaxW=C[y]; if(R[y]>=0){ cxSum+=(L[y]+R[y])/2*C[y]; cnt+=C[y]; } }
-  const headCx = cnt? cxSum/cnt : w/2;
-  const shY=Math.min(h-1, neck+Math.round(0.05*h));
-  const hipY=Math.round(0.80*h);
-  ANCH = {
-    w, h,
-    headCxF: headCx/w,
-    neckF: neck/h,
-    headRxF: (headMaxW/2)/w,
-    shoulderHalfF: ((R[shY]-L[shY])/2)/w,
-    hipYF: hipY/h,
-    hipHalfF: Math.max(8,(R[hipY]-L[hipY])/2)/w,
-  };
+  ANCH = { w, h };
 }
 
 export { SPRITE };
@@ -139,17 +107,10 @@ export class Character {
     ctx.save(); ctx.translate(cx, cyFeet); this._paint(ctx, H); ctx.restore();
   }
 
-  // ── Composite the layered avatar (local space, feet at origin) ─────────────
+  // ── Draw chibi sprite (feet at origin) ─────────────────────────────────────
   _paint(ctx, H) {
     const Wd = SPRITE.width*(H/SPRITE.height);
-    const G  = this._geo(Wd, H);
-    ctx.lineJoin='round'; ctx.lineCap='round';
-    this._drawBackHair(ctx, G);
     ctx.drawImage(SPRITE, -Wd/2, -H, Wd, H);
-    this._drawClothes(ctx, G);
-    this._drawFace(ctx, G);
-    this._drawFrontHair(ctx, G);
-    this._drawAccessory(ctx, G);
   }
 
   _geo(Wd, H) {

@@ -25,7 +25,7 @@
     <h1 class="select-title">Elegí un juego</h1>
     <div class="hub-grid">
       <button class="hub-card world" data-game="world">
-        <div class="hub-emoji">🌍</div>
+        <img src="/assets/chibi_main.png" class="hub-img" alt="Mi Mundo">
         <div class="hub-name">Mi Mundo</div>
         <div class="hub-desc">Explorá, personalizá y jugá</div>
       </button>
@@ -36,7 +36,7 @@
       </button>
       <button class="hub-card cocina" data-game="cocina">
         <div class="hub-emoji">🍳</div>
-        <div class="hub-name">Cocina con Labubu</div>
+        <div class="hub-name">Cocina con Viole</div>
         <div class="hub-desc">Buscá ingredientes y cociná</div>
       </button>
     </div>
@@ -152,6 +152,15 @@
     <button id="gesture-close" title="Cerrar">✕</button>
   </div>
 
+  <!-- Fridge inventory -->
+  <div id="fridge-menu" class="hidden">
+    <div class="fridge-header">
+      <span>Heladera</span>
+      <button id="fridge-close" title="Cerrar">✕</button>
+    </div>
+    <div id="fridge-items"></div>
+  </div>
+
   <!-- Dog runner mini-game controls -->
   <div id="runner-ui" class="hidden">
     <button id="runner-exit" title="Salir">✕</button>
@@ -169,7 +178,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v1.1.0</div>
+  <div id="app-version">v1.7.0</div>
 
   <script type="module" src="/js/game.js"></script>
 </body>

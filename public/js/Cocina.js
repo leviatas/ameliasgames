@@ -16,17 +16,23 @@ const ING = {
   lechuga:   { raw: '🥬', name: 'Lechuga' },
   zanahoria: { raw: '🥕', name: 'Zanahoria' },
   queso:     { raw: '🧀', name: 'Queso' },
+  cebolla:   { raw: '🧅', name: 'Cebolla' },
   manzana:   { raw: '🍎', blended: '🧃', name: 'Manzana' },
   pan:       { raw: '🍞', name: 'Pan' },
+  masa:      { raw: '🫓', name: 'Masa' },
   carne:     { raw: '🥩', cooked: '🍖', name: 'Carne' },
+  chorizo:   { raw: '🌭', cooked: '🌭', name: 'Chorizo' },
   pollo:     { raw: '🐔', cooked: '🍗', name: 'Pollo' },
   huevo:     { raw: '🥚', cooked: '🍳', name: 'Huevo' },
   papa:      { raw: '🥔', cooked: '🍟', name: 'Papa' },
+  maiz:      { raw: '🌽', cooked: '🍲', name: 'Maíz' },
+  calabaza:  { raw: '🎃', cooked: '🥣', name: 'Calabaza' },
   agua:      { raw: '💧', cooked: '🍵', name: 'Caldo' },
   leche:     { raw: '🥛', blended: '🥤', name: 'Leche' },
+  dulce:     { raw: '🍯', name: 'Dulce' },
 };
-const CHOPPABLE = ['tomate', 'lechuga', 'zanahoria', 'queso', 'manzana'];
-const COOKABLE  = ['carne', 'pollo', 'huevo', 'papa', 'agua'];
+const CHOPPABLE = ['tomate', 'lechuga', 'zanahoria', 'queso', 'cebolla', 'manzana'];
+const COOKABLE  = ['carne', 'chorizo', 'pollo', 'huevo', 'papa', 'maiz', 'calabaza', 'agua'];
 const BLENDABLE = ['manzana', 'leche'];
 
 const RECIPES = [
@@ -40,6 +46,10 @@ const RECIPES = [
   { name: 'Pollo con papas', emoji: '🍗', need: [['pollo','cooked'], ['papa','cooked']] },
   { name: 'Jugo',            emoji: '🧃', need: [['manzana','blended']] },
   { name: 'Licuado',         emoji: '🥤', need: [['manzana','blended'], ['leche','blended']] },
+  { name: 'Empanadas',       emoji: '🥟', need: [['masa','raw'], ['carne','cooked'], ['cebolla','chopped'], ['huevo','cooked']] },
+  { name: 'Locro',           emoji: '🍲', need: [['maiz','cooked'], ['calabaza','cooked'], ['papa','cooked'], ['chorizo','cooked']] },
+  { name: 'Asado',           emoji: '🥩', need: [['carne','cooked'], ['chorizo','cooked'], ['pan','raw']] },
+  { name: 'Flan con dulce',  emoji: '🍮', need: [['leche','blended'], ['huevo','cooked'], ['dulce','raw']] },
 ];
 
 const PROC_DUR = 1.1;   // seconds to chop / cook one item
@@ -84,15 +94,17 @@ export class Cocina {
       { id: 'plate', kind: 'plate', icon: '🍽️', label: 'Plato',    nx: 0.70, ny: 0.34 },
       { id: 'trash', kind: 'trash', icon: '🗑️', label: 'Tirar',    nx: 0.89, ny: 0.34 },
     ];
-    // ingredient baskets in two rows along the bottom
-    const rowA = ['tomate', 'lechuga', 'zanahoria', 'queso', 'manzana', 'pan'];
-    const rowB = ['carne', 'pollo', 'huevo', 'papa', 'agua', 'leche'];
+    // ingredient baskets in rows along the bottom
+    const rowA = ['tomate', 'lechuga', 'zanahoria', 'queso', 'cebolla', 'manzana'];
+    const rowB = ['pan', 'masa', 'carne', 'chorizo', 'pollo', 'huevo'];
+    const rowC = ['papa', 'maiz', 'calabaza', 'agua', 'leche', 'dulce'];
     const place = (list, ny) => list.forEach((base, i) => {
       const nx = 0.10 + i * (0.80 / (list.length - 1));
       this.stations.push({ id: 'b_' + base, kind: 'basket', base, nx, ny });
     });
     place(rowA, 0.64);
-    place(rowB, 0.86);
+    place(rowB, 0.75);
+    place(rowC, 0.86);
   }
 
   _geom() {
@@ -149,6 +161,9 @@ export class Cocina {
       this.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60 * G.scale, life: 0, max: 0.6 + Math.random() * 0.4, size: (3 + Math.random() * 4) * G.scale, color });
     }
   }
+  _stationReach(s, G) {
+    return s.kind === 'basket' ? 34 * G.scale : 100 * G.scale;
+  }
 
   update(dt) {
     const G = this._geom();
@@ -172,18 +187,19 @@ export class Cocina {
     if (mx) this.face = mx < 0 ? -1 : 1;
 
     // nearest station within reach
-    const px = this._px(this.p), py = this._py(this.p), reach = 100 * G.scale;
-    let near = null, nd = reach;
+    const px = this._px(this.p), py = this._py(this.p);
+    let near = null, nd = Infinity;
     for (const s of this.stations) {
       const d = Math.hypot(this._px(s) - px, this._py(s) - py);
-      if (d < nd) { nd = d; near = s; }
+      const reach = this._stationReach(s, G);
+      if (d < reach && d < nd) { nd = d; near = s; }
     }
     const entered = near && near.id !== this.lastZone;
     this.lastZone = near ? near.id : null;
     this.nearId = near ? near.id : null;
 
     if (near) {
-      if (near.kind === 'basket' && entered && !this.carry) {
+      if (near.kind === 'basket' && !this.carry && !this.moving) {
         this.carry = { base: near.base, state: 'raw' };
       } else if (near.kind === 'trash' && entered && this.carry) {
         this.carry = null;

@@ -692,6 +692,7 @@ export class Interior {
     // Dining set - right side
     this._objects.push(new DiningSet(W*0.75, 500));
     // Kitchen counter - left side
+    this._objects.push(new Fridge(W*0.34, 500));
     this._objects.push(new KitchenCounter(W*0.22, 480));
     // Bed - top right corner (bedroom vibe)
     this._objects.push(new Bed(W-140, 250, this._accentColor));
@@ -735,6 +736,16 @@ export class Interior {
   containsTV(wx, wy) {
     const tx = INTERIOR_W / 2, ty = 155, s = interiorDepthScale(ty);
     return wx >= tx - 74*s && wx <= tx + 74*s && wy >= ty - 94*s && wy <= ty + 10*s;
+  }
+
+  containsFridge(wx, wy) {
+    const fx = INTERIOR_W * 0.34, fy = 500, s = interiorDepthScale(fy);
+    return wx >= fx - 40*s && wx <= fx + 40*s && wy >= fy - 136*s && wy <= fy + 16*s;
+  }
+
+  containsKitchen(wx, wy) {
+    const kx = INTERIOR_W * 0.22, ky = 480, s = interiorDepthScale(ky);
+    return wx >= kx - 92*s && wx <= kx + 92*s && wy >= ky - 48*s && wy <= ky + 8*s;
   }
 
   // Seat positions for character sitting detection

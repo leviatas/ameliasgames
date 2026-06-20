@@ -5,6 +5,7 @@ import { Controls }              from './Controls.js';
 import { TouchControls }         from './TouchControls.js';
 import { Runner }                from './Runner.js';
 import { Cocina }                from './Cocina.js';
+import { getFridge, eatFood }    from './Pantry.js';
 
 // ── Canvas ─────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('game-canvas');
@@ -176,6 +177,7 @@ function fadeFromBlack() {
 
 // ── Enter / Exit house ─────────────────────────────────────────────────────
 function enterHouse(house) {
+  hideFridgeMenu();
   savedPos = { x: character.x, y: character.y };
   fadeToBlack(() => {
     interior = new Interior(house._wall, house._roof);
@@ -193,6 +195,7 @@ function enterHouse(house) {
 }
 
 function exitHouse() {
+  hideFridgeMenu();
   fadeToBlack(() => {
     if (interior) { interior.destroy(); interior = null; }
     mode            = 'exterior';
@@ -230,7 +233,8 @@ function saveState() {
 { const p = loadState(); if (p && p.look) look = Object.assign({}, DEFAULT_CFG, p.look); }
 
 // ── Game hub (main menu: choose which game to play) ─────────────────────────
-let runnerFrom = 'tv';   // 'tv' (from a house) | 'hub' (standalone)
+let runnerFrom  = 'tv';    // 'tv' (from a house) | 'hub' (standalone)
+let cocinaFrom  = 'hub';   // 'kitchen' (from a house) | 'hub' (standalone)
 
 function showHub() {
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
@@ -239,6 +243,7 @@ function showHub() {
   runner = null;
   cocina = null;
   hideGestureMenu();
+  hideFridgeMenu();
   document.getElementById('cust-panel').classList.add('hidden');
   document.getElementById('runner-ui').classList.add('hidden');
   document.getElementById('cocina-ui').classList.add('hidden');
@@ -269,6 +274,7 @@ function launchRunner() {
 // ── Cooking mini-game ────────────────────────────────────────────────────────
 function launchCocina() {
   if (isTouch) forceLandscape();
+  cocinaFrom = 'hub';
   document.getElementById('hub-screen').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -278,16 +284,32 @@ function launchCocina() {
   lastTime = performance.now();
   if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
 }
+function enterCocina() {              // launched from the kitchen counter inside a house
+  if (mode !== 'interior') return;
+  hideGestureMenu();
+  hideFridgeMenu();
+  cocinaFrom = 'kitchen';
+  cocina = new Cocina(canvas);
+  mode = 'cocina';
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('cocina-ui').classList.remove('hidden');
+}
 function exitCocina() {
   document.getElementById('cocina-ui').classList.add('hidden');
   cocina = null;
-  showHub();
+  if (cocinaFrom === 'kitchen') {
+    mode = 'interior';
+    document.getElementById('hud').classList.remove('hidden');
+  } else {
+    showHub();
+  }
 }
 
 // ── Dog runner mini-game ─────────────────────────────────────────────────────
 function enterRunner() {              // launched from the TV inside a house
   if (mode !== 'interior') return;
   hideGestureMenu();
+  hideFridgeMenu();
   runnerFrom = 'tv';
   runner = new Runner(canvas);
   mode = 'runner';
@@ -443,6 +465,7 @@ function update(delta) {
     character.state = 'walk';
   }
   if (moving) hideGestureMenu();
+  if (moving) hideFridgeMenu();
 
   if (moving) {
     const spd  = controls.sprint ? character.sprintSpeed : character.speed;
@@ -680,6 +703,68 @@ document.querySelectorAll('.gesture-btn').forEach(b => {
 });
 document.getElementById('gesture-close').addEventListener('click', hideGestureMenu);
 
+// ── Fridge menu ─────────────────────────────────────────────────────────────
+const fridgeMenu = document.getElementById('fridge-menu');
+const fridgeItems = document.getElementById('fridge-items');
+let fridgeMenuOpen = false;
+
+function renderFridgeMenu() {
+  const foods = getFridge();
+  const entries = Object.entries(foods).sort((a, b) => a[0].localeCompare(b[0]));
+  fridgeItems.textContent = '';
+  if (!entries.length) {
+    const empty = document.createElement('div');
+    empty.className = 'fridge-empty';
+    empty.textContent = 'Todavía no hay comida. Cociná platos en Cocina con Labubu y van a aparecer acá.';
+    fridgeItems.appendChild(empty);
+    return;
+  }
+  for (const [name, item] of entries) {
+    const row = document.createElement('div');
+    row.className = 'fridge-item';
+    const emoji = document.createElement('div');
+    emoji.className = 'fridge-emoji';
+    emoji.textContent = item.emoji;
+    const meta = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'fridge-name';
+    title.textContent = name;
+    const count = document.createElement('div');
+    count.className = 'fridge-count';
+    count.textContent = `x${item.count}`;
+    const eat = document.createElement('button');
+    eat.className = 'fridge-eat';
+    eat.dataset.food = name;
+    eat.textContent = 'Comer';
+    meta.append(title, count);
+    row.append(emoji, meta, eat);
+    fridgeItems.appendChild(row);
+  }
+}
+
+function showFridgeMenu() {
+  hideGestureMenu();
+  renderFridgeMenu();
+  fridgeMenu.classList.remove('hidden');
+  fridgeMenuOpen = true;
+}
+
+function hideFridgeMenu() {
+  if (!fridgeMenuOpen) return;
+  fridgeMenu.classList.add('hidden');
+  fridgeMenuOpen = false;
+}
+
+document.getElementById('fridge-close').addEventListener('click', hideFridgeMenu);
+fridgeItems.addEventListener('click', e => {
+  const btn = e.target.closest('.fridge-eat');
+  if (!btn) return;
+  if (eatFood(btn.dataset.food)) {
+    if (character) character.playGesture('dance');
+    renderFridgeMenu();
+  }
+});
+
 // ── Click: tap character → gesture menu, else tap house → enter ─────────────
 canvas.addEventListener('click', e => {
   if (fadingIn || fadingOut) return;
@@ -688,8 +773,11 @@ canvas.addEventListener('click', e => {
   const worldX = (e.clientX - rect.left)  / cam.zoom + cam.x;
   const worldY = (e.clientY - rect.top)   / cam.zoom + cam.y;
   if (mode === 'interior' && interior && interior.containsTV(worldX, worldY)) { enterRunner(); return; }
-  if (characterAt(worldX, worldY)) { showGestureMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsFridge(worldX, worldY)) { showFridgeMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsKitchen(worldX, worldY)) { enterCocina(); return; }
+  if (characterAt(worldX, worldY)) { hideFridgeMenu(); showGestureMenu(); return; }
   hideGestureMenu();
+  hideFridgeMenu();
   if (mode !== 'exterior' || !world) return;
   const house = world.getHouseAt(worldX, worldY, WORLD_H);
   if (house) enterHouse(house);
@@ -704,8 +792,11 @@ canvas.addEventListener('touchend', e => {
   const worldX = (t.clientX - rect.left) / cam.zoom + cam.x;
   const worldY = (t.clientY - rect.top)  / cam.zoom + cam.y;
   if (mode === 'interior' && interior && interior.containsTV(worldX, worldY)) { e.preventDefault(); enterRunner(); return; }
-  if (characterAt(worldX, worldY)) { e.preventDefault(); showGestureMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsFridge(worldX, worldY)) { e.preventDefault(); showFridgeMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsKitchen(worldX, worldY)) { e.preventDefault(); enterCocina(); return; }
+  if (characterAt(worldX, worldY)) { e.preventDefault(); hideFridgeMenu(); showGestureMenu(); return; }
   hideGestureMenu();
+  hideFridgeMenu();
   if (mode !== 'exterior' || !world) return;
   const house = world.getHouseAt(worldX, worldY, WORLD_H);
   if (house) { e.preventDefault(); enterHouse(house); }
