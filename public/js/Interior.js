@@ -249,23 +249,24 @@ class Plant {
 
 // ── Rug ───────────────────────────────────────────────────────────────────
 class Rug {
-  constructor(x, y) { this.x=x; this.y=y; }
+  constructor(x, y, color='#6A1A8A') { this.x=x; this.y=y; this._c=color; }
   draw(ctx, cam, ds) {
     const sx=Math.round(this.x-cam.x), sy=Math.round(this.y-cam.y), s=ds(this.y);
+    const c=this._c;
     // Outer ring
-    ctx.fillStyle='#6A1A8A';
+    ctx.fillStyle=c;
     ctx.beginPath();
     ctx.ellipse(sx, sy, 130*s, 72*s, 0, 0, Math.PI*2); ctx.fill();
     // Middle ring
-    ctx.fillStyle='#B050D8';
+    ctx.fillStyle=shade(c, 0.32);
     ctx.beginPath();
     ctx.ellipse(sx, sy, 108*s, 60*s, 0, 0, Math.PI*2); ctx.fill();
     // Inner ring
-    ctx.fillStyle='#8030B0';
+    ctx.fillStyle=shade(c, -0.18);
     ctx.beginPath();
     ctx.ellipse(sx, sy, 84*s, 46*s, 0, 0, Math.PI*2); ctx.fill();
     // Center
-    ctx.fillStyle='#E090FF';
+    ctx.fillStyle=shade(c, 0.55);
     ctx.beginPath();
     ctx.ellipse(sx, sy, 40*s, 22*s, 0, 0, Math.PI*2); ctx.fill();
     // Cross lines
@@ -274,7 +275,7 @@ class Rug {
     ctx.moveTo(sx-128*s, sy); ctx.lineTo(sx+128*s, sy);
     ctx.moveTo(sx, sy-70*s); ctx.lineTo(sx, sy+70*s); ctx.stroke();
     // Fringe
-    ctx.strokeStyle='#5A1880'; ctx.lineWidth=2*s;
+    ctx.strokeStyle=shade(c, -0.3); ctx.lineWidth=2*s;
     for(let fi=-9;fi<=9;fi++){
       const fx=sx+fi*13*s;
       if(Math.abs(fi*13*s)>128*s) continue;
@@ -282,6 +283,36 @@ class Rug {
       ctx.moveTo(fx, sy-71*s); ctx.lineTo(fx, sy-80*s);
       ctx.moveTo(fx, sy+71*s); ctx.lineTo(fx, sy+80*s); ctx.stroke();
     }
+  }
+}
+
+// ── Wall art (framed picture, purely decorative) ───────────────────────────
+class WallArt {
+  constructor(x, y, kind=0) { this.x=x; this.y=y; this._kind=kind; }
+  draw(ctx, cam, ds) {
+    const sx=Math.round(this.x-cam.x), sy=Math.round(this.y-cam.y), s=ds(this.y);
+    const w=46*s, h=34*s;
+    // Frame
+    ctx.fillStyle='#5A3818';
+    ctx.beginPath(); ctx.roundRect(sx-w/2-4*s, sy-h-4*s, w+8*s, h+8*s, 3*s); ctx.fill();
+    // Canvas
+    const palettes = [['#A8D8E8','#F0E0A0'], ['#E8B8C8','#F8E8D0'], ['#C8E0A8','#F0F0D0']];
+    const [c1, c2] = palettes[this._kind % palettes.length];
+    const g = ctx.createLinearGradient(sx-w/2, sy-h, sx+w/2, sy);
+    g.addColorStop(0, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = g;
+    ctx.fillRect(sx-w/2, sy-h, w, h);
+    // Simple motif (sun/hills)
+    ctx.fillStyle='rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.arc(sx-w*0.22, sy-h*0.7, 6*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(sx-w/2, sy); ctx.quadraticCurveTo(sx-w*0.1, sy-h*0.55, sx+w*0.2, sy-h*0.25);
+    ctx.quadraticCurveTo(sx+w*0.4, sy-h*0.4, sx+w/2, sy-h*0.1);
+    ctx.lineTo(sx+w/2, sy); ctx.closePath(); ctx.fill();
+    // Glass shine
+    ctx.strokeStyle='rgba(0,0,0,0.2)'; ctx.lineWidth=1*s;
+    ctx.strokeRect(sx-w/2, sy-h, w, h);
   }
 }
 
@@ -525,49 +556,138 @@ class ExitDoor {
   }
 }
 
-// ── Bed (for bedroom corner) ──────────────────────────────────────────────
+// ── Bed (vertical, sized to fit lying chibi) ──────────────────────────────
 class Bed {
-  constructor(x, y, color='#4060A0') { this.x=x; this.y=y; this._c=color; }
+  constructor(x, y, color='#F4B8CC') { this.x=x; this.y=y; this._c=color; }
   draw(ctx, cam, ds) {
     const sx=Math.round(this.x-cam.x), sy=Math.round(this.y-cam.y), s=ds(this.y);
-    // Frame
-    ctx.fillStyle='#6B4226';
-    ctx.beginPath();
-    ctx.roundRect(sx-54*s, sy-80*s, 108*s, 88*s, 4*s); ctx.fill();
-    // Headboard
+    // Frame (wider & taller to fit lying character)
     ctx.fillStyle='#7B4E32';
     ctx.beginPath();
-    ctx.roundRect(sx-52*s, sy-86*s, 104*s, 18*s, [0,0,3*s,3*s]); ctx.fill();
+    ctx.roundRect(sx-62*s, sy-158*s, 124*s, 166*s, 6*s); ctx.fill();
+    // Headboard
+    ctx.fillStyle='#8B5E3C';
+    ctx.beginPath();
+    ctx.roundRect(sx-60*s, sy-166*s, 120*s, 22*s, [4*s,4*s,0,0]); ctx.fill();
+    // Headboard detail
+    ctx.fillStyle='#A07050';
+    ctx.beginPath();
+    ctx.roundRect(sx-52*s, sy-162*s, 104*s, 14*s, 3*s); ctx.fill();
     // Mattress
-    ctx.fillStyle='#E8E0D0';
+    ctx.fillStyle='#F0EAE0';
     ctx.beginPath();
-    ctx.roundRect(sx-48*s, sy-76*s, 96*s, 76*s, 3*s); ctx.fill();
-    // Blanket
-    ctx.fillStyle=this._c;
+    ctx.roundRect(sx-56*s, sy-154*s, 112*s, 152*s, 4*s); ctx.fill();
+    // Blanket (covers lower 2/3)
+    const grad = ctx.createLinearGradient(sx-56*s, sy-100*s, sx+56*s, sy);
+    grad.addColorStop(0, this._c);
+    grad.addColorStop(1, '#E890AC');
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.roundRect(sx-46*s, sy-46*s, 92*s, 44*s, 3*s); ctx.fill();
-    // Pillow(s)
-    ctx.fillStyle='#FFFFF0';
+    ctx.roundRect(sx-54*s, sy-100*s, 108*s, 98*s, [0,0,4*s,4*s]); ctx.fill();
+    // Blanket folds
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=2*s;
+    for(const dy of [-70,-45,-22]){
+      ctx.beginPath(); ctx.moveTo(sx-50*s, sy+dy*s); ctx.lineTo(sx+50*s, sy+dy*s); ctx.stroke();
+    }
+    // Pillow
+    ctx.fillStyle='#FFF8F0';
     ctx.beginPath();
-    ctx.roundRect(sx-40*s, sy-74*s, 36*s, 26*s, 4*s); ctx.fill();
-    ctx.beginPath();
-    ctx.roundRect(sx+4*s, sy-74*s, 36*s, 26*s, 4*s); ctx.fill();
+    ctx.roundRect(sx-44*s, sy-150*s, 88*s, 36*s, 6*s); ctx.fill();
+    ctx.strokeStyle='rgba(180,160,140,0.4)'; ctx.lineWidth=1*s;
+    ctx.beginPath(); ctx.moveTo(sx, sy-150*s); ctx.lineTo(sx, sy-114*s); ctx.stroke();
     // Footboard
     ctx.fillStyle='#7B4E32';
     ctx.beginPath();
-    ctx.roundRect(sx-52*s, sy-2*s, 104*s, 10*s, 2*s); ctx.fill();
+    ctx.roundRect(sx-60*s, sy+6*s, 120*s, 12*s, [0,0,4*s,4*s]); ctx.fill();
     // Shadow
     ctx.save(); ctx.globalAlpha=0.12; ctx.fillStyle='#000';
-    ctx.beginPath(); ctx.ellipse(sx+4*s, sy+8*s, 52*s, 10*s, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.ellipse(sx, sy+12*s, 58*s, 8*s, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+}
+
+// ── Wardrobe (placard) ────────────────────────────────────────────────────
+class Wardrobe {
+  constructor(x, y) { this.x = x; this.y = y; }
+  draw(ctx, cam, ds) {
+    const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y), s = ds(this.y);
+    const w = 90 * s, h = 150 * s;
+    const x0 = sx - w / 2;
+
+    // Shadow
+    ctx.save(); ctx.globalAlpha = 0.14; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx + 3*s, sy + 4*s, 48*s, 10*s, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+
+    // Main cabinet body
+    const bodyG = ctx.createLinearGradient(x0, sy - h, x0 + w, sy - h);
+    bodyG.addColorStop(0, '#6A4828'); bodyG.addColorStop(0.5, '#8B6040'); bodyG.addColorStop(1, '#6A4828');
+    ctx.fillStyle = bodyG;
+    ctx.beginPath(); ctx.roundRect(x0, sy - h, w, h, [4*s, 4*s, 3*s, 3*s]); ctx.fill();
+    ctx.strokeStyle = '#4A2810'; ctx.lineWidth = 2*s; ctx.stroke();
+
+    // Crown molding at top
+    ctx.fillStyle = '#9A7050';
+    ctx.beginPath(); ctx.roundRect(x0 - 3*s, sy - h - 8*s, w + 6*s, 10*s, [3*s, 3*s, 0, 0]); ctx.fill();
+    ctx.strokeStyle = '#4A2810'; ctx.lineWidth = 1.5*s; ctx.stroke();
+
+    // Two doors
+    const mid = sx;
+    for (const [dx0, dw] of [[x0 + 3*s, w/2 - 4*s], [mid + 1*s, w/2 - 4*s]]) {
+      ctx.fillStyle = '#7A5030';
+      ctx.beginPath(); ctx.roundRect(dx0, sy - h + 4*s, dw, h - 7*s, 2*s); ctx.fill();
+      ctx.strokeStyle = '#4A2810'; ctx.lineWidth = 1*s; ctx.stroke();
+
+      const px = dx0 + 4*s, py = sy - h + 12*s, pw = dw - 8*s, ph = (h - 20*s) * 0.55;
+      ctx.fillStyle = '#A8C8D8';
+      ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 2*s); ctx.fill();
+      ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.roundRect(px + 2*s, py + 2*s, pw * 0.35, ph - 4*s, [2*s, 0, 0, 2*s]); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1*s; ctx.stroke();
+
+      const lpy = py + ph + 4*s, lph = h - 20*s - ph - 4*s;
+      ctx.fillStyle = '#7A5030';
+      ctx.beginPath(); ctx.roundRect(px, lpy, pw, lph, 2*s); ctx.fill();
+      ctx.strokeStyle = '#4A2810'; ctx.lineWidth = 0.8*s; ctx.stroke();
+
+      const kx = dx0 === x0 + 3*s ? dx0 + dw - 5*s : dx0 + 5*s;
+      const ky = sy - h / 2;
+      ctx.fillStyle = '#C8A050';
+      ctx.beginPath(); ctx.arc(kx, ky, 3.5*s, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#8A6020'; ctx.lineWidth = 1*s; ctx.stroke();
+    }
+
+    // Center gap
+    ctx.fillStyle = '#2A1008';
+    ctx.fillRect(mid - 1*s, sy - h + 3*s, 2*s, h - 6*s);
+
+    // Clothes peeking
+    const hangY = sy - 14*s;
+    const colors = ['#F2A7BB', '#56C0A6', '#9B59B6', '#FF8C00'];
+    for (let i = 0; i < 4; i++) {
+      const hx = sx - 28*s + i * 18*s;
+      ctx.fillStyle = colors[i];
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.roundRect(hx - 6*s, hangY - 20*s, 12*s, 22*s, 2*s); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Label
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font = `bold ${7*s}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText('PLACARD', sx, sy - h + 22*s);
+    ctx.restore();
   }
 }
 
 // ── Interior ──────────────────────────────────────────────────────────────
 
+const RUG_COLORS = ['#6A1A8A', '#1A6A6A', '#8A5A1A', '#1A4A8A', '#8A1A3A'];
+
 export class Interior {
-  constructor(wallColor='#F0EAE0', accentColor='#B03030') {
+  constructor(wallColor='#F0EAE0', accentColor='#B03030', seed=0) {
     this._wallColor   = wallColor;
     this._accentColor = accentColor;
+    this._seed        = Math.abs(Math.round(seed)) % 12;
     this._objects     = [];
     this._bg          = this._buildBackground();
     this._buildFurniture();
@@ -671,36 +791,37 @@ export class Interior {
   _buildFurniture() {
     const W = INTERIOR_W, H = INTERIOR_H;
     const cx = W / 2;
+    const seed = this._seed;
 
-    // TV unit on north wall
+    // ── Fixed, gameplay-relevant pieces (positions must match the hit-test
+    // helpers below, so these never move between houses) ──
     this._objects.push(new TV(cx, 155));
-    // Sofa facing TV
     this._objects.push(new Sofa(cx, 330, this._accentColor));
-    // Coffee table between sofa and TV
     this._objects.push(new CoffeeTable(cx, 240));
-    // Rug under living area
-    this._objects.push(new Rug(cx, 280));
-    // Bookshelf left wall
-    this._objects.push(new Bookshelf(100, 280));
-    // Bookshelf right wall
-    this._objects.push(new Bookshelf(W-100, 280));
-    // Plants in corners
-    this._objects.push(new Plant(70, 180, true));
-    this._objects.push(new Plant(W-70, 180, true));
-    this._objects.push(new Plant(180, 500));
-    this._objects.push(new Plant(W-200, 520));
-    // Dining set - right side
     this._objects.push(new DiningSet(W*0.75, 500));
-    // Kitchen counter - left side
     this._objects.push(new Fridge(W*0.34, 500));
     this._objects.push(new KitchenCounter(W*0.22, 480));
-    // Bed - top right corner (bedroom vibe)
-    this._objects.push(new Bed(W-140, 250, this._accentColor));
-    // Floor lamps
-    this._objects.push(new FloorLamp(cx-160, 400));
-    this._objects.push(new FloorLamp(cx+160, 420));
-    // Exit door
+    this._objects.push(new Bed(W-300, 250, this._accentColor));
+    this._objects.push(new Wardrobe(INTERIOR_W * 0.15, 230));
     this._objects.push(new ExitDoor());
+
+    // ── Purely decorative pieces — vary per house for visual variety ──
+    this._objects.push(new Rug(cx, 280, RUG_COLORS[seed % RUG_COLORS.length]));
+
+    const bookshelfCount = seed % 5 === 0 ? 1 : 2;
+    this._objects.push(new Bookshelf(100, 280));
+    if (bookshelfCount === 2) this._objects.push(new Bookshelf(W-100, 280));
+
+    this._objects.push(new Plant(70, 180, true));
+    this._objects.push(new Plant(W-70, 180, true));
+    if (seed % 3 !== 0) this._objects.push(new Plant(180, 500));
+    if (seed % 4 !== 0) this._objects.push(new Plant(W-200, 520));
+
+    this._objects.push(new FloorLamp(cx-160, 400));
+    if (seed % 3 !== 1) this._objects.push(new FloorLamp(cx+160, 420));
+
+    this._objects.push(new WallArt(cx - 200, 110, seed));
+    if (bookshelfCount === 1) this._objects.push(new WallArt(W-110, 110, seed + 1));
   }
 
   render(ctx, cam, vw, vh) {
@@ -748,6 +869,16 @@ export class Interior {
     return wx >= kx - 92*s && wx <= kx + 92*s && wy >= ky - 48*s && wy <= ky + 8*s;
   }
 
+  containsBed(wx, wy) {
+    const bx = INTERIOR_W - 300, by = 250, s = interiorDepthScale(by);
+    return wx >= bx - 62*s && wx <= bx + 62*s && wy >= by - 166*s && wy <= by + 18*s;
+  }
+
+  containsWardrobe(wx, wy) {
+    const wx2 = INTERIOR_W * 0.15, wy2 = 230, s = interiorDepthScale(wy2);
+    return wx >= wx2 - 50*s && wx <= wx2 + 50*s && wy >= wy2 - 158*s && wy <= wy2 + 5*s;
+  }
+
   // Seat positions for character sitting detection
   getSeats() {
     const W = INTERIOR_W, cx = W / 2;
@@ -761,7 +892,7 @@ export class Interior {
   }
 
   getBeds() {
-    return [{ x: INTERIOR_W - 140, y: 250 }];
+    return [{ x: INTERIOR_W - 300, y: 252 }];
   }
 
   destroy() { this._bg = null; this._objects = []; }

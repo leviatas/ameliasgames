@@ -5,8 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Avatar World</title>
   <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <meta name="theme-color" content="#FF8AB0"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Avatar World"/>
 </head>
 <body>
+
+  <!-- PWA install banner -->
+  <div id="install-banner" class="hidden">
+    <img src="/icons/icon-192.png" alt="Avatar World" class="install-icon"/>
+    <div class="install-text">
+      <strong>Avatar World</strong>
+      <span>Instalá la app para jugar sin internet</span>
+    </div>
+    <button id="install-btn">Instalar</button>
+    <button id="install-dismiss">✕</button>
+  </div>
 
   <!-- Loading -->
   <div id="loading">
@@ -22,6 +40,8 @@
 
   <!-- Game chooser (main menu) -->
   <div id="hub-screen">
+    <button id="reload-btn" title="Actualizar a la última versión">🔄 Actualizar</button>
+    <button id="reset-btn" title="Borrar todo el progreso y empezar de cero">🗑️ Resetear</button>
     <h1 class="select-title">Elegí un juego</h1>
     <div class="hub-grid">
       <button class="hub-card world" data-game="world">
@@ -38,6 +58,36 @@
         <div class="hub-emoji">🍳</div>
         <div class="hub-name">Cocina con Viole</div>
         <div class="hub-desc">Buscá ingredientes y cociná</div>
+      </button>
+      <button class="hub-card match3" data-game="match3">
+        <div class="hub-emoji">🍬</div>
+        <div class="hub-name">Dulces de Labubu</div>
+        <div class="hub-desc">Uní 3 dulces iguales</div>
+      </button>
+      <button class="hub-card hole" data-game="hole">
+        <div class="hub-emoji">🕳️</div>
+        <div class="hub-name">Agujero glotón</div>
+        <div class="hub-desc">Tragate todo y crecé</div>
+      </button>
+      <button class="hub-card helado" data-game="helado">
+        <div class="hub-emoji">🍦</div>
+        <div class="hub-name">Heladería Labubu</div>
+        <div class="hub-desc">Pintá helados y serví</div>
+      </button>
+      <button class="hub-card tienda" data-game="tienda">
+        <div class="hub-emoji">👗</div>
+        <div class="hub-name">Tienda de Ropa</div>
+        <div class="hub-desc">Comprá ropa con tus monedas</div>
+      </button>
+      <button class="hub-card mob" data-game="mob">
+        <div class="hub-emoji">👾</div>
+        <div class="hub-name">Mob Control</div>
+        <div class="hub-desc">Derribá a los amigos antes de que lleguen</div>
+      </button>
+      <button class="hub-card galaga" data-game="galaga">
+        <div class="hub-emoji">🚀</div>
+        <div class="hub-name">Space Galaga</div>
+        <div class="hub-desc">Destruí la invasión alienígena</div>
       </button>
     </div>
   </div>
@@ -76,6 +126,7 @@
       <kbd>Shift</kbd> Correr &nbsp;|&nbsp; <kbd>Clic</kbd> en casa para entrar &nbsp;|&nbsp;
       <kbd>Clic</kbd> en el personaje para gestos
     </div>
+    <div id="coin-display">💰 <span id="coin-count">100</span></div>
     <button id="back-btn">← Menú</button>
     <button id="time-btn" title="Día / Noche">🌙</button>
     <button id="cust-btn" title="Personalizar">🎨</button>
@@ -149,7 +200,17 @@
     <button class="gesture-btn" data-gesture="sing"><span class="g-emoji">🎤</span>Cantar</button>
     <button class="gesture-btn" data-gesture="dance"><span class="g-emoji">💃</span>Bailar</button>
     <button class="gesture-btn" data-gesture="wave"><span class="g-emoji">👋</span>Saludar</button>
+    <button class="gesture-btn" data-gesture="jump"><span class="g-emoji">🦘</span>Saltar</button>
     <button id="gesture-close" title="Cerrar">✕</button>
+  </div>
+
+  <!-- Wardrobe (placard) inventory -->
+  <div id="wardrobe-menu" class="hidden">
+    <div class="fridge-header">
+      <span>👗 Placard</span>
+      <button id="wardrobe-close" title="Cerrar">✕</button>
+    </div>
+    <div id="wardrobe-items"></div>
   </div>
 
   <!-- Fridge inventory -->
@@ -171,15 +232,174 @@
   <!-- Cooking mini-game controls -->
   <div id="cocina-ui" class="hidden">
     <button id="cocina-exit" title="Salir">✕</button>
-    <div id="cocina-hint">Tocá para mover · llevá los ingredientes a las estaciones</div>
+  </div>
+
+  <!-- Match-3 mini-game controls -->
+  <div id="match3-ui" class="hidden">
+    <button id="match3-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Hole submenu (choose which hole game) -->
+  <div id="hole-submenu" class="hidden">
+    <button id="hole-submenu-back" class="corner-back">← Juegos</button>
+    <h1 class="select-title">Agujero Glotón</h1>
+    <p class="select-subtitle">¿Qué querés comerte?</p>
+    <div class="hub-grid">
+      <button class="hub-card hole" id="hole-submenu-classic">
+        <div class="hub-emoji">🕳️</div>
+        <div class="hub-name">Agujero Glotón</div>
+        <div class="hub-desc">Tragate el barrio entero</div>
+      </button>
+      <button class="hub-card hole" id="hole-submenu-feast">
+        <div class="hub-emoji">🍕</div>
+        <div class="hub-name">Festín de comidas</div>
+        <div class="hub-desc">¡Comete todas las comidas!</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Hole mini-game controls -->
+  <div id="hole-ui" class="hidden">
+    <button id="hole-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Hole2 — Festín de comidas controls -->
+  <div id="hole2-ui" class="hidden">
+    <button id="hole2-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Ice-cream shop controls -->
+  <div id="helado-ui" class="hidden">
+    <button id="helado-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Clothing store controls -->
+  <div id="tienda-ui" class="hidden">
+    <button id="tienda-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Mob Control controls -->
+  <div id="mob-ui" class="hidden">
+    <button id="mob-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Cinema controls -->
+  <div id="cinema-ui" class="hidden">
+    <button id="cinema-exit" title="Salir">✕</button>
+    <button id="cinema-prev" class="cinema-nav" title="Película anterior">‹</button>
+    <button id="cinema-next" class="cinema-nav" title="Película siguiente">›</button>
   </div>
 
   <!-- Canvas inserted by JS -->
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v1.7.0</div>
+  <div id="app-version">v2.34.1</div>
+
+  <!-- Galaga controls -->
+  <div id="galaga-ui" class="hidden">
+    <button id="galaga-exit" title="Salir">✕</button>
+    <button id="galaga-left"  class="galaga-btn" title="Izquierda">◀</button>
+    <button id="galaga-fire"  class="galaga-btn galaga-fire-btn" title="Disparar">🔥</button>
+    <button id="galaga-right" class="galaga-btn" title="Derecha">▶</button>
+  </div>
+
+  <!-- Visits log overlay (password-protected, opened by tapping the version badge) -->
+  <div id="visits-overlay" class="hidden">
+    <div class="visits-panel">
+      <button id="visits-close">×</button>
+      <h2>Visitas</h2>
+      <div id="visits-list"></div>
+    </div>
+  </div>
 
   <script type="module" src="/js/game.js"></script>
+  <script>
+    // Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+
+    // "Actualizar": wipe caches + service worker so the newest version loads.
+    const reloadBtn = document.getElementById('reload-btn');
+    if (reloadBtn) reloadBtn.addEventListener('click', async () => {
+      reloadBtn.disabled = true;
+      reloadBtn.textContent = 'Actualizando…';
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        if (window.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch (e) { /* ignore and reload anyway */ }
+      // cache-busting reload
+      location.replace(location.pathname + '?v=' + Date.now());
+    });
+    // PWA install banner
+    let _deferredPrompt = null;
+    const banner   = document.getElementById('install-banner');
+    const installBtn = document.getElementById('install-btn');
+    const dismissBtn = document.getElementById('install-dismiss');
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      _deferredPrompt = e;
+      banner.classList.remove('hidden');
+    });
+    installBtn.addEventListener('click', async () => {
+      banner.classList.add('hidden');
+      if (!_deferredPrompt) return;
+      _deferredPrompt.prompt();
+      await _deferredPrompt.userChoice;
+      _deferredPrompt = null;
+    });
+    dismissBtn.addEventListener('click', () => banner.classList.add('hidden'));
+    window.addEventListener('appinstalled', () => banner.classList.add('hidden'));
+
+    // Visits log (password-protected, tap the version badge to open)
+    const visitsOverlay = document.getElementById('visits-overlay');
+    const visitsList     = document.getElementById('visits-list');
+    document.getElementById('app-version').addEventListener('click', async () => {
+      const password = window.prompt('Contraseña:');
+      if (password === null) return;
+      const res = await fetch('/api/visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        alert('Contraseña incorrecta');
+        return;
+      }
+      const visits = await res.json();
+      visitsList.innerHTML = visits.length
+        ? visits.map(v => `
+            <div class="visit-row">
+              <span class="visit-date">${v.created_at}</span>
+              <span class="visit-device">${v.device}</span>
+              <span class="visit-ip">${v.ip}</span>
+              <span class="visit-ua">${v.user_agent}</span>
+            </div>`).join('')
+        : '<p>No hay visitas registradas.</p>';
+      visitsOverlay.classList.remove('hidden');
+    });
+    document.getElementById('visits-close').addEventListener('click', () => {
+      visitsOverlay.classList.add('hidden');
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      if (!confirm('¿Borrar todo el progreso? Monedas, ropa y puntajes se perderán.')) return;
+      const keys = [
+        'wallet_coins', 'wardrobe_items', 'wardrobe_equipped',
+        'mimundo_state_v2', 'fridge_foods',
+        'hole_best', 'cocina_best', 'match3_best',
+        'runner_level', 'runner_hearts', 'helado_best',
+      ];
+      keys.forEach(k => localStorage.removeItem(k));
+      location.reload();
+    });
+  </script>
 </body>
 </html>

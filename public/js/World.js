@@ -21,6 +21,12 @@ class House {
     this._wall    = wallColor;
     this._roof    = roofColor;
     this._shutter = shutterColor;
+    // Deterministic per-house variety (stable across re-renders, varies between houses)
+    const h = Math.abs(Math.round(x * 7 + y * 13)) % 30;
+    this._style     = h % 5;                      // 0=classic 1=victorian 2=ranch 3=modern 4=colonial
+    this._ridgeFrac = h % 3 === 0 ? 0.38 : 0;
+    this._winCount  = h % 5 === 0 ? 1 : 2;
+    this._hasAwning = h % 2 === 0;
   }
 
   containsPoint(wx, wy, worldH) {
@@ -34,15 +40,25 @@ class House {
   draw(ctx, cam, depthScaleFn) {
     const sx = Math.round(this.x - cam.x);
     const sy = Math.round(this.y - cam.y);
-    if (sx < -200 || sx > ctx.canvas.width  + 200) return;
-    if (sy < -300 || sy > ctx.canvas.height + 40)  return;
+    if (sx < -200 || sx > ctx.canvas.width / cam.zoom + 200) return;
+    if (sy < -300 || sy > ctx.canvas.height / cam.zoom + 40)  return;
 
-    const s   = depthScaleFn(this.y);
-    const W   = 120 * s;   // wall half-width → full = 240*s... too big, let's use half
-    const HW  = W / 2;     // half-wall width
-    const WH  = 92 * s;    // wall height
-    const RH  = 68 * s;    // roof height above wall
-    const OV  = 14 * s;    // roof overhang
+    const s = depthScaleFn(this.y);
+    switch (this._style) {
+      case 1: this._drawVictorian(ctx, sx, sy, s); break;
+      case 2: this._drawRanch(ctx, sx, sy, s);     break;
+      case 3: this._drawModern(ctx, sx, sy, s);    break;
+      case 4: this._drawColonial(ctx, sx, sy, s);  break;
+      default: this._drawClassic(ctx, sx, sy, s);  break;
+    }
+  }
+
+  _drawClassic(ctx, sx, sy, s) {
+    const HW  = 60 * s;
+    const W   = HW * 2;
+    const WH  = 92 * s;
+    const RH  = 68 * s;
+    const OV  = 14 * s;
     const wallTop = sy - WH;
 
     // ── Ground shadow ──────────────────────────────────────────────
@@ -151,7 +167,8 @@ class House {
     }
     ctx.globalAlpha = 1;
 
-    // ── Roof ─────────────────────────────────────────────────────
+    // ── Roof (gable or flat-topped hip, varies per house) ─────────
+    const ridgeHW = (HW + OV) * this._ridgeFrac;
     const roofGrad = ctx.createLinearGradient(sx, wallTop - RH, sx, wallTop);
     roofGrad.addColorStop(0, lerpColor(this._roof, -0.12));
     roofGrad.addColorStop(1, lerpColor(this._roof,  0.08));
@@ -160,7 +177,8 @@ class House {
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(sx - HW - OV, wallTop);
-    ctx.lineTo(sx, wallTop - RH);
+    ctx.lineTo(sx - ridgeHW, wallTop - RH);
+    ctx.lineTo(sx + ridgeHW, wallTop - RH);
     ctx.lineTo(sx + HW + OV, wallTop);
     ctx.closePath();
     ctx.fill();
@@ -172,7 +190,7 @@ class House {
     const steps = 8;
     for (let ri = 1; ri < steps; ri++) {
       const frac = ri / steps;
-      const lw   = (HW + OV) * frac;
+      const lw   = (HW + OV) * frac + ridgeHW * (1 - frac);
       const ly   = wallTop - RH + RH * frac;
       ctx.beginPath();
       ctx.moveTo(sx - lw, ly);
@@ -182,16 +200,388 @@ class House {
     // Ridge cap
     ctx.fillStyle = lerpColor(this._roof, -0.25);
     ctx.beginPath();
-    ctx.roundRect(sx - 6 * s, wallTop - RH - 4 * s, 12 * s, 8 * s, 3 * s);
+    ctx.roundRect(sx - (6 + ridgeHW) * s, wallTop - RH - 4 * s, (12 + ridgeHW * 2) * s, 8 * s, 3 * s);
     ctx.fill();
 
-    // ── Windows ──────────────────────────────────────────────────
+    // ── Awning over the door (some houses) ────────────────────────
+    if (this._hasAwning) {
+      ctx.fillStyle = lerpColor(this._shutter, -0.05);
+      ctx.beginPath();
+      ctx.moveTo(sx - 24 * s, sy - 50 * s);
+      ctx.lineTo(sx + 24 * s, sy - 50 * s);
+      ctx.lineTo(sx + 30 * s, sy - 38 * s);
+      ctx.lineTo(sx - 30 * s, sy - 38 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1;
+      for (let ai = -1; ai <= 1; ai++) {
+        ctx.beginPath();
+        ctx.moveTo(sx + ai * 16 * s, sy - 50 * s);
+        ctx.lineTo(sx + ai * 20 * s, sy - 38 * s);
+        ctx.stroke();
+      }
+    }
+
+    // ── Windows (single big window on some houses, two on others) ─
     const winY = wallTop + WH * 0.35;
-    this._drawWindow(ctx, sx - HW * 0.52, winY, s);
-    this._drawWindow(ctx, sx + HW * 0.52, winY, s);
+    if (this._winCount === 1) {
+      this._drawWindow(ctx, sx, winY, s * 1.25);
+    } else {
+      this._drawWindow(ctx, sx - HW * 0.52, winY, s);
+      this._drawWindow(ctx, sx + HW * 0.52, winY, s);
+    }
 
     // ── Door ─────────────────────────────────────────────────────
     this._drawDoor(ctx, sx, sy, s);
+
+    ctx.restore();
+  }
+
+  // ── Victorian: tall, narrow, steep pointed roof, bay window ──────────────
+  _drawVictorian(ctx, sx, sy, s) {
+    const HW = 44 * s, WH = 115 * s, RH = 96 * s, OV = 10 * s;
+    const wallTop = sy - WH;
+    ctx.save();
+
+    // shadow
+    ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx + 8*s, sy + 10*s, HW * 0.9, 14*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // garden path
+    ctx.fillStyle = '#C8B888';
+    ctx.beginPath(); ctx.roundRect(sx - 12*s, sy, 24*s, 28*s, 3*s); ctx.fill();
+
+    // fence
+    this._drawFence(ctx, sx, sy + 26*s, HW + 16*s, s);
+
+    // foundation
+    ctx.fillStyle = lerpColor(this._wall, -0.15);
+    ctx.beginPath(); ctx.roundRect(sx - HW, sy - 7*s, HW*2, 9*s, 2*s); ctx.fill();
+
+    // main wall
+    ctx.fillStyle = this._wall; ctx.strokeStyle = lerpColor(this._wall, -0.12); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.roundRect(sx - HW, wallTop, HW*2, WH, [0,0,2*s,2*s]); ctx.fill(); ctx.stroke();
+
+    // vertical board & batten texture
+    ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 0.9;
+    for (let xl = sx - HW + 9*s; xl < sx + HW; xl += 9*s) {
+      ctx.beginPath(); ctx.moveTo(xl, wallTop); ctx.lineTo(xl, sy); ctx.stroke();
+    }
+
+    // corner trim
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(sx - HW, wallTop, 6*s, WH);
+    ctx.fillRect(sx + HW - 6*s, wallTop, 6*s, WH);
+
+    // fascia
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(sx - HW - OV, wallTop - 4*s, HW*2 + OV*2, 5*s);
+
+    // chimney (left side, tall)
+    const csx = sx - 20*s, cTop = wallTop - RH + 10*s, cBot = wallTop + 6*s, cW = 14*s;
+    ctx.fillStyle = '#8A3820'; ctx.fillRect(csx - cW/2, cTop, cW, cBot - cTop);
+    ctx.fillStyle = '#6A2810'; ctx.fillRect(csx - cW/2 - 2*s, cTop, cW + 4*s, 5*s);
+
+    // very steep gable roof
+    ctx.fillStyle = this._roof; ctx.strokeStyle = lerpColor(this._roof, -0.2); ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx - HW - OV, wallTop);
+    ctx.lineTo(sx, wallTop - RH);
+    ctx.lineTo(sx + HW + OV, wallTop);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // roof tile lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1;
+    for (let ri = 1; ri < 10; ri++) {
+      const f = ri / 10, lw2 = (HW+OV)*f;
+      const ly = wallTop - RH + RH*f;
+      ctx.beginPath(); ctx.moveTo(sx - lw2, ly); ctx.lineTo(sx + lw2, ly); ctx.stroke();
+    }
+    // gingerbread ornament at peak
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(sx, wallTop - RH, 7*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = this._roof; ctx.beginPath(); ctx.arc(sx, wallTop - RH, 4*s, 0, Math.PI*2); ctx.fill();
+
+    // bay window (protruding center, upper half)
+    const bwY = wallTop + WH * 0.20, bwH = WH * 0.35, bwW = HW * 0.9;
+    ctx.fillStyle = lerpColor(this._wall, -0.06);
+    ctx.beginPath(); ctx.roundRect(sx - bwW/2, bwY, bwW, bwH, [0,0,4*s,4*s]); ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5*s;
+    // three bay panes
+    for (let pi = 0; pi < 3; pi++) {
+      const px2 = sx - bwW/2 + bwW*(pi+0.5)/3, ph = bwH * 0.80, pw = bwW*0.26;
+      ctx.fillStyle = '#B8DAFF';
+      ctx.beginPath(); ctx.roundRect(px2 - pw/2, bwY + bwH*0.08, pw, ph, [3*s,3*s,0,0]); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(px2, bwY + bwH*0.08); ctx.lineTo(px2, bwY + bwH*0.08 + ph); ctx.stroke();
+    }
+    ctx.fillStyle = lerpColor(this._wall, -0.1);
+    ctx.fillRect(sx - bwW/2 - 5*s, bwY - 6*s, bwW + 10*s, 7*s);
+
+    // lower single window
+    this._drawWindow(ctx, sx, wallTop + WH*0.68, s * 0.9);
+
+    // door
+    this._drawDoor(ctx, sx, sy, s);
+    ctx.restore();
+  }
+
+  // ── Ranch: wide, single-storey, shallow hip roof, porch ─────────────────
+  _drawRanch(ctx, sx, sy, s) {
+    const HW = 82*s, WH = 62*s, RH = 34*s, OV = 18*s;
+    const ridgeHW = HW * 0.5;
+    const wallTop = sy - WH;
+    ctx.save();
+
+    ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx + 10*s, sy + 10*s, HW * 0.9, 14*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // wide garden path
+    ctx.fillStyle = '#C8B888';
+    ctx.beginPath(); ctx.roundRect(sx - 16*s, sy, 32*s, 30*s, 3*s); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1*s;
+    for (let pi = 0; pi < 3; pi++) {
+      ctx.beginPath(); ctx.moveTo(sx - 16*s, sy + (pi+0.5)*10*s); ctx.lineTo(sx + 16*s, sy + (pi+0.5)*10*s); ctx.stroke();
+    }
+
+    this._drawFence(ctx, sx, sy + 28*s, HW + 14*s, s);
+    this._drawBush(ctx, sx - HW + 16*s, sy + 4*s, 0.55*s, '#3A9A40');
+    this._drawBush(ctx, sx + HW - 16*s, sy + 4*s, 0.55*s, '#3A9A40');
+
+    // foundation
+    ctx.fillStyle = lerpColor(this._wall, -0.15);
+    ctx.beginPath(); ctx.roundRect(sx - HW, sy - 7*s, HW*2, 9*s, 2*s); ctx.fill();
+
+    // wall
+    ctx.fillStyle = this._wall; ctx.strokeStyle = lerpColor(this._wall, -0.12); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.roundRect(sx - HW, wallTop, HW*2, WH, [0,0,2*s,2*s]); ctx.fill(); ctx.stroke();
+
+    // horizontal siding
+    ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 0.9;
+    for (let yl = wallTop + 7*s; yl < sy - 7*s; yl += 8*s) {
+      ctx.beginPath(); ctx.moveTo(sx - HW + 2, yl); ctx.lineTo(sx + HW - 2, yl); ctx.stroke();
+    }
+
+    // porch columns (3 columns)
+    ctx.fillStyle = '#FFFFFF';
+    for (const cx2 of [sx - HW*0.5, sx, sx + HW*0.5]) {
+      ctx.beginPath(); ctx.roundRect(cx2 - 4*s, sy - WH + 4*s, 8*s, WH - 4*s, 2*s); ctx.fill();
+    }
+    // porch beam
+    ctx.fillRect(sx - HW - 4*s, wallTop, HW*2 + 8*s, 8*s);
+
+    // shallow hip roof
+    const roofGrad = ctx.createLinearGradient(sx, wallTop - RH, sx, wallTop);
+    roofGrad.addColorStop(0, lerpColor(this._roof, -0.12)); roofGrad.addColorStop(1, lerpColor(this._roof, 0.08));
+    ctx.fillStyle = roofGrad; ctx.strokeStyle = lerpColor(this._roof, -0.2); ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx - HW - OV, wallTop);
+    ctx.lineTo(sx - ridgeHW, wallTop - RH);
+    ctx.lineTo(sx + ridgeHW, wallTop - RH);
+    ctx.lineTo(sx + HW + OV, wallTop);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // ridge cap
+    ctx.fillStyle = lerpColor(this._roof, -0.25);
+    ctx.beginPath(); ctx.roundRect(sx - ridgeHW, wallTop - RH - 4*s, ridgeHW*2, 7*s, 3*s); ctx.fill();
+
+    // 3 windows
+    for (const wx2 of [sx - HW*0.60, sx, sx + HW*0.60]) {
+      this._drawWindow(ctx, wx2, wallTop + WH*0.40, s * 0.85);
+    }
+    this._drawDoor(ctx, sx, sy, s);
+    ctx.restore();
+  }
+
+  // ── Modern: tall, flat roof, big picture windows, clean lines ────────────
+  _drawModern(ctx, sx, sy, s) {
+    const HW = 58*s, WH = 100*s, OV = 4*s;
+    const wallTop = sy - WH;
+    ctx.save();
+
+    ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx + 10*s, sy + 10*s, HW*0.9, 14*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // concrete path
+    ctx.fillStyle = '#C0B8B0';
+    ctx.beginPath(); ctx.roundRect(sx - 18*s, sy, 36*s, 30*s, 2*s); ctx.fill();
+
+    // low hedge instead of picket fence
+    ctx.fillStyle = '#2A7A2A';
+    ctx.beginPath(); ctx.roundRect(sx - HW - 8*s, sy + 20*s, HW*2 + 16*s, 12*s, 6*s); ctx.fill();
+    ctx.fillStyle = '#3A9A3A';
+    ctx.beginPath(); ctx.roundRect(sx - HW - 6*s, sy + 18*s, HW*2 + 12*s, 8*s, 4*s); ctx.fill();
+
+    // foundation
+    ctx.fillStyle = lerpColor(this._wall, -0.15);
+    ctx.beginPath(); ctx.roundRect(sx - HW, sy - 8*s, HW*2, 10*s, 2*s); ctx.fill();
+
+    // smooth stucco wall
+    ctx.fillStyle = this._wall; ctx.strokeStyle = lerpColor(this._wall, -0.08); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(sx - HW, wallTop, HW*2, WH, 2*s); ctx.fill(); ctx.stroke();
+
+    // accent stripe (dark horizontal band across middle)
+    ctx.fillStyle = lerpColor(this._wall, -0.3);
+    ctx.fillRect(sx - HW, wallTop + WH*0.48, HW*2, 8*s);
+
+    // flat roof with parapet
+    ctx.fillStyle = lerpColor(this._wall, -0.18);
+    ctx.beginPath(); ctx.roundRect(sx - HW - OV, wallTop - 18*s, HW*2 + OV*2, 18*s, [3*s,3*s,0,0]); ctx.fill();
+    // rooftop detail line
+    ctx.strokeStyle = lerpColor(this._wall, -0.3); ctx.lineWidth = 2*s;
+    ctx.beginPath(); ctx.moveTo(sx - HW - OV, wallTop - 4*s); ctx.lineTo(sx + HW + OV, wallTop - 4*s); ctx.stroke();
+
+    // large picture window upper
+    const pwW = HW*1.4, pwH = WH*0.30;
+    ctx.fillStyle = '#90C8E8';
+    ctx.beginPath(); ctx.roundRect(sx - pwW/2, wallTop + WH*0.08, pwW, pwH, 2*s); ctx.fill();
+    ctx.strokeStyle = lerpColor(this._wall, -0.2); ctx.lineWidth = 3*s;
+    ctx.beginPath(); ctx.roundRect(sx - pwW/2, wallTop + WH*0.08, pwW, pwH, 2*s); ctx.stroke();
+    // window panes
+    ctx.strokeStyle = lerpColor(this._wall, -0.15); ctx.lineWidth = 2*s;
+    ctx.beginPath();
+    ctx.moveTo(sx, wallTop + WH*0.08); ctx.lineTo(sx, wallTop + WH*0.08 + pwH);
+    ctx.moveTo(sx - pwW/2, wallTop + WH*0.08 + pwH*0.5); ctx.lineTo(sx + pwW/2, wallTop + WH*0.08 + pwH*0.5);
+    ctx.stroke();
+    // window shine
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath(); ctx.moveTo(sx - pwW/2 + 4*s, wallTop + WH*0.08 + 4*s); ctx.lineTo(sx - 4*s, wallTop + WH*0.08 + 4*s); ctx.lineTo(sx - pwW/2 + 4*s, wallTop + WH*0.08 + pwH*0.45); ctx.closePath(); ctx.fill();
+
+    // lower window pair
+    for (const wx2 of [sx - HW*0.45, sx + HW*0.45]) {
+      const lwH = WH*0.22;
+      ctx.fillStyle = '#90C8E8';
+      ctx.beginPath(); ctx.roundRect(wx2 - 18*s, wallTop + WH*0.58, 36*s, lwH, 2*s); ctx.fill();
+      ctx.strokeStyle = lerpColor(this._wall, -0.2); ctx.lineWidth = 2*s;
+      ctx.beginPath(); ctx.roundRect(wx2 - 18*s, wallTop + WH*0.58, 36*s, lwH, 2*s); ctx.stroke();
+    }
+
+    // modern flush door
+    const dW = 28*s, dH = 48*s;
+    ctx.fillStyle = lerpColor(this._shutter, -0.1);
+    ctx.beginPath(); ctx.roundRect(sx - dW/2, sy - dH, dW, dH, [2*s,2*s,0,0]); ctx.fill();
+    ctx.fillStyle = '#90C8E8';
+    ctx.beginPath(); ctx.roundRect(sx - dW/2 + 4*s, sy - dH + 8*s, dW - 8*s, dH*0.3, 1*s); ctx.fill();
+    ctx.fillStyle = '#FFD060';
+    ctx.beginPath(); ctx.arc(sx + dW/2 - 7*s, sy - dH*0.4, 3*s, 0, Math.PI*2); ctx.fill();
+    // steps
+    ctx.fillStyle = '#C0B8A8';
+    ctx.beginPath(); ctx.roundRect(sx - dW/2 - 8*s, sy, dW+16*s, 7*s, 2*s); ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ── Colonial: tall, brick-red, two chimneys, dormer windows ─────────────
+  _drawColonial(ctx, sx, sy, s) {
+    const HW = 66*s, WH = 102*s, RH = 72*s, OV = 16*s;
+    const wallTop = sy - WH;
+    ctx.save();
+
+    ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx + 10*s, sy + 10*s, HW*0.9, 16*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = '#C8B888';
+    ctx.beginPath(); ctx.roundRect(sx - 14*s, sy, 28*s, 30*s, 4*s); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1*s;
+    for (let pi = 0; pi < 3; pi++) {
+      ctx.beginPath(); ctx.moveTo(sx - 14*s, sy + (pi+0.5)*10*s); ctx.lineTo(sx + 14*s, sy + (pi+0.5)*10*s); ctx.stroke();
+    }
+
+    this._drawFence(ctx, sx, sy + 28*s, HW + 20*s, s);
+    this._drawBush(ctx, sx - HW + 10*s, sy + 4*s, 0.55*s, '#3A9A40');
+    this._drawBush(ctx, sx + HW - 10*s, sy + 4*s, 0.55*s, '#3A9A40');
+
+    // brick foundation
+    ctx.fillStyle = '#8A3820'; ctx.beginPath(); ctx.roundRect(sx - HW, sy - 8*s, HW*2, 10*s, 2*s); ctx.fill();
+
+    // brick wall (red hue from wallColor, with mortar lines)
+    ctx.fillStyle = this._wall; ctx.strokeStyle = lerpColor(this._wall, -0.12); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.roundRect(sx - HW, wallTop, HW*2, WH, [0,0,2*s,2*s]); ctx.fill(); ctx.stroke();
+    // brick rows
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 0.8;
+    for (let yl = wallTop + 8*s; yl < sy - 8*s; yl += 10*s) {
+      ctx.beginPath(); ctx.moveTo(sx - HW + 2, yl); ctx.lineTo(sx + HW - 2, yl); ctx.stroke();
+    }
+    // brick columns
+    for (let xl = sx - HW + 12*s; xl < sx + HW; xl += 24*s) {
+      ctx.beginPath(); ctx.moveTo(xl, wallTop); ctx.lineTo(xl, sy - 8*s); ctx.stroke();
+    }
+
+    // white quoin corners
+    ctx.fillStyle = '#FFFFFF';
+    for (let qi = 0; qi < 5; qi++) {
+      const qy = wallTop + qi * WH/5;
+      ctx.fillRect(sx - HW, qy, 10*s, 8*s);
+      ctx.fillRect(sx + HW - 10*s, qy, 10*s, 8*s);
+    }
+
+    // white fascia
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(sx - HW - OV, wallTop - 5*s, HW*2 + OV*2, 6*s);
+
+    // two chimneys
+    for (const cof of [-28, 28]) {
+      const csx2 = sx + cof*s, cTop2 = wallTop - RH - 12*s, cBot2 = wallTop + 6*s, cW2 = 13*s;
+      ctx.fillStyle = '#8A3820'; ctx.fillRect(csx2 - cW2/2, cTop2, cW2, cBot2 - cTop2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 0.8;
+      for (let br = 0; br * 8*s < cBot2 - cTop2; br++) {
+        const by = cTop2 + br * 8*s;
+        ctx.beginPath(); ctx.moveTo(csx2 - cW2/2, by); ctx.lineTo(csx2 + cW2/2, by); ctx.stroke();
+      }
+      ctx.fillStyle = '#6A2010'; ctx.fillRect(csx2 - cW2/2 - 2*s, cTop2, cW2 + 4*s, 5*s);
+      // smoke
+      const t = performance.now() * 0.001;
+      for (let pi = 0; pi < 2; pi++) {
+        const ph = ((t * 0.4 + pi * 0.5) % 1);
+        ctx.globalAlpha = (1 - ph) * 0.35;
+        ctx.fillStyle = '#D0C8C0';
+        ctx.beginPath(); ctx.arc(csx2 + Math.sin(t + pi*2)*3*s, cTop2 - ph*20*s, (2+ph*7)*s, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // gable roof
+    const roofGrad = ctx.createLinearGradient(sx, wallTop - RH, sx, wallTop);
+    roofGrad.addColorStop(0, lerpColor(this._roof, -0.12)); roofGrad.addColorStop(1, lerpColor(this._roof, 0.08));
+    ctx.fillStyle = roofGrad; ctx.strokeStyle = lerpColor(this._roof, -0.2); ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx - HW - OV, wallTop);
+    ctx.lineTo(sx, wallTop - RH);
+    ctx.lineTo(sx + HW + OV, wallTop);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // tile lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 1;
+    for (let ri = 1; ri < 9; ri++) {
+      const f = ri/9, lw2 = (HW+OV)*f;
+      ctx.beginPath(); ctx.moveTo(sx - lw2, wallTop - RH + RH*f); ctx.lineTo(sx + lw2, wallTop - RH + RH*f); ctx.stroke();
+    }
+
+    // dormer (small gabled window in roof)
+    const dmX = sx, dmY = wallTop - RH*0.45, dmW = 28*s, dmH = 22*s;
+    ctx.fillStyle = this._wall;
+    ctx.beginPath(); ctx.roundRect(dmX - dmW/2, dmY, dmW, dmH, 2*s); ctx.fill();
+    ctx.fillStyle = '#B8DAFF'; ctx.fillRect(dmX - dmW/2 + 3*s, dmY + 3*s, dmW - 6*s, dmH - 6*s);
+    ctx.fillStyle = this._roof;
+    ctx.beginPath(); ctx.moveTo(dmX - dmW/2 - 4*s, dmY); ctx.lineTo(dmX, dmY - 14*s); ctx.lineTo(dmX + dmW/2 + 4*s, dmY); ctx.closePath(); ctx.fill();
+
+    // 4 symmetrical windows (2 per floor)
+    const wRow1Y = wallTop + WH*0.22, wRow2Y = wallTop + WH*0.58;
+    for (const wx2 of [sx - HW*0.52, sx + HW*0.52]) {
+      this._drawWindow(ctx, wx2, wRow1Y, s);
+      this._drawWindow(ctx, wx2, wRow2Y, s * 0.88);
+    }
+
+    // central door with pediment
+    const dW2 = 28*s, dH2 = 50*s, dX = sx - dW2/2, dY = sy - dH2;
+    ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.roundRect(dX - 6*s, dY - 8*s, dW2 + 12*s, dH2 + 8*s, [6*s,6*s,0,0]); ctx.fill();
+    ctx.fillStyle = this._shutter; ctx.beginPath(); ctx.roundRect(dX, dY, dW2, dH2, [2*s,2*s,0,0]); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath(); ctx.roundRect(dX + 3*s, dY + 5*s, dW2/2 - 5*s, dH2*0.35, 1*s); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(dX + dW2/2 + 2*s, dY + 5*s, dW2/2 - 5*s, dH2*0.35, 1*s); ctx.fill();
+    // triangular pediment above door
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.moveTo(dX - 6*s, dY - 8*s); ctx.lineTo(sx, dY - 28*s); ctx.lineTo(dX + dW2 + 6*s, dY - 8*s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFD060'; ctx.beginPath(); ctx.arc(sx + dW2/2 - 7*s, sy - dH2*0.4, 3*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#C0B8A8'; ctx.beginPath(); ctx.roundRect(sx - dW2/2 - 8*s, sy, dW2 + 16*s, 7*s, 2*s); ctx.fill();
 
     ctx.restore();
   }
@@ -383,8 +773,8 @@ class Tree {
   draw(ctx, cam, depthScaleFn) {
     const sx = Math.round(this.x - cam.x);
     const sy = Math.round(this.y - cam.y);
-    if (sx < -120 || sx > ctx.canvas.width  + 120) return;
-    if (sy < -230 || sy > ctx.canvas.height + 30)  return;
+    if (sx < -120 || sx > ctx.canvas.width / cam.zoom + 120) return;
+    if (sy < -230 || sy > ctx.canvas.height / cam.zoom + 30)  return;
 
     const s = depthScaleFn(this.y) * this._scale;
     const t = performance.now() * 0.001;
@@ -432,7 +822,7 @@ class Flower {
 
   draw(ctx, cam, depthScaleFn) {
     let sx = this.x - cam.x, sy = this.y - cam.y;
-    if (sx < -20 || sx > ctx.canvas.width + 20 || sy < -20 || sy > ctx.canvas.height + 20) return;
+    if (sx < -20 || sx > ctx.canvas.width / cam.zoom + 20 || sy < -20 || sy > ctx.canvas.height / cam.zoom + 20) return;
     const r = this._r * depthScaleFn(this.y);
     const t = performance.now() * 0.001;
     sx += Math.sin(t * 1.8 + this._phase) * r * 0.5;   // bob in the breeze
@@ -462,7 +852,7 @@ class Bush {
 
   draw(ctx, cam, depthScaleFn) {
     const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
-    if (sx < -60 || sx > ctx.canvas.width + 60 || sy < -60 || sy > ctx.canvas.height + 20) return;
+    if (sx < -60 || sx > ctx.canvas.width / cam.zoom + 60 || sy < -60 || sy > ctx.canvas.height / cam.zoom + 20) return;
     const s = depthScaleFn(this.y) * this._scale;
     const t = performance.now() * 0.001;
     const sw = Math.sin(t * 1.4 + this._phase) * 1.6 * s;   // gentle sway on the crown
@@ -501,7 +891,7 @@ class Rock {
 
   draw(ctx, cam, depthScaleFn) {
     const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
-    if (sx < -80 || sx > ctx.canvas.width + 80 || sy < -60 || sy > ctx.canvas.height + 20) return;
+    if (sx < -80 || sx > ctx.canvas.width / cam.zoom + 80 || sy < -60 || sy > ctx.canvas.height / cam.zoom + 20) return;
     const s = depthScaleFn(this.y) * this._scale * 22;
     ctx.save();
     ctx.globalAlpha = 0.2;
@@ -531,7 +921,7 @@ class Lamppost {
   constructor(x, y) { this.x = x; this.y = y; }
   draw(ctx, cam, depthScaleFn) {
     const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
-    if (sx < -40 || sx > ctx.canvas.width + 40 || sy < -160 || sy > ctx.canvas.height + 20) return;
+    if (sx < -40 || sx > ctx.canvas.width / cam.zoom + 40 || sy < -160 || sy > ctx.canvas.height / cam.zoom + 20) return;
     const s = depthScaleFn(this.y);
     ctx.fillStyle = '#787888';
     ctx.beginPath();
@@ -568,7 +958,7 @@ class Bench {
   constructor(x, y, rotated = false) { this.x = x; this.y = y; this._rot = rotated; }
   draw(ctx, cam, depthScaleFn) {
     const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
-    if (sx < -80 || sx > ctx.canvas.width + 80 || sy < -60 || sy > ctx.canvas.height + 20) return;
+    if (sx < -80 || sx > ctx.canvas.width / cam.zoom + 80 || sy < -60 || sy > ctx.canvas.height / cam.zoom + 20) return;
     const s = depthScaleFn(this.y);
     ctx.save(); ctx.translate(sx, sy);
     if (this._rot) ctx.rotate(Math.PI / 2);
@@ -590,7 +980,7 @@ class Fountain {
   constructor(x, y) { this.x = x; this.y = y; }
   draw(ctx, cam, depthScaleFn) {
     const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
-    if (sx < -120 || sx > ctx.canvas.width + 120 || sy < -180 || sy > ctx.canvas.height + 50) return;
+    if (sx < -120 || sx > ctx.canvas.width / cam.zoom + 120 || sy < -180 || sy > ctx.canvas.height / cam.zoom + 50) return;
     const s = depthScaleFn(this.y);
     ctx.fillStyle = '#5BAFD0';
     ctx.beginPath();
@@ -641,6 +1031,361 @@ class Fountain {
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+  }
+}
+
+// ── Cinema building ─────────────────────────────────────────────────────────
+
+class CinemaBuilding {
+  constructor(x, y) { this.x = x; this.y = y; }
+
+  containsPoint(wx, wy, worldH) {
+    const s  = 0.72 + (this.y / worldH) * 0.48;
+    const HW = 112 * s, WH = 152 * s;
+    return wx >= this.x - HW && wx <= this.x + HW &&
+           wy >= this.y - WH && wy <= this.y + 40 * s;
+  }
+
+  draw(ctx, cam, depthScaleFn) {
+    const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
+    if (sx < -300 || sx > ctx.canvas.width / cam.zoom + 300) return;
+    if (sy < -380 || sy > ctx.canvas.height / cam.zoom + 60)  return;
+    const s = depthScaleFn(this.y);
+    const t = performance.now() * 0.001;
+    const HW = 112 * s, WH = 152 * s, top = sy - WH;
+
+    ctx.save();
+
+    // ground shadow
+    ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx + 10 * s, sy + 14 * s, HW * 0.95, 22 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // red carpet leading to the doors
+    ctx.fillStyle = '#9B2235';
+    ctx.beginPath(); ctx.roundRect(sx - 30 * s, sy - 4 * s, 60 * s, 44 * s, 4 * s); ctx.fill();
+    ctx.strokeStyle = '#D4AF37'; ctx.lineWidth = 2 * s;
+    ctx.beginPath(); ctx.moveTo(sx - 22 * s, sy - 2 * s); ctx.lineTo(sx - 22 * s, sy + 38 * s);
+    ctx.moveTo(sx + 22 * s, sy - 2 * s); ctx.lineTo(sx + 22 * s, sy + 38 * s); ctx.stroke();
+
+    // building body
+    ctx.fillStyle = '#3A2E55';
+    ctx.fillRect(sx - HW, top, HW * 2, WH);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(sx - HW, top, HW * 2, WH * 0.5);
+    ctx.fillStyle = 'rgba(0,0,0,0.20)'; ctx.fillRect(sx + HW - 18 * s, top, 18 * s, WH);
+
+    // roof cornice
+    ctx.fillStyle = '#241B3A';
+    ctx.fillRect(sx - HW - 7 * s, top - 18 * s, HW * 2 + 14 * s, 24 * s);
+
+    // marquee sign
+    const mqY = top + 22 * s, mqH = 48 * s, mqX = sx - HW * 0.88, mqW = HW * 1.76;
+    ctx.fillStyle = '#1C1530';
+    ctx.beginPath(); ctx.roundRect(mqX - 4 * s, mqY - 4 * s, mqW + 8 * s, mqH + 8 * s, 10 * s); ctx.fill();
+    const mg = ctx.createLinearGradient(0, mqY, 0, mqY + mqH);
+    mg.addColorStop(0, '#FFE066'); mg.addColorStop(1, '#F2B705');
+    ctx.fillStyle = mg;
+    ctx.beginPath(); ctx.roundRect(mqX, mqY, mqW, mqH, 8 * s); ctx.fill();
+    // blinking bulbs around the marquee
+    const bulbs = Math.max(7, Math.round(mqW / (10 * s)));
+    for (let i = 0; i <= bulbs; i++) {
+      const bx = mqX + mqW * (i / bulbs);
+      const on = (Math.floor(t * 4) + i) % 2 === 0;
+      ctx.fillStyle = on ? '#FFF6C0' : '#9A7B16';
+      ctx.beginPath(); ctx.arc(bx, mqY - 4 * s, 2.6 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bx, mqY + mqH + 4 * s, 2.6 * s, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#7A1020';
+    ctx.font = `900 ${30 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('CINE', sx, mqY + mqH / 2);
+
+    // two movie posters on the facade
+    const posY = mqY + mqH + 16 * s, posW = 42 * s, posH = 56 * s;
+    const posters = [['#E8503A', '#FFD23F'], ['#3A7BE8', '#7BD389']];
+    for (let p = 0; p < 2; p++) {
+      const pxp = sx + (p === 0 ? -HW * 0.55 : HW * 0.55) - posW / 2;
+      ctx.fillStyle = '#0E0A1A';
+      ctx.beginPath(); ctx.roundRect(pxp - 3 * s, posY - 3 * s, posW + 6 * s, posH + 6 * s, 4 * s); ctx.fill();
+      const pg = ctx.createLinearGradient(0, posY, 0, posY + posH);
+      pg.addColorStop(0, posters[p][0]); pg.addColorStop(1, posters[p][1]);
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.roundRect(pxp, posY, posW, posH, 3 * s); ctx.fill();
+      // simple star on poster
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.arc(pxp + posW / 2, posY + posH * 0.4, posW * 0.16, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // entrance doors (glassy, glowing)
+    const dW = 64 * s, dH = 60 * s, dX = sx - dW / 2, dY = sy - dH;
+    ctx.fillStyle = '#0E0A18';
+    ctx.beginPath(); ctx.roundRect(dX - 4 * s, dY - 4 * s, dW + 8 * s, dH + 8 * s, 6 * s); ctx.fill();
+    const dg = ctx.createLinearGradient(0, dY, 0, dY + dH);
+    dg.addColorStop(0, '#5AC8FA'); dg.addColorStop(1, '#2A6A9A');
+    ctx.fillStyle = dg;
+    ctx.beginPath(); ctx.roundRect(dX, dY, dW, dH, 5 * s); ctx.fill();
+    ctx.strokeStyle = '#102030'; ctx.lineWidth = 2 * s;
+    ctx.beginPath(); ctx.moveTo(sx, dY); ctx.lineTo(sx, dY + dH); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath(); ctx.moveTo(dX + 6 * s, dY + 6 * s); ctx.lineTo(dX + 20 * s, dY + 6 * s);
+    ctx.lineTo(dX + 8 * s, dY + dH - 6 * s); ctx.lineTo(dX + 2 * s, dY + dH - 6 * s); ctx.closePath(); ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+// ── Boutique (launches the clothing store) ─────────────────────────────────
+
+class BoutiqueBuilding {
+  constructor(x, y) { this.x = x; this.y = y; }
+
+  containsPoint(wx, wy, worldH) {
+    const s  = 0.72 + (this.y / worldH) * 0.48;
+    const HW = 92 * s, WH = 128 * s;
+    return wx >= this.x - HW && wx <= this.x + HW &&
+           wy >= this.y - WH && wy <= this.y + 40 * s;
+  }
+
+  draw(ctx, cam, depthScaleFn) {
+    const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
+    if (sx < -280 || sx > ctx.canvas.width / cam.zoom + 280) return;
+    if (sy < -360 || sy > ctx.canvas.height / cam.zoom + 60)  return;
+    const s = depthScaleFn(this.y);
+    const t = performance.now() * 0.001;
+    const HW = 92 * s, WH = 128 * s, top = sy - WH;
+
+    ctx.save();
+
+    // ground shadow
+    ctx.globalAlpha = 0.17; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx + 10*s, sy + 14*s, HW*0.92, 20*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // entrance carpet
+    ctx.fillStyle = '#B83868';
+    ctx.beginPath(); ctx.roundRect(sx - 26*s, sy - 2*s, 52*s, 40*s, 4*s); ctx.fill();
+    ctx.strokeStyle = '#F0C060'; ctx.lineWidth = 2*s;
+    ctx.beginPath(); ctx.roundRect(sx - 22*s, sy + 2*s, 44*s, 32*s, 3*s); ctx.stroke();
+
+    // main wall
+    ctx.fillStyle = '#FEF4F6';
+    ctx.fillRect(sx - HW, top, HW * 2, WH);
+
+    // subtle vertical siding lines
+    ctx.strokeStyle = 'rgba(210,150,170,0.10)'; ctx.lineWidth = 1;
+    for (let xl = sx - HW + 14*s; xl < sx + HW; xl += 14*s) {
+      ctx.beginPath(); ctx.moveTo(xl, top); ctx.lineTo(xl, sy); ctx.stroke();
+    }
+
+    // cornice bar
+    ctx.fillStyle = '#E8A8C0';
+    ctx.fillRect(sx - HW - 6*s, top - 22*s, HW*2 + 12*s, 28*s);
+    // small arch cutouts on cornice
+    ctx.fillStyle = '#FEF4F6';
+    const archN = 8;
+    for (let i = 0; i < archN; i++) {
+      const ax = sx - HW - 3*s + (i + 0.5) * ((HW*2 + 6*s) / archN);
+      ctx.beginPath(); ctx.arc(ax, top - 4*s, 7*s, Math.PI, 0); ctx.fill();
+    }
+
+    // triangular pediment
+    ctx.fillStyle = '#CE5878';
+    ctx.beginPath();
+    ctx.moveTo(sx - HW - 6*s, top - 22*s);
+    ctx.lineTo(sx, top - 64*s);
+    ctx.lineTo(sx + HW + 6*s, top - 22*s);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#A03858'; ctx.lineWidth = 2*s; ctx.stroke();
+
+    // rose rosette on pediment
+    const rox = sx, roy = top - 48*s;
+    ctx.fillStyle = '#F8E0EC';
+    ctx.beginPath(); ctx.arc(rox, roy, 9*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#D04870';
+    for (let i = 0; i < 6; i++) {
+      const a = (i/6)*Math.PI*2;
+      ctx.beginPath(); ctx.arc(rox + Math.cos(a)*9*s, roy + Math.sin(a)*9*s, 4*s, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#FFD880';
+    ctx.beginPath(); ctx.arc(rox, roy, 3.5*s, 0, Math.PI*2); ctx.fill();
+
+    // sign box
+    const sgY = top + 14*s, sgH = 44*s, sgX = sx - HW*0.84, sgW = HW*1.68;
+    ctx.fillStyle = '#6A1030';
+    ctx.beginPath(); ctx.roundRect(sgX - 4*s, sgY - 4*s, sgW + 8*s, sgH + 8*s, 8*s); ctx.fill();
+    const sgg = ctx.createLinearGradient(0, sgY, 0, sgY + sgH);
+    sgg.addColorStop(0, '#E82868'); sgg.addColorStop(1, '#B01850');
+    ctx.fillStyle = sgg;
+    ctx.beginPath(); ctx.roundRect(sgX, sgY, sgW, sgH, 6*s); ctx.fill();
+    // blinking sign dots
+    const nDots = Math.max(8, Math.round(sgW / (10*s)));
+    for (let i = 0; i <= nDots; i++) {
+      const bx = sgX + sgW * (i / nDots);
+      const on = (Math.floor(t * 5) + i) % 2 === 0;
+      ctx.fillStyle = on ? '#FFE0FF' : '#901840';
+      ctx.beginPath(); ctx.arc(bx, sgY - 3*s, 2.4*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bx, sgY + sgH + 3*s, 2.4*s, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#FFE8F6';
+    ctx.font = `900 ${26*s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('BOUTIQUE', sx, sgY + sgH/2);
+
+    // two display windows
+    const dWinW = 50*s, dWinH = 52*s, dWinY = sgY + sgH + 10*s;
+    for (let side = -1; side <= 1; side += 2) {
+      const wx2 = sx + side * HW * 0.55;
+      // outer frame
+      ctx.fillStyle = '#FFF';
+      ctx.beginPath(); ctx.roundRect(wx2 - dWinW/2 - 4*s, dWinY - 4*s, dWinW + 8*s, dWinH + 8*s, 4*s); ctx.fill();
+      // glass
+      ctx.fillStyle = '#DAF0FF';
+      ctx.fillRect(wx2 - dWinW/2, dWinY, dWinW, dWinH);
+      // mannequin — dress
+      ctx.fillStyle = side < 0 ? '#E070B0' : '#9060D0';
+      // torso
+      ctx.beginPath(); ctx.ellipse(wx2, dWinY + dWinH*0.34, 9*s, 14*s, 0, 0, Math.PI*2); ctx.fill();
+      // skirt flare
+      ctx.beginPath();
+      ctx.moveTo(wx2 - 12*s, dWinY + dWinH*0.55);
+      ctx.quadraticCurveTo(wx2 - 20*s, dWinY + dWinH*0.80, wx2 - 18*s, dWinY + dWinH - 4*s);
+      ctx.lineTo(wx2 + 18*s, dWinY + dWinH - 4*s);
+      ctx.quadraticCurveTo(wx2 + 20*s, dWinY + dWinH*0.80, wx2 + 12*s, dWinY + dWinH*0.55);
+      ctx.closePath(); ctx.fill();
+      // head
+      ctx.fillStyle = '#EEC0A0';
+      ctx.beginPath(); ctx.arc(wx2, dWinY + dWinH*0.14, 7*s, 0, Math.PI*2); ctx.fill();
+      // star sparkle
+      ctx.save(); ctx.globalAlpha = 0.55 + 0.3*Math.sin(t*3.5 + side*1.5);
+      ctx.fillStyle = '#FFE8F8'; ctx.font = `${11*s}px system-ui`;
+      ctx.textBaseline = 'middle'; ctx.fillText('✨', wx2 + 16*s, dWinY + 8*s); ctx.restore();
+      // price tag
+      ctx.fillStyle = '#FFE88A';
+      ctx.beginPath(); ctx.roundRect(wx2 + dWinW/2 - 22*s, dWinY + dWinH*0.28, 20*s, 12*s, 3*s); ctx.fill();
+      ctx.fillStyle = '#7A3800'; ctx.font = `bold ${7*s}px system-ui`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('¡SALE!', wx2 + dWinW/2 - 12*s, dWinY + dWinH*0.28 + 6*s);
+    }
+
+    // glass entrance doors
+    const entW = 52*s, entH = 50*s, entX = sx - entW/2, entY = sy - entH;
+    // arch frame
+    ctx.fillStyle = '#F0D0DC';
+    ctx.beginPath(); ctx.arc(sx, entY, entW/2 + 6*s, Math.PI, 0); ctx.fill();
+    ctx.fillRect(entX - 6*s, entY, entW + 12*s, 10*s);
+    // glass panels
+    const dg = ctx.createLinearGradient(0, entY, 0, entY + entH);
+    dg.addColorStop(0, '#DDEEFF'); dg.addColorStop(1, '#AACCEE');
+    ctx.fillStyle = dg;
+    ctx.beginPath(); ctx.roundRect(entX, entY, entW, entH, [4*s,4*s,0,0]); ctx.fill();
+    ctx.strokeStyle = '#C0A0B8'; ctx.lineWidth = 2*s;
+    ctx.beginPath(); ctx.moveTo(sx, entY); ctx.lineTo(sx, entY+entH); ctx.stroke();
+    // door shine
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.beginPath(); ctx.moveTo(entX+4*s,entY+4*s); ctx.lineTo(entX+16*s,entY+4*s); ctx.lineTo(entX+6*s,entY+entH-6*s); ctx.lineTo(entX+2*s,entY+entH-6*s); ctx.closePath(); ctx.fill();
+
+    // pink striped awning
+    const awTop = entY - 10*s, awBot = entY + 10*s, awHW = 48*s;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(sx - awHW, awTop); ctx.lineTo(sx + awHW, awTop);
+    ctx.lineTo(sx + awHW + 8*s, awBot); ctx.lineTo(sx - awHW - 8*s, awBot);
+    ctx.closePath(); ctx.clip();
+    ctx.fillStyle = '#E06090';
+    ctx.fillRect(sx - awHW - 10*s, awTop, awHW*2 + 20*s, awBot - awTop);
+    ctx.fillStyle = '#FFF4F8';
+    for (let si = -5; si <= 5; si++) {
+      ctx.fillRect(sx + si*13*s - 4*s, awTop, 7*s, awBot - awTop);
+    }
+    ctx.restore();
+    // awning scalloped edge
+    ctx.fillStyle = '#E06090';
+    for (let sc2 = -4; sc2 <= 4; sc2++) {
+      ctx.beginPath(); ctx.arc(sx + sc2*13*s, awBot, 6.5*s, 0, Math.PI); ctx.fill();
+    }
+
+    // steps
+    ctx.fillStyle = '#EED8DC';
+    ctx.beginPath(); ctx.roundRect(sx - entW/2 - 8*s, sy, entW+16*s, 7*s, 2*s); ctx.fill();
+    ctx.fillStyle = '#DEC8CC';
+    ctx.beginPath(); ctx.roundRect(sx - entW/2 - 5*s, sy+7*s, entW+10*s, 6*s, 2*s); ctx.fill();
+
+    // floating label
+    const bob = Math.sin(t * 2) * 3 * s;
+    const lw = 138*s, lh = 30*s, lx = sx - lw/2, ly = sy - WH - 50*s + bob;
+    ctx.fillStyle = 'rgba(90,20,45,0.93)';
+    ctx.beginPath(); ctx.roundRect(lx, ly, lw, lh, 9*s); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx-7*s, ly+lh); ctx.lineTo(sx+7*s, ly+lh); ctx.lineTo(sx, ly+lh+8*s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFD8EE';
+    ctx.font = `900 ${15*s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('👗 BOUTIQUE ▶', sx, ly + lh/2);
+
+    ctx.restore();
+  }
+}
+
+// ── Hole portal (launches the hole mini-game) ───────────────────────────────
+
+class HolePortal {
+  constructor(x, y) { this.x = x; this.y = y; }
+
+  containsPoint(wx, wy) { return Math.hypot(wx - this.x, wy - this.y) < 80; }
+
+  draw(ctx, cam, depthScaleFn) {
+    const sx = Math.round(this.x - cam.x), sy = Math.round(this.y - cam.y);
+    if (sx < -180 || sx > ctx.canvas.width / cam.zoom + 180) return;
+    if (sy < -240 || sy > ctx.canvas.height / cam.zoom + 90)  return;
+    const s = depthScaleFn(this.y);
+    const r = 62 * s;
+    const t = performance.now() * 0.001;
+
+    // pull-shadow on the grass
+    const g = ctx.createRadialGradient(sx, sy, r * 0.7, sx, sy, r * 1.7);
+    g.addColorStop(0, 'rgba(0,0,0,0.32)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, r * 1.7, 0, Math.PI * 2); ctx.fill();
+
+    // dug edge
+    ctx.fillStyle = '#5E7A3C';
+    ctx.beginPath(); ctx.ellipse(sx, sy, r * 1.08, r * 1.0, 0, 0, Math.PI * 2); ctx.fill();
+
+    // void
+    const hg = ctx.createRadialGradient(sx, sy - r * 0.18, r * 0.05, sx, sy, r);
+    hg.addColorStop(0, '#000000'); hg.addColorStop(0.55, '#080510');
+    hg.addColorStop(0.85, '#170E26'); hg.addColorStop(1, '#2A1C3E');
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill();
+
+    // swirling vortex
+    ctx.save();
+    ctx.beginPath(); ctx.arc(sx, sy, r * 0.98, 0, Math.PI * 2); ctx.clip();
+    ctx.translate(sx, sy); ctx.rotate(t * 0.8);
+    ctx.strokeStyle = 'rgba(150,110,200,0.18)';
+    for (let k = 0; k < 3; k++) {
+      ctx.lineWidth = r * 0.05; ctx.beginPath();
+      for (let a = 0; a < Math.PI * 3; a += 0.3) {
+        const rr = r * 0.15 + a / (Math.PI * 3) * r * 0.8;
+        const px = Math.cos(a + k * 2.1) * rr, py = Math.sin(a + k * 2.1) * rr;
+        a === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // rim highlight
+    ctx.lineWidth = Math.max(1.5, r * 0.07);
+    ctx.strokeStyle = 'rgba(180,160,220,0.45)';
+    ctx.beginPath(); ctx.arc(sx, sy, r * 0.95, Math.PI * 1.05, Math.PI * 1.85); ctx.stroke();
+
+    // floating label
+    const bob = Math.sin(t * 2) * 3 * s;
+    const lw = 116 * s, lh = 30 * s, lx = sx - lw / 2, ly = sy - r - 50 * s + bob;
+    ctx.fillStyle = 'rgba(35,18,52,0.94)';
+    ctx.beginPath(); ctx.roundRect(lx, ly, lw, lh, 9 * s); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx - 7 * s, ly + lh); ctx.lineTo(sx + 7 * s, ly + lh); ctx.lineTo(sx, ly + lh + 8 * s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#C9A8FF';
+    ctx.font = `900 ${15 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('AGUJERO ▶', sx, ly + lh / 2);
   }
 }
 
@@ -737,6 +1482,11 @@ export class World {
 
     this._objects.push(new Fountain(cx, cy));
 
+    // Commercial buildings (flanking the main road intersection)
+    this._objects.push(new CinemaBuilding(W * 0.28, H * 0.44));
+    this._objects.push(new BoutiqueBuilding(W * 0.72, H * 0.44));
+    this._objects.push(new HolePortal(W * 0.50, H * 0.62));
+
     // Trees
     for (const [x, y] of [
       [W*.07, H*.10], [W*.17, H*.07], [W*.10, H*.20], [W*.30, H*.09],
@@ -799,7 +1549,10 @@ export class World {
       const y = 80 + Math.random() * (H - 160);
       const nearRoad = Math.abs(x - cx) < 160 || Math.abs(y - cy) < 80;
       const nearHouseRow = (y > H * 0.64 && y < H * 0.90);
-      if (!nearRoad && !nearHouseRow) this._objects.push(new Flower(x, y));
+      const nearCinema   = Math.abs(x - W * 0.28) < 150 && Math.abs(y - H * 0.44) < 170;
+      const nearBoutique = Math.abs(x - W * 0.72) < 150 && Math.abs(y - H * 0.44) < 170;
+      const nearPortal   = Math.hypot(x - W * 0.50, y - H * 0.62) < 120;
+      if (!nearRoad && !nearHouseRow && !nearCinema && !nearBoutique && !nearPortal) this._objects.push(new Flower(x, y));
     }
   }
 
@@ -824,8 +1577,12 @@ export class World {
         const s   = 0.72 + (obj.y / this.h) * 0.48;
         const HW  = 60*s, WH = 92*s;
         const wY  = obj.y - WH + WH*0.35;
-        out.push({ worldX: obj.x - HW*0.52, worldY: wY, radius: 60*s, color: [255, 210, 140] });
-        out.push({ worldX: obj.x + HW*0.52, worldY: wY, radius: 60*s, color: [255, 210, 140] });
+        if (obj._winCount === 1) {
+          out.push({ worldX: obj.x, worldY: wY, radius: 70*s, color: [255, 210, 140] });
+        } else {
+          out.push({ worldX: obj.x - HW*0.52, worldY: wY, radius: 60*s, color: [255, 210, 140] });
+          out.push({ worldX: obj.x + HW*0.52, worldY: wY, radius: 60*s, color: [255, 210, 140] });
+        }
       }
     }
     return out;
@@ -834,6 +1591,27 @@ export class World {
   getHouseAt(wx, wy, worldH) {
     for (const o of this._objects) {
       if (o instanceof House && o.containsPoint(wx, wy, worldH)) return o;
+    }
+    return null;
+  }
+
+  getCinemaAt(wx, wy, worldH) {
+    for (const o of this._objects) {
+      if (o instanceof CinemaBuilding && o.containsPoint(wx, wy, worldH)) return o;
+    }
+    return null;
+  }
+
+  getBoutiqueAt(wx, wy, worldH) {
+    for (const o of this._objects) {
+      if (o instanceof BoutiqueBuilding && o.containsPoint(wx, wy, worldH)) return o;
+    }
+    return null;
+  }
+
+  getHolePortalAt(wx, wy) {
+    for (const o of this._objects) {
+      if (o instanceof HolePortal && o.containsPoint(wx, wy)) return o;
     }
     return null;
   }
