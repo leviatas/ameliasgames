@@ -50,7 +50,7 @@ export class Galaga {
     this.phase = 'entry';
     this.phaseTimer = 0;
 
-    this.player = { x: W / 2, y: H - 58, w: 32, h: 38, fireCD: 0, invTimer: 0 };
+    this.player = { x: W / 2, y: H - 48, w: 22, h: 26, fireCD: 0, invTimer: 0 };
     this.dirL    = false;
     this.dirR    = false;
     this.autoFire = false;
@@ -68,11 +68,11 @@ export class Galaga {
 
   _spawnFormation() {
     const W = this.canvas.width, H = this.canvas.height;
-    const cW = Math.min(48, (W * 0.9) / _COLS);
-    const cH = Math.min(42, cW * 0.87);
+    const cW = Math.min(38, (W * 0.88) / _COLS);
+    const cH = Math.min(30, cW * 0.80);
     const fW  = _COLS * cW;
     const bX  = (W - fW) / 2 + cW / 2;
-    const bY  = H * 0.15;
+    const bY  = H * 0.06;
 
     this._cW = cW; this._cH = cH;
     this._bX = bX; this._bY = bY;
@@ -304,7 +304,7 @@ export class Galaga {
     if (this.score > this.best) { this.best = this.score; localStorage.setItem('galaga_best', this.best); }
   }
 
-  _R(e) { return { bee: 10, fighter: 12, commander: 16 }[e.kind] ?? 11; }
+  _R(e) { return { bee: 7, fighter: 9, commander: 11 }[e.kind] ?? 8; }
 
   _boom(x, y, col) {
     const N = 7 + Math.floor(Math.random() * 5);
