@@ -89,6 +89,11 @@
         <div class="hub-name">Space Galaga</div>
         <div class="hub-desc">Destruí la invasión alienígena</div>
       </button>
+      <button class="hub-card versus" data-game="versus">
+        <div class="hub-emoji">🎮</div>
+        <div class="hub-name">2 Players</div>
+        <div class="hub-desc">Jugá de a dos</div>
+      </button>
     </div>
   </div>
 
@@ -239,6 +244,35 @@
     <button id="match3-exit" title="Salir">✕</button>
   </div>
 
+  <!-- Versus submenu (choose 2P game) -->
+  <div id="versus-submenu" class="hidden">
+    <button id="versus-back" class="corner-back">← Juegos</button>
+    <h1 class="select-title">🎮 2 Players</h1>
+    <p class="select-subtitle">Elegí un juego para dos</p>
+    <div class="hub-grid">
+      <button class="hub-card pong2p" id="versus-pong">
+        <div class="hub-emoji">🏓</div>
+        <div class="hub-name">Pong Chibi</div>
+        <div class="hub-desc">Paleta vs paleta</div>
+      </button>
+      <button class="hub-card globos2p" id="versus-globos">
+        <div class="hub-emoji">🎈</div>
+        <div class="hub-name">Tiro al Globo</div>
+        <div class="hub-desc">Pinchalos antes de que escapen</div>
+      </button>
+      <button class="hub-card sumo2p" id="versus-sumo">
+        <div class="hub-emoji">🥊</div>
+        <div class="hub-name">Sumo Chibi</div>
+        <div class="hub-desc">Empujá al rival fuera del ring</div>
+      </button>
+      <button class="hub-card cocinas2p" id="versus-cocinas">
+        <div class="hub-emoji">👨‍🍳</div>
+        <div class="hub-name">Batalla Cocinas</div>
+        <div class="hub-desc">Armá la receta antes que tu rival</div>
+      </button>
+    </div>
+  </div>
+
   <!-- Hole submenu (choose which hole game) -->
   <div id="hole-submenu" class="hidden">
     <button id="hole-submenu-back" class="corner-back">← Juegos</button>
@@ -268,6 +302,26 @@
     <button id="hole2-exit" title="Salir">✕</button>
   </div>
 
+  <!-- Pong Chibi controls -->
+  <div id="pong-ui" class="hidden">
+    <button id="pong-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Tiro al Globo controls -->
+  <div id="globos-ui" class="hidden">
+    <button id="globos-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Sumo Chibi controls -->
+  <div id="sumo-ui" class="hidden">
+    <button id="sumo-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- Batalla de Cocinas controls -->
+  <div id="cocinas-ui" class="hidden">
+    <button id="cocinas-exit" title="Salir">✕</button>
+  </div>
+
   <!-- Ice-cream shop controls -->
   <div id="helado-ui" class="hidden">
     <button id="helado-exit" title="Salir">✕</button>
@@ -294,7 +348,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.34.1</div>
+  <div id="app-version">v2.35.1</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">

@@ -772,10 +772,10 @@ body {
   cursor: pointer; user-select: none;
 }
 .galaga-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.38); }
-#galaga-left  { left: 20px; }
-#galaga-right { right: 20px; }
-#galaga-fire  { left: 50%; transform: translateX(-50%); background: rgba(180,60,220,0.45); border-color: rgba(220,120,255,0.7); }
-#galaga-fire:active { transform: translateX(-50%) scale(0.92); background: rgba(220,80,255,0.65); }
+#galaga-left  { left: 16px; }
+#galaga-right { left: 96px; }
+#galaga-fire  { right: 24px; background: rgba(180,60,220,0.45); border-color: rgba(220,120,255,0.7); }
+#galaga-fire:active { transform: scale(0.92); background: rgba(220,80,255,0.65); }
 
 /* ── Dog runner controls ── */
 #runner-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
@@ -1074,3 +1074,44 @@ body {
   .wardrobe-section { padding: 8px 14px 2px; }
   .wardrobe-header  { padding: 10px 14px 8px; font-size: 0.9rem; }
 }
+
+/* ── Versus submenu (2P game picker) ─────────────────────────────────────── */
+#versus-submenu {
+  position: fixed; inset: 0; z-index: 112;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #0a0a2e 0%, #1a1a3e 40%, #0d1b2a 100%);
+  padding: 16px 12px 24px;
+  overflow-y: auto;
+}
+#versus-submenu.hidden { display: none; }
+
+/* Hub card colours for 2P games */
+.hub-card.versus   { background: linear-gradient(135deg, #1A0030 0%, #40006A 100%); color: #E8C0FF; }
+.hub-card.versus:hover { border-color: #CC80FF; box-shadow: 0 18px 40px rgba(160,60,255,0.45); }
+.hub-card.pong2p   { background: linear-gradient(135deg, #0A1A30 0%, #0C4080 100%); color: #A0D0FF; }
+.hub-card.pong2p:hover { border-color: #60C0FF; box-shadow: 0 18px 40px rgba(40,150,255,0.4); }
+.hub-card.globos2p { background: linear-gradient(135deg, #1A0A0A 0%, #802020 100%); color: #FFB0B0; }
+.hub-card.globos2p:hover { border-color: #FF8080; box-shadow: 0 18px 40px rgba(255,80,80,0.4); }
+.hub-card.sumo2p   { background: linear-gradient(135deg, #1A1000 0%, #604000 100%); color: #FFE080; }
+.hub-card.sumo2p:hover { border-color: #FFC840; box-shadow: 0 18px 40px rgba(255,180,40,0.45); }
+.hub-card.cocinas2p { background: linear-gradient(135deg, #001A10 0%, #006040 100%); color: #80FFD0; }
+.hub-card.cocinas2p:hover { border-color: #40FFA0; box-shadow: 0 18px 40px rgba(40,255,140,0.4); }
+
+/* ── 2P game UI overlays ─────────────────────────────────────────────────── */
+#pong-ui, #globos-ui, #sumo-ui, #cocinas-ui {
+  position: fixed; inset: 0; z-index: 25; pointer-events: none;
+}
+#pong-ui.hidden, #globos-ui.hidden, #sumo-ui.hidden, #cocinas-ui.hidden { display: none; }
+#pong-ui button, #globos-ui button, #sumo-ui button, #cocinas-ui button { pointer-events: all; }
+
+#pong-exit, #globos-exit, #sumo-exit, #cocinas-exit {
+  position: absolute; top: 16px; right: 16px;
+  width: 44px; height: 44px; border-radius: 10px;
+  background: rgba(0,0,0,0.5); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-size: 1.1rem; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#pong-exit:hover, #globos-exit:hover,
+#sumo-exit:hover, #cocinas-exit:hover { background: rgba(0,0,0,0.75); }

@@ -13,6 +13,10 @@ import { Cinema }                from './Cinema.js';
 import { Helado }                from './Helado.js';
 import { Tienda, CATALOG as TIENDA_CATALOG } from './Tienda.js';
 import { Mob }                               from './Mob.js';
+import { PongChibi }      from './PongChibi.js';
+import { Globos2P }       from './Globos2P.js';
+import { Sumo2P }         from './Sumo2P.js';
+import { Cocinas2P }      from './Cocinas2P.js';
 import { getFridge, eatFood }    from './Pantry.js';
 import { getCoins, getWardrobe, getEquippedId, setEquippedId } from './Wallet.js';
 
@@ -38,8 +42,13 @@ let theater  = null;
 let helado   = null;
 let tienda   = null;
 let mob      = null;
+let pong     = null;
+let globos   = null;
+let sumo     = null;
+let cocinas  = null;
+const _2pTouches = new Map(); // pointerId → 'p1' | 'p2'
 let holeFrom = 'hub';        // 'hub' | 'world'
-let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga'
+let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas'
 let savedPos = null;         // exterior pos when inside a house
 
 let lastTime    = 0;
@@ -268,6 +277,13 @@ function showHub() {
   if (mob)    { mob.destroy(); mob = null; }
   if (galaga) { galaga.destroy(); galaga = null; }
   hideHoleSubmenu();
+  hideVersusSubmenu();
+  pong = null; globos = null; sumo = null; cocinas = null;
+  _2pTouches.clear();
+  document.getElementById('pong-ui').classList.add('hidden');
+  document.getElementById('globos-ui').classList.add('hidden');
+  document.getElementById('sumo-ui').classList.add('hidden');
+  document.getElementById('cocinas-ui').classList.add('hidden');
   hideGestureMenu();
   hideFridgeMenu();
   hideWardrobeMenu();
@@ -463,6 +479,70 @@ function exitGalaga() {
   showHub();
 }
 
+// ── 2-Player shared pointer router ───────────────────────────────────────────
+function _active2P() {
+  if (mode === 'pong'    && pong)   return pong;
+  if (mode === 'globos'  && globos) return globos;
+  if (mode === 'sumo'    && sumo)   return sumo;
+  if (mode === 'cocinas' && cocinas) return cocinas;
+  return null;
+}
+canvas.addEventListener('pointerdown', e => {
+  const g = _active2P(); if (!g) return;
+  e.preventDefault();
+  const p = canvasPoint(e);
+  const who = p.x < canvas.width / 2 ? 'p1' : 'p2';
+  _2pTouches.set(e.pointerId, who);
+  g.pointerDown(p.x, p.y, who);
+});
+canvas.addEventListener('pointermove', e => {
+  const g = _active2P(); if (!g) return;
+  const who = _2pTouches.get(e.pointerId); if (!who) return;
+  const p = canvasPoint(e);
+  g.pointerMove(p.x, p.y, who);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+  canvas.addEventListener(ev, e => {
+    const g = _active2P(); if (!g) return;
+    const who = _2pTouches.get(e.pointerId); if (!who) return;
+    g.pointerUp(who);
+    _2pTouches.delete(e.pointerId);
+  })
+);
+
+// ── Versus submenu & 2P game launchers ───────────────────────────────────────
+function showVersusSubmenu() {
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('versus-submenu').classList.remove('hidden');
+}
+function hideVersusSubmenu() {
+  document.getElementById('versus-submenu').classList.add('hidden');
+}
+function _launchVersus(uiId, modeStr) {
+  if (isTouch) forceLandscape();
+  hideVersusSubmenu();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById(uiId).classList.remove('hidden');
+  _2pTouches.clear();
+  mode = modeStr;
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function _exitVersus(uiId) {
+  document.getElementById(uiId).classList.add('hidden');
+  _2pTouches.clear();
+  showHub();
+}
+function launchPong()    { pong    = new PongChibi(canvas); _launchVersus('pong-ui',    'pong');   }
+function launchGlobos()  { globos  = new Globos2P(canvas);  _launchVersus('globos-ui',  'globos'); }
+function launchSumo()    { sumo    = new Sumo2P(canvas);    _launchVersus('sumo-ui',    'sumo');   }
+function launchCocinas() { cocinas = new Cocinas2P(canvas); _launchVersus('cocinas-ui', 'cocinas');}
+function exitPong()    { pong    = null; _exitVersus('pong-ui');    }
+function exitGlobos()  { globos  = null; _exitVersus('globos-ui');  }
+function exitSumo()    { sumo    = null; _exitVersus('sumo-ui');    }
+function exitCocinas() { cocinas = null; _exitVersus('cocinas-ui'); }
+
 // ── Cinema (watch movies, entered from the world) ────────────────────────────
 function enterCinema() {
   if (mode !== 'exterior') return;
@@ -641,6 +721,10 @@ function gameLoop(now) {
   if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
   if (mode === 'tienda' && tienda) { tienda.update(delta); tienda.render(ctx); return; }
   if (mode === 'mob'    && mob)    { mob.update(delta);    mob.render(ctx);    return; }
+  if (mode === 'pong'   && pong)   { pong.update(delta);   pong.render(ctx);   return; }
+  if (mode === 'globos' && globos) { globos.update(delta); globos.render(ctx); return; }
+  if (mode === 'sumo'   && sumo)   { sumo.update(delta);   sumo.render(ctx);   return; }
+  if (mode === 'cocinas' && cocinas) { cocinas.update(delta); cocinas.render(ctx); return; }
   update(delta);
   render();
 }
@@ -1433,19 +1517,50 @@ const playBtn = document.getElementById('play-btn');
 playBtn.addEventListener('click', beginPlay);
 playBtn.addEventListener('touchend', e => { e.preventDefault(); beginPlay(); }, { passive: false });
 
+// ── Versus submenu buttons ────────────────────────────────────────────────────
+const vsBack    = document.getElementById('versus-back');
+const vsPong    = document.getElementById('versus-pong');
+const vsGlobos  = document.getElementById('versus-globos');
+const vsSumo    = document.getElementById('versus-sumo');
+const vsCocinas = document.getElementById('versus-cocinas');
+if (vsBack)    vsBack.addEventListener('click',    () => { hideVersusSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
+if (vsPong)    { vsPong.addEventListener('click',    launchPong);    vsPong.addEventListener('touchend',    e => { e.preventDefault(); launchPong();    }, { passive: false }); }
+if (vsGlobos)  { vsGlobos.addEventListener('click',  launchGlobos);  vsGlobos.addEventListener('touchend',  e => { e.preventDefault(); launchGlobos();  }, { passive: false }); }
+if (vsSumo)    { vsSumo.addEventListener('click',    launchSumo);    vsSumo.addEventListener('touchend',    e => { e.preventDefault(); launchSumo();    }, { passive: false }); }
+if (vsCocinas) { vsCocinas.addEventListener('click', launchCocinas); vsCocinas.addEventListener('touchend', e => { e.preventDefault(); launchCocinas(); }, { passive: false }); }
+
+const pongExitBtn    = document.getElementById('pong-exit');
+const globosExitBtn  = document.getElementById('globos-exit');
+const sumoExitBtn    = document.getElementById('sumo-exit');
+const cocinasExitBtn = document.getElementById('cocinas-exit');
+if (pongExitBtn)    pongExitBtn.addEventListener('click',    exitPong);
+if (globosExitBtn)  globosExitBtn.addEventListener('click',  exitGlobos);
+if (sumoExitBtn)    sumoExitBtn.addEventListener('click',    exitSumo);
+if (cocinasExitBtn) cocinasExitBtn.addEventListener('click', exitCocinas);
+
+window.addEventListener('keydown', e => {
+  if (e.code !== 'Escape') return;
+  if      (mode === 'pong'    && pong)   { exitPong();    e.preventDefault(); }
+  else if (mode === 'globos'  && globos) { exitGlobos();  e.preventDefault(); }
+  else if (mode === 'sumo'    && sumo)   { exitSumo();    e.preventDefault(); }
+  else if (mode === 'cocinas' && cocinas){ exitCocinas(); e.preventDefault(); }
+});
+
 // Hub (game chooser)
 document.querySelectorAll('.hub-card').forEach(card => {
-  if (card.closest('#hole-submenu')) return; // submenu has its own listeners
+  if (card.closest('#hole-submenu'))   return;
+  if (card.closest('#versus-submenu')) return;
   const go = () => {
     const g = card.dataset.game;
     if (g === 'runner') launchRunner();
-    else if (g === 'cocina') launchCocina();
-    else if (g === 'match3') launchMatch3();
-    else if (g === 'hole') showHoleSubmenu();
-    else if (g === 'galaga') launchGalaga();
-    else if (g === 'helado') launchHelado();
-    else if (g === 'tienda') launchTienda();
-    else if (g === 'mob')   launchMob();
+    else if (g === 'cocina')  launchCocina();
+    else if (g === 'match3')  launchMatch3();
+    else if (g === 'hole')    showHoleSubmenu();
+    else if (g === 'galaga')  launchGalaga();
+    else if (g === 'helado')  launchHelado();
+    else if (g === 'tienda')  launchTienda();
+    else if (g === 'mob')     launchMob();
+    else if (g === 'versus')  showVersusSubmenu();
     else launchWorld();
   };
   card.addEventListener('click', go);
