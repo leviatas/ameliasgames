@@ -1,5 +1,6 @@
 // ── Endless runner mini-game (the dog 🐕) ───────────────────────────────────
 // Launched from the TV inside a house. Auto-runs forward; jump / duck to dodge.
+import { addCoins } from './Wallet.js';
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 function lerpHex(h1, h2, t) {
@@ -27,10 +28,14 @@ const OB_IMG = {};
 
 // Scenarios — cycle one per level; each restyles obstacles + background
 const SCENARIOS = [
-  { name:'Bosque', skyTop:'#9BD9F0', skyBot:'#E6F7FF', ground:'#5FBF44', groundDark:'#46962F', hill:'#9BE08A',
-    lows:[{img:'ob_forest_0',h:66},{img:'ob_forest_1',h:58}], hole:'water', plat:'wood' },
-  { name:'Ciudad', skyTop:'#AEB9C8', skyBot:'#E9EEF4', ground:'#9A9AA2', groundDark:'#74747E', hill:'#C2C6CE',
-    lows:[{img:'ob_city_0',h:46},{img:'ob_city_1',h:54},{img:'ob_city_2',h:62}], hole:'stones', plat:'stone' },
+  { name:'Bosque',   kind:'day',    skyTop:'#9BD9F0', skyBot:'#E6F7FF', ground:'#5FBF44', groundDark:'#46962F', hill:'#9BE08A',
+    lows:[{img:'ob_forest_0',h:66},{img:'ob_forest_1',h:58}], hole:'water',     plat:'wood'      },
+  { name:'Ciudad',   kind:'day',    skyTop:'#AEB9C8', skyBot:'#E9EEF4', ground:'#9A9AA2', groundDark:'#74747E', hill:'#C2C6CE',
+    lows:[{img:'ob_city_0',h:46},{img:'ob_city_1',h:54},{img:'ob_city_2',h:62}], hole:'stones', plat:'stone'     },
+  { name:'Desierto', kind:'desert', skyTop:'#C86020', skyBot:'#F0B048', ground:'#C89A50', groundDark:'#A07832', hill:'#C8A868',
+    lows:[{kind:'cactus',h:68},{kind:'cactus',h:52},{kind:'rock',h:44}], hole:'quicksand', plat:'sandstone' },
+  { name:'Cueva',    kind:'cave',   skyTop:'#141020', skyBot:'#1E1A2C', ground:'#3A3040', groundDark:'#24202E', hill:'#24203C',
+    lows:[{kind:'stalagmite',h:62},{kind:'stalagmite',h:46},{kind:'boulder',h:48}], hole:'pit', plat:'crystal'  },
 ];
 
 const GRAV = 2700, JUMP_V = 600;   // lower, snappier jump
@@ -65,7 +70,7 @@ export class Runner {
     this.curScene = SCENARIOS[lvl % SCENARIOS.length];
     this.prevScene = this.curScene; this.sceneBlend = 1;
     this.levelDist = 0;
-    this.dog = { y: 0, vy: 0, onGround: true, ducking: false, platform: null };
+    this.dog = { y: 0, vy: 0, onGround: true, ducking: false, platform: null, jumpsLeft: 2 };
     this.obstacles = []; this.spawnTimer = 1.0;
     this.coins = []; this.coinTimer = 1.4;                      // collectible hearts 💜
     this.particles = []; this.wasAir = false; this.heartsLevel = 0;
@@ -81,16 +86,24 @@ export class Runner {
   jump() {
     if (this.finished) { if (this.finishWait > 0.5) this.startLevel(this.level + 1); return; }   // next level
     if (this.gameOver) { if (this.deadFlash > 0.4) this.startLevel(this.savedLevel); return; }    // retry current
-    if (this.dog.onGround) {
-      this.dog.vy = -JUMP_V; this.dog.onGround = false; this.dog.platform = null;
-      const G = this._geom(); this._dust(G.dogX, G.groundY + this.dog.y, G.scale);
+    if (this.dog.jumpsLeft > 0) {
+      const G = this._geom();
+      const isDouble = !this.dog.onGround;
+      this.dog.vy = -JUMP_V * G.scale;
+      this.dog.jumpsLeft--;
+      if (isDouble) {
+        this._doubleJumpFX(G.dogX, G.groundY + this.dog.y, G.scale);
+      } else {
+        this.dog.onGround = false; this.dog.platform = null;
+        this._dust(G.dogX, G.groundY + this.dog.y, G.scale);
+      }
     }
   }
   setDuck(on) { if (!this.gameOver && !this.finished) this.dog.ducking = on; }
   _die() { this.gameOver = true; this.deadFlash = 0; }
   _completeLevel() {
     this.finished = true; this.finishWait = 0;
-    this.dog.y = 0; this.dog.vy = 0; this.dog.onGround = true; this.falling = false; this.dog.ducking = false;
+    this.dog.y = 0; this.dog.vy = 0; this.dog.onGround = true; this.dog.jumpsLeft = 2; this.falling = false; this.dog.ducking = false;
     const next = this.level + 1;
     if (next > this.savedLevel) { this.savedLevel = next; try { localStorage.setItem('runner_level', next); } catch(e){} }
   }
@@ -106,8 +119,13 @@ export class Runner {
     return { x: G.dogX - w*0.45, y: feetY - h, w, h };
   }
   _lowDims(o, G) {
-    const sc = G.scale, im = OB_IMG[o.imgName];
+    const sc = G.scale;
     const h = (o.oh || 50) * sc;
+    if (o.kind) {
+      const kw = { cactus: 28, rock: 56, stalagmite: 22, boulder: 56 };
+      return { w: (kw[o.kind] || 36) * sc, h };
+    }
+    const im = OB_IMG[o.imgName];
     const w = (im && im.naturalHeight) ? im.naturalWidth * (h / im.naturalHeight) : 40*sc;
     return { w, h };
   }
@@ -132,7 +150,7 @@ export class Runner {
     else               type = 'hole';
     const o = { x: G.W + 40, type, seed: Math.random(), scene: this.curScene };
     if (type === 'hole') o.w = (80 + Math.random()*55) * G.scale;
-    if (type === 'low')  { const p = this.curScene.lows[Math.floor(Math.random()*this.curScene.lows.length)]; o.imgName = p.img; o.oh = p.h; }
+    if (type === 'low')  { const p = this.curScene.lows[Math.floor(Math.random()*this.curScene.lows.length)]; if (p.img) o.imgName = p.img; else o.kind = p.kind; o.oh = p.h; }
     this.obstacles.push(o);
   }
 
@@ -156,6 +174,19 @@ export class Runner {
         vx: -(30 + Math.random()*70)*sc, vy: -(20 + Math.random()*70)*sc,
         life: 0, max: 0.35 + Math.random()*0.25, size: (3 + Math.random()*3)*sc,
         grav: 280*sc, kind: 'dust',
+      });
+    }
+  }
+  _doubleJumpFX(x, feetY, sc) {
+    const colors = ['#C080FF', '#FF80E0', '#80C0FF', '#FFFFFF'];
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const sp = (60 + Math.random() * 80) * sc;
+      this.particles.push({
+        x: x + Math.cos(a) * 10 * sc, y: feetY - 14 * sc,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 50 * sc,
+        life: 0, max: 0.38 + Math.random() * 0.22, size: (2.5 + Math.random() * 3) * sc,
+        grav: 120 * sc, kind: 'spark', color: colors[i % colors.length],
       });
     }
   }
@@ -199,7 +230,7 @@ export class Runner {
     // falling into a pit (hole) — drop, then game over
     if (this.falling) {
       this.t += dt;
-      this.dog.vy += GRAV * dt; this.dog.y += this.dog.vy * dt;
+      this.dog.vy += GRAV * G.scale * dt; this.dog.y += this.dog.vy * dt;
       if (this.dog.y > 180 * G.scale) this._die();
       return;
     }
@@ -224,7 +255,7 @@ export class Runner {
     const dog = this.dog;
     const prevAir = !dog.onGround;
     const feetPrev = G.groundY + dog.y;
-    if (!dog.onGround) { dog.vy += GRAV * dt; dog.y += dog.vy * dt; }
+    if (!dog.onGround) { dog.vy += GRAV * G.scale * dt; dog.y += dog.vy * dt; }
     let feet = G.groundY + dog.y;
 
     // ── Floating platforms: land on top from above, ride along ──
@@ -234,9 +265,9 @@ export class Runner {
       const b = this._obsBox(o, G), top = b.y;
       const within = G.dogX >= b.x && G.dogX <= b.x + b.w;
       if (within && dog.vy >= 0 && feetPrev <= top + 2 && feet >= top) {
-        dog.y = top - G.groundY; dog.vy = 0; dog.onGround = true; feet = top; onPlat = o;
+        dog.y = top - G.groundY; dog.vy = 0; dog.onGround = true; dog.jumpsLeft = 2; feet = top; onPlat = o;
       }
-      if (dog.platform === o && within) { dog.y = top - G.groundY; dog.vy = 0; dog.onGround = true; feet = top; onPlat = o; }
+      if (dog.platform === o && within) { dog.y = top - G.groundY; dog.vy = 0; dog.onGround = true; dog.jumpsLeft = 2; feet = top; onPlat = o; }
     }
     if (onPlat) dog.platform = onPlat;
     else if (dog.platform) {            // walked off the edge or it vanished
@@ -249,7 +280,7 @@ export class Runner {
     if (!dog.platform) {
       if (overHole) {
         if (dog.y >= -1) { this.falling = true; dog.onGround = false; if (dog.vy < 0) dog.vy = 0; }
-      } else if (dog.y >= 0) { dog.y = 0; dog.vy = 0; dog.onGround = true; }
+      } else if (dog.y >= 0) { dog.y = 0; dog.vy = 0; dog.onGround = true; dog.jumpsLeft = 2; }
     }
 
     // landing puff (came down onto ground or a platform)
@@ -281,6 +312,7 @@ export class Runner {
       if (!c.got && c.x > db0.x - hr && c.x < db0.x + db0.w + hr && c.y > db0.y - hr && c.y < db0.y + db0.h + hr) {
         c.got = true; this.hearts++; this.heartsLevel++;
         try { localStorage.setItem('runner_hearts', this.hearts); } catch(e){}
+        addCoins(1);
         this._heartBurst(c.x, c.y, G.scale);
       }
     }
@@ -318,8 +350,8 @@ export class Runner {
     const A = this.prevScene, Bs = this.curScene, bf = this.sceneBlend;
     const skyTop = lerpHex(A.skyTop, Bs.skyTop, bf);
     const skyBot = lerpHex(A.skyBot, Bs.skyBot, bf);
-    const grnd   = GROUND;       // floor never changes between scenarios
-    const grndD  = GROUND_DARK;
+    const grnd   = lerpHex(A.ground, Bs.ground, bf);
+    const grndD  = lerpHex(A.groundDark, Bs.groundDark, bf);
     const hill   = lerpHex(A.hill, Bs.hill, bf);
     const night  = false;
 
@@ -328,14 +360,58 @@ export class Runner {
     sg.addColorStop(0, skyTop); sg.addColorStop(1, skyBot);
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, groundY);
 
-    // stars (night)
-    if (night) {
-      ctx.fillStyle = '#fff';
-      for (const s of this.stars) { ctx.globalAlpha = 0.6 + 0.4*Math.sin(this.t*2 + s.x*20); ctx.beginPath(); ctx.arc(s.x*W, s.y*groundY, s.r, 0, Math.PI*2); ctx.fill(); }
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#F2E8B8'; ctx.beginPath(); ctx.arc(W*0.82, groundY*0.22, 26*scale, 0, Math.PI*2); ctx.fill();
+    // sky decorations — scene-specific
+    if (Bs.kind === 'cave') {
+      // floating crystals on cave ceiling
+      const crystalCols = ['#6040C0','#4060E0','#8050D0','#5070E8'];
+      for (let i = 0; i < 7; i++) {
+        const cx = ((i * W / 6.5 + this.dist * 0.06) % W + W) % W;
+        const cy = groundY * (0.12 + (i % 3) * 0.12);
+        const cr = (5 + (i % 3) * 3) * scale;
+        ctx.save();
+        ctx.globalAlpha = 0.28 + 0.14 * Math.sin(this.t * 1.8 + i * 1.1);
+        ctx.fillStyle = crystalCols[i % 4];
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - cr * 2.4); ctx.lineTo(cx + cr * 0.65, cy); ctx.lineTo(cx, cy + cr * 0.7); ctx.lineTo(cx - cr * 0.65, cy);
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 0.10 + 0.05 * Math.sin(this.t * 2 + i);
+        ctx.fillStyle = '#A090FF';
+        ctx.beginPath(); ctx.arc(cx, cy - cr * 0.8, cr * 2, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      // bats
+      for (let i = 0; i < 4; i++) {
+        const bx = ((i * W * 0.26 + this.dist * (0.07 + i * 0.03)) % W + W) % W;
+        const by = groundY * (0.36 + Math.sin(this.t * (1.1 + i * 0.2) + i * 0.8) * 0.14 + i * 0.06);
+        const flap = Math.sin(this.t * 8 + i * 1.5);
+        ctx.save(); ctx.globalAlpha = 0.45; ctx.fillStyle = '#120C1A';
+        ctx.beginPath(); ctx.ellipse(bx, by, 4*scale, 2.5*scale, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(bx-4*scale,by); ctx.quadraticCurveTo(bx-11*scale, by-5*scale*flap, bx-13*scale, by+2*scale); ctx.quadraticCurveTo(bx-8*scale, by+2*scale, bx-4*scale, by); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(bx+4*scale,by); ctx.quadraticCurveTo(bx+11*scale, by-5*scale*flap, bx+13*scale, by+2*scale); ctx.quadraticCurveTo(bx+8*scale, by+2*scale, bx+4*scale, by); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+    } else if (Bs.kind === 'desert') {
+      // scorching sun with corona
+      ctx.save();
+      ctx.globalAlpha = 0.35; ctx.fillStyle = '#FFB020';
+      ctx.beginPath(); ctx.arc(W*0.80, groundY*0.20, 50*scale, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#FFE050';
+      ctx.beginPath(); ctx.arc(W*0.80, groundY*0.20, 36*scale, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+      // heat shimmer near horizon
+      ctx.save();
+      for (let i = 0; i < 5; i++) {
+        const hy = groundY * (0.72 + i * 0.055);
+        const w0 = Math.sin(this.t * (2.5 + i * 0.4) + i * 1.2) * (7 + i * 3) * scale;
+        ctx.strokeStyle = `rgba(255,${155 + i * 10},40,${0.055 - i * 0.008})`;
+        ctx.lineWidth = (2.5 - i * 0.35) * scale;
+        ctx.beginPath(); ctx.moveTo(0, hy);
+        ctx.quadraticCurveTo(W * 0.3, hy + w0, W * 0.65, hy - w0);
+        ctx.quadraticCurveTo(W * 0.82, hy + w0 * 0.5, W, hy); ctx.stroke();
+      }
+      ctx.restore();
     } else {
-      // sun + clouds
+      // default day: sun + clouds
       ctx.fillStyle = 'rgba(255,245,200,0.9)'; ctx.beginPath(); ctx.arc(W*0.82, groundY*0.24, 30*scale, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       for (const c of this.clouds) {
@@ -344,12 +420,32 @@ export class Runner {
       }
     }
 
-    // parallax hills
-    ctx.fillStyle = hill;
-    const hillOff = (this.dist * 0.2) % (W/2);
-    for (let i = -1; i < 3; i++) {
-      const bx = i*(W/2) - hillOff;
-      ctx.beginPath(); ctx.ellipse(bx + W/4, groundY, W*0.32, 70*scale, 0, Math.PI, 0); ctx.fill();
+    // parallax hills / dunes / cave stalactites
+    if (Bs.kind === 'cave') {
+      ctx.fillStyle = hill;
+      const stOff = (this.dist * 0.14) % (W * 0.55);
+      for (let i = -1; i < 3; i++) {
+        const bx = i * (W * 0.55) - stOff;
+        ctx.beginPath(); ctx.moveTo(bx + W*0.10, 0); ctx.lineTo(bx + W*0.28, 0); ctx.lineTo(bx + W*0.19, (54 + Math.sin(i * 1.3) * 16) * scale); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(bx + W*0.31, 0); ctx.lineTo(bx + W*0.42, 0); ctx.lineTo(bx + W*0.365, (36 + Math.sin(i * 2.1) * 11) * scale); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(bx + W*0.45, 0); ctx.lineTo(bx + W*0.52, 0); ctx.lineTo(bx + W*0.485, (24 + Math.sin(i * 1.7) * 7) * scale); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillRect(0, 0, W, 10 * scale); // solid ceiling edge
+    } else if (Bs.kind === 'desert') {
+      // wide, flat sand dunes
+      ctx.fillStyle = hill;
+      const hillOff = (this.dist * 0.17) % (W * 0.72);
+      for (let i = -1; i < 3; i++) {
+        const bx = i * (W * 0.72) - hillOff;
+        ctx.beginPath(); ctx.ellipse(bx + W * 0.36, groundY, W * 0.42, 34 * scale, 0, Math.PI, 0); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = hill;
+      const hillOff = (this.dist * 0.2) % (W/2);
+      for (let i = -1; i < 3; i++) {
+        const bx = i*(W/2) - hillOff;
+        ctx.beginPath(); ctx.ellipse(bx + W/4, groundY, W*0.32, 70*scale, 0, Math.PI, 0); ctx.fill();
+      }
     }
 
     // ground
@@ -377,7 +473,7 @@ export class Runner {
     for (const p of this.particles) {
       const a = Math.max(0, 1 - p.life / p.max);
       ctx.globalAlpha = a;
-      if (p.kind === 'spark') { ctx.fillStyle = '#FFD23A'; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); }
+      if (p.kind === 'spark') { ctx.fillStyle = p.color || '#FFD23A'; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); }
       else { ctx.fillStyle = '#CDBFA6'; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); }
     }
     ctx.globalAlpha = 1;
@@ -492,6 +588,28 @@ export class Runner {
         ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2*sc;
         for (let i = 0; i < 3; i++) { const yy = G.groundY + (5 + i*7)*sc; ctx.beginPath(); ctx.moveTo(x0+6*sc, yy + Math.sin(this.t*4+i)*2*sc); ctx.lineTo(x0+w-6*sc, yy + Math.cos(this.t*4+i)*2*sc); ctx.stroke(); }
         ctx.fillStyle = '#3E7A2E'; ctx.fillRect(x0-4*sc, G.groundY, 5*sc, 7*sc); ctx.fillRect(x0+w-1*sc, G.groundY, 5*sc, 7*sc);
+      } else if (scene.hole === 'quicksand') {
+        ctx.fillStyle = '#C4924A'; ctx.fillRect(x0, G.groundY, w, H - G.groundY);
+        ctx.strokeStyle = 'rgba(155,105,38,0.65)'; ctx.lineWidth = 2*sc;
+        for (let i = 0; i < 3; i++) {
+          const phase = (this.t * 1.0 + i * 0.4) % 1;
+          const ry = G.groundY + (7 + i * 9) * sc;
+          ctx.save(); ctx.globalAlpha = Math.sin(phase * Math.PI) * 0.75;
+          ctx.beginPath(); ctx.ellipse(x0 + w/2, ry, (w/2 - 4*sc) * (0.4 + phase * 0.6), 5*sc, 0, 0, Math.PI*2);
+          ctx.stroke(); ctx.restore();
+        }
+        ctx.fillStyle = '#A87030'; ctx.fillRect(x0, G.groundY, w, 5*sc);
+        ctx.fillRect(x0-3*sc, G.groundY, 4*sc, 6*sc); ctx.fillRect(x0+w-1*sc, G.groundY, 4*sc, 6*sc);
+      } else if (scene.hole === 'pit') {
+        ctx.fillStyle = '#0C0810'; ctx.fillRect(x0, G.groundY, w, H - G.groundY);
+        ctx.fillStyle = '#26203A'; ctx.fillRect(x0, G.groundY, w, 5*sc);
+        ctx.save();
+        ctx.globalAlpha = 0.22 + 0.10 * Math.sin(this.t * 2.5);
+        const pg = ctx.createLinearGradient(x0, G.groundY + 16*sc, x0, H);
+        pg.addColorStop(0, 'rgba(0,0,0,0)'); pg.addColorStop(1, 'rgba(90,50,170,0.55)');
+        ctx.fillStyle = pg; ctx.fillRect(x0, G.groundY + 16*sc, w, H - G.groundY - 16*sc);
+        ctx.restore();
+        ctx.fillStyle = '#26203A'; ctx.fillRect(x0-3*sc, G.groundY, 4*sc, 6*sc); ctx.fillRect(x0+w-1*sc, G.groundY, 4*sc, 6*sc);
       } else { // stones
         ctx.fillStyle = '#2C2C32'; ctx.fillRect(x0, G.groundY, w, H - G.groundY);
         ctx.fillStyle = '#74747C';
@@ -514,6 +632,18 @@ export class Runner {
         ctx.fillStyle = '#B6B6BE'; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, 6*sc, [4*sc,4*sc,0,0]); ctx.fill();
         ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1*sc;
         for (let x = b.x + 20*sc; x < b.x + b.w; x += 22*sc) { ctx.beginPath(); ctx.moveTo(x, b.y + 6*sc); ctx.lineTo(x, b.y + b.h); ctx.stroke(); }
+      } else if (scene.plat === 'sandstone') {
+        ctx.fillStyle = '#C89A50'; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 4*sc); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#DEB060'; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, 6*sc, [4*sc,4*sc,0,0]); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.13)'; ctx.lineWidth = 1*sc;
+        for (let x = b.x + 24*sc; x < b.x + b.w; x += 26*sc) { ctx.beginPath(); ctx.moveTo(x, b.y + 6*sc); ctx.lineTo(x, b.y + b.h); ctx.stroke(); }
+      } else if (scene.plat === 'crystal') {
+        ctx.fillStyle = '#28203A'; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 4*sc); ctx.fill(); ctx.stroke();
+        const cg = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y);
+        cg.addColorStop(0,'#7050C0'); cg.addColorStop(0.5,'#B090FF'); cg.addColorStop(1,'#7050C0');
+        ctx.fillStyle = cg; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, 6*sc, [4*sc,4*sc,0,0]); ctx.fill();
+        ctx.save(); ctx.globalAlpha = 0.14 + 0.07 * Math.sin(this.t * 3);
+        ctx.fillStyle = '#9070E0'; ctx.beginPath(); ctx.roundRect(b.x-2*sc, b.y-2*sc, b.w+4*sc, b.h+4*sc, 6*sc); ctx.fill(); ctx.restore();
       } else { // wood + grass
         ctx.fillStyle = '#A9743E'; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 4*sc); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#6FC457'; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, 6*sc, [4*sc,4*sc,0,0]); ctx.fill();
@@ -540,12 +670,64 @@ export class Runner {
       ctx.restore(); return;
     }
 
-    // low obstacle (image: trunk / logs / stones / boulder)
-    const im = OB_IMG[o.imgName], d = this._lowDims(o, G);
-    if (im && im.naturalHeight) {
-      ctx.drawImage(im, o.x, G.groundY - d.h, d.w, d.h);
+    // low obstacle — procedural (desert/cave) or image-based (bosque/ciudad)
+    const d = this._lowDims(o, G);
+    if (o.kind === 'cactus') {
+      const bx = o.x + d.w/2, by = G.groundY, h = d.h;
+      ctx.strokeStyle = 'rgba(20,50,10,0.7)'; ctx.lineWidth = 1.5*sc;
+      ctx.fillStyle = '#3A7A2A';
+      ctx.beginPath(); ctx.roundRect(bx - 8*sc, by - h, 16*sc, h, 4*sc); ctx.fill(); ctx.stroke();
+      if (h > 42*sc) {
+        ctx.beginPath(); ctx.roundRect(bx - 22*sc, by - h*0.60, 14*sc, 8*sc, 4*sc); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.roundRect(bx - 22*sc, by - h*0.84, 8*sc, h*0.24+2*sc, 4*sc); ctx.fill(); ctx.stroke();
+      }
+      if (h > 50*sc) {
+        ctx.beginPath(); ctx.roundRect(bx + 8*sc, by - h*0.50, 14*sc, 8*sc, 4*sc); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.roundRect(bx + 14*sc, by - h*0.74, 8*sc, h*0.24+2*sc, 4*sc); ctx.fill(); ctx.stroke();
+      }
+      ctx.strokeStyle = '#8AAA60'; ctx.lineWidth = sc;
+      for (let i = 0; i < 5; i++) {
+        const sy = by - h * (0.14 + i * 0.15);
+        ctx.beginPath(); ctx.moveTo(bx - 9*sc, sy); ctx.lineTo(bx - 14*sc, sy - 3*sc); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(bx + 9*sc, sy); ctx.lineTo(bx + 14*sc, sy - 3*sc); ctx.stroke();
+      }
+    } else if (o.kind === 'rock') {
+      const bx = o.x + d.w/2, by = G.groundY, h = d.h, w2 = d.w;
+      const rg = ctx.createLinearGradient(bx - w2/2, by - h, bx + w2/2, by);
+      rg.addColorStop(0, '#C09060'); rg.addColorStop(1, '#886040');
+      ctx.fillStyle = rg; ctx.strokeStyle = 'rgba(20,12,6,0.8)'; ctx.lineWidth = 2*sc;
+      ctx.beginPath();
+      ctx.moveTo(bx - w2*0.40, by); ctx.lineTo(bx - w2*0.46, by - h*0.50);
+      ctx.lineTo(bx - w2*0.24, by - h*0.86); ctx.lineTo(bx + w2*0.10, by - h*0.96);
+      ctx.lineTo(bx + w2*0.40, by - h*0.60); ctx.lineTo(bx + w2*0.46, by);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.13)';
+      ctx.beginPath(); ctx.moveTo(bx - w2*0.18, by - h*0.70); ctx.lineTo(bx + w2*0.08, by - h*0.88); ctx.lineTo(bx + w2*0.20, by - h*0.60); ctx.closePath(); ctx.fill();
+    } else if (o.kind === 'stalagmite') {
+      const bx = o.x + d.w/2, by = G.groundY, h = d.h, w2 = d.w;
+      const sg = ctx.createLinearGradient(bx, by, bx, by - h);
+      sg.addColorStop(0, '#4A4050'); sg.addColorStop(1, '#7060A0');
+      ctx.fillStyle = sg; ctx.strokeStyle = 'rgba(20,12,6,0.7)'; ctx.lineWidth = 2*sc;
+      ctx.beginPath();
+      ctx.moveTo(bx - w2*0.48, by); ctx.lineTo(bx - w2*0.16, by - h*0.78); ctx.lineTo(bx, by - h); ctx.lineTo(bx + w2*0.16, by - h*0.78); ctx.lineTo(bx + w2*0.48, by);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.save(); ctx.globalAlpha = 0.5 + 0.2 * Math.sin(this.t * 3 + (o.seed || 0) * 5);
+      ctx.fillStyle = '#C0A0FF'; ctx.beginPath(); ctx.arc(bx, by - h, 3*sc, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    } else if (o.kind === 'boulder') {
+      const bx = o.x + d.w/2, by = G.groundY, h = d.h, w2 = d.w;
+      const bg = ctx.createRadialGradient(bx - w2*0.15, by - h*0.62, 4*sc, bx, by - h*0.48, w2*0.52);
+      bg.addColorStop(0, '#5A5070'); bg.addColorStop(1, '#2A2030');
+      ctx.fillStyle = bg; ctx.strokeStyle = 'rgba(20,12,6,0.7)'; ctx.lineWidth = 2*sc;
+      ctx.beginPath(); ctx.ellipse(bx, by - h*0.46, w2*0.46, h*0.46, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(180,160,220,0.14)';
+      ctx.beginPath(); ctx.ellipse(bx - w2*0.14, by - h*0.66, w2*0.19, h*0.17, -0.3, 0, Math.PI*2); ctx.fill();
     } else {
-      ctx.fillStyle = '#7A5230'; ctx.beginPath(); ctx.roundRect(o.x, G.groundY - d.h, d.w, d.h, 6*sc); ctx.fill(); ctx.stroke();
+      const im = OB_IMG[o.imgName];
+      if (im && im.naturalHeight) {
+        ctx.drawImage(im, o.x, G.groundY - d.h, d.w, d.h);
+      } else {
+        ctx.fillStyle = '#7A5230'; ctx.beginPath(); ctx.roundRect(o.x, G.groundY - d.h, d.w, d.h, 6*sc); ctx.fill(); ctx.stroke();
+      }
     }
     ctx.restore();
   }

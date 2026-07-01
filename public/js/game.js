@@ -5,6 +5,16 @@ import { Controls }              from './Controls.js';
 import { TouchControls }         from './TouchControls.js';
 import { Runner }                from './Runner.js';
 import { Cocina }                from './Cocina.js';
+import { Match3 }                from './Match3.js';
+import { Hole }                  from './Hole.js';
+import { Hole2 }                 from './Hole2.js';
+import { Galaga }                from './Galaga.js';
+import { Cinema }                from './Cinema.js';
+import { Helado }                from './Helado.js';
+import { Tienda, CATALOG as TIENDA_CATALOG } from './Tienda.js';
+import { Mob }                               from './Mob.js';
+import { getFridge, eatFood }    from './Pantry.js';
+import { getCoins, getWardrobe, getEquippedId, setEquippedId } from './Wallet.js';
 
 // ── Canvas ─────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('game-canvas');
@@ -20,7 +30,16 @@ let world, character, controls, touchControls;
 let interior = null;
 let runner   = null;
 let cocina   = null;
-let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina'
+let match3   = null;
+let hole     = null;
+let hole2    = null;
+let galaga   = null;
+let theater  = null;
+let helado   = null;
+let tienda   = null;
+let mob      = null;
+let holeFrom = 'hub';        // 'hub' | 'world'
+let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga'
 let savedPos = null;         // exterior pos when inside a house
 
 let lastTime    = 0;
@@ -176,9 +195,10 @@ function fadeFromBlack() {
 
 // ── Enter / Exit house ─────────────────────────────────────────────────────
 function enterHouse(house) {
+  hideFridgeMenu();
   savedPos = { x: character.x, y: character.y };
   fadeToBlack(() => {
-    interior = new Interior(house._wall, house._roof);
+    interior = new Interior(house._wall, house._roof, house.x + house.y);
     mode     = 'interior';
     character.x = INTERIOR_W / 2;
     character.y = INTERIOR_H - 200;   // inside room, not near door
@@ -193,6 +213,7 @@ function enterHouse(house) {
 }
 
 function exitHouse() {
+  hideFridgeMenu();
   fadeToBlack(() => {
     if (interior) { interior.destroy(); interior = null; }
     mode            = 'exterior';
@@ -230,7 +251,8 @@ function saveState() {
 { const p = loadState(); if (p && p.look) look = Object.assign({}, DEFAULT_CFG, p.look); }
 
 // ── Game hub (main menu: choose which game to play) ─────────────────────────
-let runnerFrom = 'tv';   // 'tv' (from a house) | 'hub' (standalone)
+let runnerFrom  = 'tv';    // 'tv' (from a house) | 'hub' (standalone)
+let cocinaFrom  = 'hub';   // 'kitchen' (from a house) | 'hub' (standalone)
 
 function showHub() {
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
@@ -238,10 +260,27 @@ function showHub() {
   mode   = 'exterior';
   runner = null;
   cocina = null;
+  match3 = null;
+  hole = null;
+  theater = null;
+  helado = null;
+  tienda = null;
+  if (mob)    { mob.destroy(); mob = null; }
+  if (galaga) { galaga.destroy(); galaga = null; }
+  hideHoleSubmenu();
   hideGestureMenu();
+  hideFridgeMenu();
+  hideWardrobeMenu();
   document.getElementById('cust-panel').classList.add('hidden');
   document.getElementById('runner-ui').classList.add('hidden');
   document.getElementById('cocina-ui').classList.add('hidden');
+  document.getElementById('match3-ui').classList.add('hidden');
+  document.getElementById('hole-ui').classList.add('hidden');
+  document.getElementById('cinema-ui').classList.add('hidden');
+  document.getElementById('helado-ui').classList.add('hidden');
+  document.getElementById('tienda-ui').classList.add('hidden');
+  document.getElementById('mob-ui').classList.add('hidden');
+  document.getElementById('galaga-ui').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('hub-screen').classList.remove('hidden');
@@ -269,6 +308,7 @@ function launchRunner() {
 // ── Cooking mini-game ────────────────────────────────────────────────────────
 function launchCocina() {
   if (isTouch) forceLandscape();
+  cocinaFrom = 'hub';
   document.getElementById('hub-screen').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -278,16 +318,207 @@ function launchCocina() {
   lastTime = performance.now();
   if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
 }
+// ── Match-3 mini-game ────────────────────────────────────────────────────────
+function launchMatch3() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('match3-ui').classList.remove('hidden');
+  match3 = new Match3(canvas);
+  mode   = 'match3';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitMatch3() {
+  document.getElementById('match3-ui').classList.add('hidden');
+  match3 = null;
+  showHub();
+}
+
+// ── Ice-cream shop mini-game ─────────────────────────────────────────────────
+function launchHelado() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('helado-ui').classList.remove('hidden');
+  helado = new Helado(canvas);
+  mode   = 'helado';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitHelado() {
+  document.getElementById('helado-ui').classList.add('hidden');
+  helado = null;
+  showHub();
+}
+
+// ── Clothing store ───────────────────────────────────────────────────────────
+function launchTienda() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('tienda-ui').classList.remove('hidden');
+  tienda = new Tienda(canvas,
+    () => look,
+    (newLook) => { look = Object.assign({}, newLook); if (character) Object.assign(character.cfg, look); drawSelectionPreviews(); updateHUDPortrait(); saveState(); }
+  );
+  mode = 'tienda';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitTienda() {
+  document.getElementById('tienda-ui').classList.add('hidden');
+  tienda = null;
+  showHub();
+}
+
+// ── Mob Control mini-game ─────────────────────────────────────────────────────
+function launchMob() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('mob-ui').classList.remove('hidden');
+  mob  = new Mob(canvas);
+  mode = 'mob';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitMob() {
+  document.getElementById('mob-ui').classList.add('hidden');
+  if (mob) { mob.destroy(); mob = null; }
+  showHub();
+}
+
+// ── Hole mini-game ───────────────────────────────────────────────────────────
+function _openHole() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('hole-ui').classList.remove('hidden');
+  hole = new Hole(canvas);
+  mode = 'hole';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function showHoleSubmenu() {
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('hole-submenu').classList.remove('hidden');
+}
+function hideHoleSubmenu() {
+  document.getElementById('hole-submenu').classList.add('hidden');
+}
+function launchHole() { holeFrom = 'hub'; hideHoleSubmenu(); _openHole(); }    // from the game chooser
+function enterHoleFromWorld() { holeFrom = 'world'; _openHole(); }  // from the world portal
+function exitHole() {
+  document.getElementById('hole-ui').classList.add('hidden');
+  hole = null;
+  if (holeFrom === 'world') {
+    mode = 'exterior';
+    document.getElementById('hud').classList.remove('hidden');
+    lastTime = performance.now();
+  } else {
+    showHub();
+  }
+}
+
+// ── Hole2 — Festín de comidas ─────────────────────────────────────────────────
+function launchHole2() {
+  if (isTouch) forceLandscape();
+  hideHoleSubmenu();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('hole2-ui').classList.remove('hidden');
+  hole2 = new Hole2(canvas);
+  mode = 'hole2';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitHole2() {
+  document.getElementById('hole2-ui').classList.add('hidden');
+  hole2 = null;
+  showHub();
+}
+
+// ── Galaga — space shooter ────────────────────────────────────────────────────
+function launchGalaga() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('galaga-ui').classList.remove('hidden');
+  galaga = new Galaga(canvas);
+  mode = 'galaga';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitGalaga() {
+  document.getElementById('galaga-ui').classList.add('hidden');
+  if (galaga) { galaga.destroy(); galaga = null; }
+  showHub();
+}
+
+// ── Cinema (watch movies, entered from the world) ────────────────────────────
+function enterCinema() {
+  if (mode !== 'exterior') return;
+  if (isTouch) forceLandscape();
+  hideGestureMenu(); hideFridgeMenu();
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('cinema-ui').classList.remove('hidden');
+  theater = new Cinema(canvas);
+  mode = 'cinema';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitCinema() {
+  document.getElementById('cinema-ui').classList.add('hidden');
+  theater = null;
+  mode = 'exterior';
+  document.getElementById('hud').classList.remove('hidden');
+  lastTime = performance.now();
+}
+function toggleLie() {
+  if (!character) return;
+  if (character.state === 'lie') {
+    character.state = 'walk';
+  } else {
+    character.state = 'lie';
+    // Snap to bed center; y=252 > bed.y=250 so character sorts on top in depth order
+    character.x = INTERIOR_W - 300;
+    character.y = 252;
+  }
+}
+function enterCocina() {              // launched from the kitchen counter inside a house
+  if (mode !== 'interior') return;
+  hideGestureMenu();
+  hideFridgeMenu();
+  cocinaFrom = 'kitchen';
+  cocina = new Cocina(canvas);
+  mode = 'cocina';
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('cocina-ui').classList.remove('hidden');
+}
 function exitCocina() {
   document.getElementById('cocina-ui').classList.add('hidden');
   cocina = null;
-  showHub();
+  if (cocinaFrom === 'kitchen') {
+    mode = 'interior';
+    document.getElementById('hud').classList.remove('hidden');
+  } else {
+    showHub();
+  }
 }
 
 // ── Dog runner mini-game ─────────────────────────────────────────────────────
 function enterRunner() {              // launched from the TV inside a house
   if (mode !== 'interior') return;
   hideGestureMenu();
+  hideFridgeMenu();
   runnerFrom = 'tv';
   runner = new Runner(canvas);
   mode = 'runner';
@@ -378,6 +609,8 @@ function updateHUDPortrait() {
   ctx2.clearRect(0, 0, c.width, c.height);
   const tmp = character || new Character(0, 0, look);
   tmp.drawPreview(ctx2, c.width / 2, c.height - 3, (c.height - 6) / 132);
+  const coinEl = document.getElementById('coin-count');
+  if (coinEl) coinEl.textContent = getCoins();
 }
 
 // Selection preview — composite avatar with the current look
@@ -395,8 +628,19 @@ function gameLoop(now) {
   animFrameId = requestAnimationFrame(gameLoop);
   const delta = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
+  // Full-screen mini-games own the whole canvas; start from a clean transform
+  // (defends against any residual transform left by the world/interior render).
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (mode === 'runner' && runner) { runner.update(delta); runner.render(ctx); return; }
   if (mode === 'cocina' && cocina) { cocina.update(delta); cocina.render(ctx); return; }
+  if (mode === 'match3' && match3) { match3.update(delta); match3.render(ctx); return; }
+  if (mode === 'hole'  && hole)  { hole.update(delta);  hole.render(ctx);  return; }
+  if (mode === 'hole2'  && hole2)  { hole2.update(delta);  hole2.render(ctx);  return; }
+  if (mode === 'galaga' && galaga) { galaga.update(delta); galaga.render(ctx); return; }
+  if (mode === 'cinema' && theater) { theater.update(delta); theater.render(ctx); return; }
+  if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
+  if (mode === 'tienda' && tienda) { tienda.update(delta); tienda.render(ctx); return; }
+  if (mode === 'mob'    && mob)    { mob.update(delta);    mob.render(ctx);    return; }
   update(delta);
   render();
 }
@@ -443,6 +687,8 @@ function update(delta) {
     character.state = 'walk';
   }
   if (moving) hideGestureMenu();
+  if (moving) hideFridgeMenu();
+  if (moving) hideWardrobeMenu();
 
   if (moving) {
     const spd  = controls.sprint ? character.sprintSpeed : character.speed;
@@ -473,7 +719,7 @@ function update(delta) {
           if (Math.hypot(character.x - bed.x, character.y - bed.y) < BED_R) {
             character.state = 'lie';
             character.x = bed.x;
-            character.y = bed.y;
+            character.y = bed.y;  // already 252, above bed's draw y=250
             break;
           }
         }
@@ -680,17 +926,151 @@ document.querySelectorAll('.gesture-btn').forEach(b => {
 });
 document.getElementById('gesture-close').addEventListener('click', hideGestureMenu);
 
+// ── Fridge menu ─────────────────────────────────────────────────────────────
+const fridgeMenu = document.getElementById('fridge-menu');
+const fridgeItems = document.getElementById('fridge-items');
+let fridgeMenuOpen = false;
+
+function renderFridgeMenu() {
+  const foods = getFridge();
+  const entries = Object.entries(foods).sort((a, b) => a[0].localeCompare(b[0]));
+  fridgeItems.textContent = '';
+  if (!entries.length) {
+    const empty = document.createElement('div');
+    empty.className = 'fridge-empty';
+    empty.textContent = 'Todavía no hay comida. Cociná platos en Cocina con Labubu y van a aparecer acá.';
+    fridgeItems.appendChild(empty);
+    return;
+  }
+  for (const [name, item] of entries) {
+    const row = document.createElement('div');
+    row.className = 'fridge-item';
+    const emoji = document.createElement('div');
+    emoji.className = 'fridge-emoji';
+    emoji.textContent = item.emoji;
+    const meta = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'fridge-name';
+    title.textContent = name;
+    const count = document.createElement('div');
+    count.className = 'fridge-count';
+    count.textContent = `x${item.count}`;
+    const eat = document.createElement('button');
+    eat.className = 'fridge-eat';
+    eat.dataset.food = name;
+    eat.textContent = 'Comer';
+    meta.append(title, count);
+    row.append(emoji, meta, eat);
+    fridgeItems.appendChild(row);
+  }
+}
+
+function showFridgeMenu() {
+  hideGestureMenu();
+  renderFridgeMenu();
+  fridgeMenu.classList.remove('hidden');
+  fridgeMenuOpen = true;
+}
+
+function hideFridgeMenu() {
+  if (!fridgeMenuOpen) return;
+  fridgeMenu.classList.add('hidden');
+  fridgeMenuOpen = false;
+}
+
+// ── Wardrobe menu ────────────────────────────────────────────────────────────
+const wardrobeMenu  = document.getElementById('wardrobe-menu');
+const wardrobeItems = document.getElementById('wardrobe-items');
+let wardrobeMenuOpen = false;
+
+function renderWardrobeMenu() {
+  const owned = getWardrobe();
+  const equippedId = getEquippedId();
+  wardrobeItems.textContent = '';
+  if (!Object.keys(owned).length) {
+    const empty = document.createElement('div');
+    empty.className = 'fridge-empty';
+    empty.textContent = 'Tu placard está vacío. Comprá ropa en la Tienda de Ropa.';
+    wardrobeItems.appendChild(empty);
+    return;
+  }
+  for (const item of TIENDA_CATALOG) {
+    if (!owned[item.id]) continue;
+    const row = document.createElement('div');
+    row.className = 'fridge-item';
+    const emoji = document.createElement('div');
+    emoji.className = 'fridge-emoji'; emoji.textContent = item.emoji;
+    const meta = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'fridge-name'; title.textContent = item.name;
+    const eq = equippedId === item.id;
+    const status = document.createElement('div');
+    status.className = 'fridge-count'; status.textContent = eq ? '✓ Puesto' : '';
+    const btn = document.createElement('button');
+    btn.className = 'fridge-eat'; btn.dataset.id = item.id;
+    btn.textContent = eq ? 'Puesto' : 'Usar';
+    if (eq) btn.disabled = true;
+    meta.append(title, status);
+    row.append(emoji, meta, btn);
+    wardrobeItems.appendChild(row);
+  }
+}
+
+function openWardrobeMenu() {
+  hideGestureMenu(); hideFridgeMenu();
+  renderWardrobeMenu();
+  wardrobeMenu.classList.remove('hidden');
+  wardrobeMenuOpen = true;
+}
+function hideWardrobeMenu() {
+  if (!wardrobeMenuOpen) return;
+  wardrobeMenu.classList.add('hidden');
+  wardrobeMenuOpen = false;
+}
+document.getElementById('wardrobe-close').addEventListener('click', hideWardrobeMenu);
+wardrobeItems.addEventListener('click', e => {
+  const btn = e.target.closest('.fridge-eat');
+  if (!btn || btn.disabled) return;
+  const id = btn.dataset.id;
+  const item = TIENDA_CATALOG.find(c => c.id === id);
+  if (!item) return;
+  setEquippedId(id);
+  look = Object.assign({}, look, item.cfg);
+  if (character) Object.assign(character.cfg, look);
+  drawSelectionPreviews(); updateHUDPortrait(); saveState();
+  renderWardrobeMenu();
+});
+
+document.getElementById('fridge-close').addEventListener('click', hideFridgeMenu);
+fridgeItems.addEventListener('click', e => {
+  const btn = e.target.closest('.fridge-eat');
+  if (!btn) return;
+  if (eatFood(btn.dataset.food)) {
+    if (character) character.playGesture('dance');
+    renderFridgeMenu();
+  }
+});
+
 // ── Click: tap character → gesture menu, else tap house → enter ─────────────
 canvas.addEventListener('click', e => {
   if (fadingIn || fadingOut) return;
-  if (mode === 'cocina' || mode === 'runner') return;   // these modes handle their own input
+  if (mode !== 'exterior' && mode !== 'interior') return;   // mini-game modes handle their own input
   const rect  = canvas.getBoundingClientRect();
   const worldX = (e.clientX - rect.left)  / cam.zoom + cam.x;
   const worldY = (e.clientY - rect.top)   / cam.zoom + cam.y;
   if (mode === 'interior' && interior && interior.containsTV(worldX, worldY)) { enterRunner(); return; }
-  if (characterAt(worldX, worldY)) { showGestureMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsFridge(worldX, worldY)) { showFridgeMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsKitchen(worldX, worldY)) { enterCocina(); return; }
+  if (mode === 'interior' && interior && interior.containsBed(worldX, worldY)) { toggleLie(); return; }
+  if (mode === 'interior' && interior && interior.containsWardrobe(worldX, worldY)) { openWardrobeMenu(); return; }
+  if (characterAt(worldX, worldY)) { hideFridgeMenu(); hideWardrobeMenu(); showGestureMenu(); return; }
   hideGestureMenu();
+  hideFridgeMenu();
+  hideWardrobeMenu();
   if (mode !== 'exterior' || !world) return;
+  if (world.getHolePortalAt(worldX, worldY)) { enterHoleFromWorld(); return; }
+  if (world.getCinemaAt(worldX, worldY, WORLD_H)) { enterCinema(); return; }
+  if (world.getBoutiqueAt(worldX, worldY, WORLD_H)) { launchTienda(); return; }
   const house = world.getHouseAt(worldX, worldY, WORLD_H);
   if (house) enterHouse(house);
 });
@@ -698,15 +1078,24 @@ canvas.addEventListener('click', e => {
 // Touch tap: same behaviour
 canvas.addEventListener('touchend', e => {
   if (fadingIn || fadingOut) return;
-  if (mode === 'cocina' || mode === 'runner') return;   // these modes handle their own input
+  if (mode !== 'exterior' && mode !== 'interior') return;   // mini-game modes handle their own input
   const t     = e.changedTouches[0];
   const rect  = canvas.getBoundingClientRect();
   const worldX = (t.clientX - rect.left) / cam.zoom + cam.x;
   const worldY = (t.clientY - rect.top)  / cam.zoom + cam.y;
   if (mode === 'interior' && interior && interior.containsTV(worldX, worldY)) { e.preventDefault(); enterRunner(); return; }
-  if (characterAt(worldX, worldY)) { e.preventDefault(); showGestureMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsFridge(worldX, worldY)) { e.preventDefault(); showFridgeMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsKitchen(worldX, worldY)) { e.preventDefault(); enterCocina(); return; }
+  if (mode === 'interior' && interior && interior.containsBed(worldX, worldY)) { e.preventDefault(); toggleLie(); return; }
+  if (mode === 'interior' && interior && interior.containsWardrobe(worldX, worldY)) { e.preventDefault(); openWardrobeMenu(); return; }
+  if (characterAt(worldX, worldY)) { e.preventDefault(); hideFridgeMenu(); hideWardrobeMenu(); showGestureMenu(); return; }
   hideGestureMenu();
+  hideFridgeMenu();
+  hideWardrobeMenu();
   if (mode !== 'exterior' || !world) return;
+  if (world.getHolePortalAt(worldX, worldY)) { e.preventDefault(); enterHoleFromWorld(); return; }
+  if (world.getCinemaAt(worldX, worldY, WORLD_H)) { e.preventDefault(); enterCinema(); return; }
+  if (world.getBoutiqueAt(worldX, worldY, WORLD_H)) { e.preventDefault(); launchTienda(); return; }
   const house = world.getHouseAt(worldX, worldY, WORLD_H);
   if (house) { e.preventDefault(); enterHouse(house); }
 }, { passive: false });
@@ -795,16 +1184,205 @@ window.addEventListener('keyup', e => {
   cocinaApplyKeys();
 });
 
-// ── Customization panel ─────────────────────────────────────────────────────
-const custPanel = document.getElementById('cust-panel');
-function openCust()  { custPanel.classList.remove('hidden'); }
-function closeCust() { custPanel.classList.add('hidden'); }
+// ── Match-3 controls (tap / drag to swap; arrows + Enter on desktop) ──────────
+const m3Exit = document.getElementById('match3-exit');
+if (m3Exit) m3Exit.addEventListener('click', exitMatch3);
+
+let match3PointerDown = false;
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'match3' || !match3) return;
+  match3PointerDown = true; const p = canvasPoint(e); match3.pointerDown(p.x, p.y);
+});
+canvas.addEventListener('pointermove', e => {
+  if (mode !== 'match3' || !match3 || !match3PointerDown) return;
+  const p = canvasPoint(e); match3.pointerMove(p.x, p.y);
+});
+['pointerup','pointerleave','pointercancel'].forEach(ev =>
+  canvas.addEventListener(ev, () => { if (mode === 'match3' && match3) { match3PointerDown = false; match3.pointerUp(); } }));
+
+window.addEventListener('keydown', e => {
+  if (mode !== 'match3' || !match3) return;
+  if (e.code==='Escape') { exitMatch3(); return; }
+  if (e.code==='ArrowUp'||e.code==='KeyW') match3.moveCursor(0, -1);
+  else if (e.code==='ArrowDown'||e.code==='KeyS') match3.moveCursor(0, 1);
+  else if (e.code==='ArrowLeft'||e.code==='KeyA') match3.moveCursor(-1, 0);
+  else if (e.code==='ArrowRight'||e.code==='KeyD') match3.moveCursor(1, 0);
+  else if (e.code==='Enter'||e.code==='Space') match3.selectCursor();
+  else return;
+  e.preventDefault();
+});
+
+// ── Hole controls (tap / drag to steer; WASD or arrows) ──────────────────────
+// Hole submenu buttons
+const holeSubmenuBack  = document.getElementById('hole-submenu-back');
+const holeSubmenuClassic = document.getElementById('hole-submenu-classic');
+const holeSubmenuFeast   = document.getElementById('hole-submenu-feast');
+if (holeSubmenuBack)    holeSubmenuBack.addEventListener('click',    () => { hideHoleSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
+if (holeSubmenuClassic) { holeSubmenuClassic.addEventListener('click', launchHole); holeSubmenuClassic.addEventListener('touchend', e => { e.preventDefault(); launchHole(); }, { passive: false }); }
+if (holeSubmenuFeast)   { holeSubmenuFeast.addEventListener('click', launchHole2);  holeSubmenuFeast.addEventListener('touchend',   e => { e.preventDefault(); launchHole2(); },  { passive: false }); }
+
+const holeExit = document.getElementById('hole-exit');
+if (holeExit) holeExit.addEventListener('click', exitHole);
+
+let holePointerDown = false;
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'hole' || !hole) return;
+  holePointerDown = true; const p = canvasPoint(e); hole.pointer(p.x, p.y);
+});
+canvas.addEventListener('pointermove', e => {
+  if (mode !== 'hole' || !hole || !holePointerDown) return;
+  const p = canvasPoint(e); hole.pointer(p.x, p.y);
+});
+['pointerup','pointerleave','pointercancel'].forEach(ev =>
+  canvas.addEventListener(ev, () => { if (mode === 'hole' && hole) { holePointerDown = false; hole.pointerUp(); } }));
+
+const holeKeys = { up:false, down:false, left:false, right:false };
+function holeApplyKeys() {
+  if (hole) hole.setDir((holeKeys.right?1:0) - (holeKeys.left?1:0), (holeKeys.down?1:0) - (holeKeys.up?1:0));
+}
+window.addEventListener('keydown', e => {
+  if (mode !== 'hole' || !hole) return;
+  if (e.code==='Escape') { exitHole(); return; }
+  if (e.code==='ArrowUp'||e.code==='KeyW') holeKeys.up = true;
+  else if (e.code==='ArrowDown'||e.code==='KeyS') holeKeys.down = true;
+  else if (e.code==='ArrowLeft'||e.code==='KeyA') holeKeys.left = true;
+  else if (e.code==='ArrowRight'||e.code==='KeyD') holeKeys.right = true;
+  else return;
+  e.preventDefault(); holeApplyKeys();
+});
+window.addEventListener('keyup', e => {
+  if (mode !== 'hole' || !hole) return;
+  if (e.code==='ArrowUp'||e.code==='KeyW') holeKeys.up = false;
+  else if (e.code==='ArrowDown'||e.code==='KeyS') holeKeys.down = false;
+  else if (e.code==='ArrowLeft'||e.code==='KeyA') holeKeys.left = false;
+  else if (e.code==='ArrowRight'||e.code==='KeyD') holeKeys.right = false;
+  else return;
+  holeApplyKeys();
+});
+
+// ── Hole2 controls ───────────────────────────────────────────────────────────
+const hole2Exit = document.getElementById('hole2-exit');
+if (hole2Exit) hole2Exit.addEventListener('click', exitHole2);
+
+let hole2PointerDown = false;
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'hole2' || !hole2) return;
+  hole2PointerDown = true; const p = canvasPoint(e); hole2.pointer(p.x, p.y);
+});
+canvas.addEventListener('pointermove', e => {
+  if (mode !== 'hole2' || !hole2 || !hole2PointerDown) return;
+  const p = canvasPoint(e); hole2.pointer(p.x, p.y);
+});
+['pointerup','pointerleave','pointercancel'].forEach(ev =>
+  canvas.addEventListener(ev, () => { if (mode === 'hole2' && hole2) { hole2PointerDown = false; hole2.pointerUp(); } }));
+
+const hole2Keys = { up:false, down:false, left:false, right:false };
+function hole2ApplyKeys() {
+  if (hole2) hole2.setDir((hole2Keys.right?1:0)-(hole2Keys.left?1:0),(hole2Keys.down?1:0)-(hole2Keys.up?1:0));
+}
+window.addEventListener('keydown', e => {
+  if (mode !== 'hole2' || !hole2) return;
+  if (e.code==='Escape') { exitHole2(); return; }
+  if (e.code==='ArrowUp'||e.code==='KeyW') hole2Keys.up = true;
+  else if (e.code==='ArrowDown'||e.code==='KeyS') hole2Keys.down = true;
+  else if (e.code==='ArrowLeft'||e.code==='KeyA') hole2Keys.left = true;
+  else if (e.code==='ArrowRight'||e.code==='KeyD') hole2Keys.right = true;
+  else return;
+  e.preventDefault(); hole2ApplyKeys();
+});
+window.addEventListener('keyup', e => {
+  if (mode !== 'hole2' || !hole2) return;
+  if (e.code==='ArrowUp'||e.code==='KeyW') hole2Keys.up = false;
+  else if (e.code==='ArrowDown'||e.code==='KeyS') hole2Keys.down = false;
+  else if (e.code==='ArrowLeft'||e.code==='KeyA') hole2Keys.left = false;
+  else if (e.code==='ArrowRight'||e.code==='KeyD') hole2Keys.right = false;
+  else return;
+  hole2ApplyKeys();
+});
+
+// ── Galaga controls ───────────────────────────────────────────────────────────
+const gExit = document.getElementById('galaga-exit');
+if (gExit) gExit.addEventListener('click', exitGalaga);
+
+bindHold(document.getElementById('galaga-left'),  () => { if (galaga) galaga.setDir(-1); }, () => { if (galaga) galaga.setDir(0); });
+bindHold(document.getElementById('galaga-right'), () => { if (galaga) galaga.setDir(1);  }, () => { if (galaga) galaga.setDir(0); });
+bindHold(document.getElementById('galaga-fire'),  () => { if (galaga) galaga.startFire(); }, () => { if (galaga) galaga.stopFire(); });
+
+// Canvas tap for game-over "play again" button
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'galaga' || !galaga) return;
+  const p = canvasPoint(e); galaga.tap(p.x, p.y);
+});
+
+window.addEventListener('keydown', e => {
+  if (mode !== 'galaga' || !galaga) return;
+  if (e.code === 'Escape')                            { exitGalaga(); return; }
+  if (e.code === 'ArrowLeft'  || e.code === 'KeyA')  { galaga.setDir(-1); e.preventDefault(); }
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') { galaga.setDir(1);  e.preventDefault(); }
+  else if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { galaga.startFire(); e.preventDefault(); }
+});
+window.addEventListener('keyup', e => {
+  if (mode !== 'galaga' || !galaga) return;
+  if (e.code === 'ArrowLeft'  || e.code === 'KeyA')  galaga.setDir(0);
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') galaga.setDir(0);
+  else if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') galaga.stopFire();
+});
+
+// ── Cinema controls (‹ › to change movie; tap screen sides) ──────────────────
+const cinExit = document.getElementById('cinema-exit');
+if (cinExit) cinExit.addEventListener('click', exitCinema);
+const cinPrev = document.getElementById('cinema-prev');
+if (cinPrev) cinPrev.addEventListener('click', () => { if (theater) theater.prev(); });
+const cinNext = document.getElementById('cinema-next');
+if (cinNext) cinNext.addEventListener('click', () => { if (theater) theater.next(); });
+
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'cinema' || !theater) return;
+  const p = canvasPoint(e); theater.pointer(p.x, p.y);
+});
+window.addEventListener('keydown', e => {
+  if (mode !== 'cinema' || !theater) return;
+  if (e.code === 'Escape') exitCinema();
+  else if (e.code === 'ArrowLeft' || e.code === 'KeyA') theater.prev();
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') theater.next();
+  else return;
+  e.preventDefault();
+});
+
+// ── Ice-cream shop controls (tap palette / scoops / buttons) ─────────────────
+const heladoExit = document.getElementById('helado-exit');
+if (heladoExit) heladoExit.addEventListener('click', exitHelado);
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'helado' || !helado) return;
+  const p = canvasPoint(e); helado.pointer(p.x, p.y);
+});
+window.addEventListener('keydown', e => {
+  if (mode === 'helado' && helado && e.code === 'Escape') { exitHelado(); e.preventDefault(); }
+});
+
+// ── Tienda controls ──────────────────────────────────────────────────────────
+const tiendaExit = document.getElementById('tienda-exit');
+if (tiendaExit) tiendaExit.addEventListener('click', exitTienda);
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'tienda' || !tienda) return;
+  const p = canvasPoint(e); tienda.pointer(p.x, p.y);
+});
+window.addEventListener('keydown', e => {
+  if (mode === 'tienda' && tienda && e.code === 'Escape') { exitTienda(); e.preventDefault(); }
+});
+
+// ── Mob Control controls ──────────────────────────────────────────────────────
+const mobExit = document.getElementById('mob-exit');
+if (mobExit) mobExit.addEventListener('click', exitMob);
+window.addEventListener('keydown', e => {
+  if (mode === 'mob' && mob && e.code === 'Escape') { exitMob(); e.preventDefault(); }
+});
+
+// ── Customization panel — now redirects to wardrobe (purchased looks) ────────
 ['cust-btn', 'customize-btn'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('click', openCust);
+  if (el) el.addEventListener('click', openWardrobeMenu);
 });
-const custClose = document.getElementById('cust-close');
-if (custClose) custClose.addEventListener('click', closeCust);
 
 function applyLook(cat, value) {
   look[cat] = value;
@@ -847,7 +1425,7 @@ if (isTouch) window.addEventListener('pointerdown', () => forceLandscape(), { on
 // ── Selection screen UI ───────────────────────────────────────────────────
 function beginPlay() {
   if (isTouch) forceLandscape();
-  closeCust();
+  document.getElementById('cust-panel').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   startGame();
 }
@@ -857,10 +1435,17 @@ playBtn.addEventListener('touchend', e => { e.preventDefault(); beginPlay(); }, 
 
 // Hub (game chooser)
 document.querySelectorAll('.hub-card').forEach(card => {
+  if (card.closest('#hole-submenu')) return; // submenu has its own listeners
   const go = () => {
     const g = card.dataset.game;
     if (g === 'runner') launchRunner();
     else if (g === 'cocina') launchCocina();
+    else if (g === 'match3') launchMatch3();
+    else if (g === 'hole') showHoleSubmenu();
+    else if (g === 'galaga') launchGalaga();
+    else if (g === 'helado') launchHelado();
+    else if (g === 'tienda') launchTienda();
+    else if (g === 'mob')   launchMob();
     else launchWorld();
   };
   card.addEventListener('click', go);

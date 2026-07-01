@@ -10,64 +10,48 @@ function _dc(hex, amt) {
 const OC   = 'rgba(25,12,5,0.78)';
 const BROW = '#3A2418';
 
-// ── Base sprite (uploaded blank body) processed at load ─────────────────────
-let SPRITE = null;          // trimmed offscreen canvas (transparent bg)
+// ── Sprites ──────────────────────────────────────────────────────────────────
+let SPRITE     = null;   // standing
+let SPRITE_SIT = null;   // sitting
+let SPRITE_LIE = null;   // lying
 let SPRITE_READY = false;
-let ANCH = null;            // anchor fractions computed from the silhouette
+let ANCH = null;
 const _readyCbs = [];
 export function onSpriteReady(cb) { SPRITE_READY ? cb() : _readyCbs.push(cb); }
 
-const RAW = new Image();
-RAW.onload = () => { try { processSprite(); } catch(e){ console.error(e); } SPRITE_READY = true; _readyCbs.splice(0).forEach(c => c()); };
-RAW.src = '/assets/base.jpg';
-
-function processSprite() {
-  const TW = 320, TH = Math.round(RAW.naturalHeight * TW / RAW.naturalWidth);
-  const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
-  const cx = cv.getContext('2d'); cx.drawImage(RAW, 0, 0, TW, TH);
-  const im = cx.getImageData(0, 0, TW, TH); const d = im.data;
-  const isbg = i => { const r=d[i],g=d[i+1],b=d[i+2]; const mn=Math.min(r,g,b),mx=Math.max(r,g,b); return mn>232 && (mx-mn)<16; };
-  // flood-fill the white background from the borders
-  const seen = new Uint8Array(TW*TH); const st = [];
-  for (let x=0;x<TW;x++){ st.push(x); st.push((TH-1)*TW+x); }
-  for (let y=0;y<TH;y++){ st.push(y*TW); st.push(y*TW+TW-1); }
-  while (st.length) {
-    const p = st.pop(); if (seen[p]) continue; seen[p]=1;
-    const i=p*4; if (!isbg(i)) continue;
-    d[i+3]=0;
-    const px=p%TW, py=(p/TW)|0;
-    if (px>0) st.push(p-1); if (px<TW-1) st.push(p+1);
-    if (py>0) st.push(p-TW); if (py<TH-1) st.push(p+TW);
-  }
-  cx.putImageData(im, 0, 0);
-  // trim
-  let minx=TW,miny=TH,maxx=0,maxy=0;
-  for (let p=0;p<TW*TH;p++){ if (d[p*4+3]>10){ const px=p%TW,py=(p/TW)|0; if(px<minx)minx=px;if(px>maxx)maxx=px;if(py<miny)miny=py;if(py>maxy)maxy=py; } }
-  const w=maxx-minx+1, h=maxy-miny+1;
-  const sc=document.createElement('canvas'); sc.width=w; sc.height=h;
-  sc.getContext('2d').drawImage(cv, minx,miny,w,h, 0,0,w,h);
-  SPRITE = sc;
-  // anchors from row extents
-  const td = sc.getContext('2d').getImageData(0,0,w,h).data;
-  const L=new Int32Array(h), R=new Int32Array(h), C=new Int32Array(h);
-  for (let y=0;y<h;y++){ let l=w,r=-1,c=0; for(let x=0;x<w;x++){ if(td[(y*w+x)*4+3]>10){ if(x<l)l=x; if(x>r)r=x; c++; } } L[y]=l;R[y]=r;C[y]=c; }
-  let neck=Math.round(0.5*h), best=1e9;
-  for (let y=Math.round(0.34*h); y<Math.round(0.64*h); y++){ if (C[y]<best){ best=C[y]; neck=y; } }
-  let headMaxW=0, cxSum=0, cnt=0;
-  for (let y=0;y<neck;y++){ if(C[y]>headMaxW)headMaxW=C[y]; if(R[y]>=0){ cxSum+=(L[y]+R[y])/2*C[y]; cnt+=C[y]; } }
-  const headCx = cnt? cxSum/cnt : w/2;
-  const shY=Math.min(h-1, neck+Math.round(0.05*h));
-  const hipY=Math.round(0.80*h);
-  ANCH = {
-    w, h,
-    headCxF: headCx/w,
-    neckF: neck/h,
-    headRxF: (headMaxW/2)/w,
-    shoulderHalfF: ((R[shY]-L[shY])/2)/w,
-    hipYF: hipY/h,
-    hipHalfF: Math.max(8,(R[hipY]-L[hipY])/2)/w,
+function loadTrimmed(src, onDone) {
+  const img = new Image();
+  img.onload = () => {
+    const TW = 320, TH = Math.round(img.naturalHeight * TW / img.naturalWidth);
+    const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
+    const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, TW, TH);
+    const im = cx.getImageData(0, 0, TW, TH); const d = im.data;
+    let minx=TW,miny=TH,maxx=0,maxy=0;
+    for (let p=0;p<TW*TH;p++){ if(d[p*4+3]>10){ const px=p%TW,py=(p/TW)|0; if(px<minx)minx=px;if(px>maxx)maxx=px;if(py<miny)miny=py;if(py>maxy)maxy=py; } }
+    const w=maxx-minx+1, h=maxy-miny+1;
+    const sc=document.createElement('canvas'); sc.width=w; sc.height=h;
+    sc.getContext('2d').drawImage(cv, minx,miny,w,h, 0,0,w,h);
+    onDone(sc);
   };
+  img.src = src;
 }
+
+let _loaded = 0;
+function _onLoad() { if (++_loaded === 3) { SPRITE_READY = true; _readyCbs.splice(0).forEach(c => c()); } }
+
+// ── Outfit sprite cache (trimmed like base sprites) ───────────────────────────
+const _outfitCache = {};
+function _loadOutfit(url) {
+  if (!url || url in _outfitCache) return;
+  _outfitCache[url] = null; // mark as loading
+  loadTrimmed(url, sc => { _outfitCache[url] = sc; });
+}
+function _outfitReady(url) { return !!(url && _outfitCache[url] && _outfitCache[url].width > 0); }
+
+
+loadTrimmed('/assets/chibi_sprite.png', sc => { SPRITE = sc; ANCH = { w: sc.width, h: sc.height, headCxF: 0.50, neckF: 0.35, headRxF: 0.21, shoulderHalfF: 0.21, hipYF: 0.63, hipHalfF: 0.17 }; _onLoad(); });
+loadTrimmed('/assets/chibi_sit.png',    sc => { SPRITE_SIT = sc; _onLoad(); });
+loadTrimmed('/assets/chibi_lie.png',    sc => { SPRITE_LIE = sc; _onLoad(); });
 
 export { SPRITE };
 
@@ -75,7 +59,6 @@ export { SPRITE };
 export const DEFAULT_CFG = {
   hair: 'buns', hairColor: '#EDEDED',
   eyes: 'round', eyeColor: '#3A6EA5',
-  outfit: 'pop', topColor: '#F2A7BB', bottomColor: '#AEDCEC',
   accessory: 'none',
 };
 
@@ -83,6 +66,7 @@ export class Character {
   constructor(startX, startY, cfg) {
     this.x = startX; this.y = startY;
     this.cfg = Object.assign({}, DEFAULT_CFG, cfg || {});
+    if (this.cfg.outfitSprite) _loadOutfit(this.cfg.outfitSprite);
     this.isMoving = false; this.facingDir = 1;
     this.bobTime = 0; this.bobOffset = 0; this.walkPhase = 0;
     this.speed = 260; this.sprintSpeed = 520;
@@ -104,127 +88,88 @@ export class Character {
     if (this.gesture){ this.gestureTime+=delta; if (this.gestureTime>this.gestureDur){ this.gesture=null; this.gestureTime=0; } }
   }
 
-  playGesture(name){ if (this.state==='lie') return; this.gesture=name; this.gestureTime=0; this.gestureDur = name==='wave'?2.5: name==='dance'?6:4.5; }
+  playGesture(name){ if (this.state==='lie') return; this.gesture=name; this.gestureTime=0; this.gestureDur = name==='wave'?2.5: name==='dance'?6: name==='jump'?1.1: 4.5; }
 
   draw(ctx, cam, depthScaleFn) {
     const sx=this.x-cam.x, sy=this.y-cam.y, s=depthScaleFn(this.y);
-    // shadow
-    ctx.save(); ctx.globalAlpha=0.22; ctx.fillStyle='#000';
-    ctx.beginPath(); ctx.ellipse(sx, sy, (this.state==='lie'?52:22)*s, 6*s, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
-    if (!SPRITE_READY || !SPRITE) return;
+    const isSit = this.state==='sit', isLie = this.state==='lie';
 
-    const H = 152*s, Wd = SPRITE.width*(H/SPRITE.height);
-    let ox=0, oy=0, rot=0, scaleY=1;
+    const H = 152*s;
+    let ox=0, oy=0, rot=0, scaleY=1, shadowScale=1;
     const walking = this.isMoving && this.state==='walk';
-    if (walking){ oy+=this.bobOffset*s; rot+=Math.sin(this.walkPhase)*0.05; scaleY=1+Math.abs(Math.sin(this.walkPhase))*0.02; }
-    if (this.gesture==='sing'){ oy+=Math.sin(this.animTime*7)*2.5*s; }
-    else if (this.gesture==='dance'){ oy+=Math.abs(Math.sin(this.animTime*8))*4*s; ox+=Math.sin(this.animTime*4)*9*s; rot+=Math.sin(this.animTime*8)*0.07; }
-    else if (this.gesture==='wave'){ rot+=Math.sin(this.animTime*9)*0.12; }
-    if (this.state==='sit'){ scaleY=0.82; oy+=10*s*this.poseT; }
-    if (this.state==='lie')  rot += -Math.PI/2*this.poseT;
+    if (walking){ oy+=this.bobOffset*s; rot+=Math.sin(this.walkPhase)*0.05; }
+    if (this.gesture==='sing')        { oy+=Math.sin(this.animTime*7)*2.5*s; }
+    else if (this.gesture==='dance')  { oy+=Math.abs(Math.sin(this.animTime*8))*4*s; ox+=Math.sin(this.animTime*4)*9*s; rot+=Math.sin(this.animTime*8)*0.07; }
+    else if (this.gesture==='wave')   { rot+=Math.sin(this.animTime*9)*0.12; }
+    else if (this.gesture==='jump') {
+      const t = Math.min(this.gestureTime / this.gestureDur, 1);
+      if (t < 0.13) {
+        // Crouch
+        const p = t / 0.13;
+        oy += 12 * p * s; scaleY = 1 - 0.18*p;
+      } else if (t < 0.87) {
+        // Air: parabolic arc
+        const p = (t - 0.13) / 0.74;
+        const arc = Math.sin(p * Math.PI);
+        oy -= 80 * arc * s;
+        scaleY = 1 + 0.14 * arc;
+        rot += Math.sin(p * Math.PI * 2) * 0.08;
+        shadowScale = 1 - 0.5 * arc;   // shadow shrinks while airborne
+      } else {
+        // Land squash
+        const p = (t - 0.87) / 0.13;
+        oy += 12 * (1-p) * s; scaleY = 0.82 + 0.18*p;
+      }
+    }
+
+    // Shadow (skip for lie/sit where shadow is handled differently)
+    if (!isLie && !isSit) {
+      ctx.save(); ctx.globalAlpha=0.22*shadowScale; ctx.fillStyle='#000';
+      ctx.beginPath(); ctx.ellipse(sx+ox, sy, 22*s*shadowScale, 6*s*shadowScale, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+    } else {
+      ctx.save(); ctx.globalAlpha=0.22; ctx.fillStyle='#000';
+      ctx.beginPath(); ctx.ellipse(sx, sy, (isLie?52:32)*s, 6*s, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+
+    if (!SPRITE_READY || !SPRITE) return;
 
     ctx.save();
     ctx.translate(sx,sy); ctx.translate(ox,oy); ctx.rotate(rot);
     if (this.facingDir<0) ctx.scale(-1,1);
-    ctx.scale(1,scaleY);
+    ctx.scale(1, scaleY);
     this._paint(ctx, H);
     ctx.restore();
 
     if (this.gesture==='sing'||this.gesture==='dance') this._drawNotes(ctx, sx+ox, sy+oy-H+10*s, s);
+    if (this.state==='lie') this._drawZzz(ctx, sx, sy, H, s);
   }
 
   drawPreview(ctx, cx, cyFeet, scale) {
     if (!SPRITE_READY || !SPRITE) return;
     const H = 132*scale;
-    ctx.save(); ctx.translate(cx, cyFeet); this._paint(ctx, H); ctx.restore();
+    ctx.save(); ctx.translate(cx, cyFeet);
+    this._paint(ctx, H);
+    ctx.restore();
   }
 
-  // ── Composite the layered avatar (local space, feet at origin) ─────────────
+  // ── Draw chibi sprite (feet at origin) ─────────────────────────────────────
   _paint(ctx, H) {
-    const Wd = SPRITE.width*(H/SPRITE.height);
-    const G  = this._geo(Wd, H);
-    ctx.lineJoin='round'; ctx.lineCap='round';
-    this._drawBackHair(ctx, G);
-    ctx.drawImage(SPRITE, -Wd/2, -H, Wd, H);
-    this._drawClothes(ctx, G);
-    this._drawFace(ctx, G);
-    this._drawFrontHair(ctx, G);
-    this._drawAccessory(ctx, G);
-  }
-
-  _geo(Wd, H) {
-    const A = ANCH; const x0=-Wd/2, y0=-H;
-    const hx = x0 + A.headCxF*Wd;
-    const headTopY = y0;
-    const neckY = y0 + A.neckF*H;
-    const headRx = A.headRxF*Wd;
-    const headRy = (neckY-headTopY)/2;
-    const headCy = headTopY + headRy;
-    return {
-      hx, headTopY, neckY, headRx, headRy, headCy,
-      eyeY: headCy + headRy*0.20,
-      eyeDX: headRx*0.42,
-      shoulderHalf: A.shoulderHalfF*Wd,
-      hipY: y0 + A.hipYF*H,
-      hipHalf: A.hipHalfF*Wd,
-      bottomY: 0,
-      u: Wd / A.w,
-    };
-  }
-
-  // ── Clothes ────────────────────────────────────────────────────────────────
-  _drawClothes(ctx, G) {
-    const { hx, neckY, hipY, bottomY, shoulderHalf, hipHalf, u } = G;
-    const cfg = this.cfg, ow = Math.max(1, 1.6*u);
-    const top = cfg.topColor, bot = cfg.bottomColor;
-    ctx.strokeStyle = OC; ctx.lineWidth = ow;
-    const FS = () => { ctx.fill(); ctx.stroke(); };
-    const grad = (c, x1, x2) => { const g=ctx.createLinearGradient(x1,0,x2,0); g.addColorStop(0,_dc(c,0.2)); g.addColorStop(0.35,c); g.addColorStop(0.7,_lc(c,0.18)); g.addColorStop(1,_dc(c,0.2)); return g; };
-    const torsoH = hipY - neckY;
-    const shW = Math.max(shoulderHalf, hipHalf) * 1.12;
-
-    if (cfg.outfit === 'vestido') {
-      const hemY = hipY + (bottomY-hipY)*0.5;
-      ctx.fillStyle = grad(top, hx-shW, hx+shW);
-      ctx.beginPath();
-      ctx.moveTo(hx-shW, neckY+torsoH*0.05);
-      ctx.lineTo(hx+shW, neckY+torsoH*0.05);
-      ctx.lineTo(hx+shW*0.8, hipY);
-      ctx.lineTo(hx+shW*1.6, hemY);
-      ctx.quadraticCurveTo(hx, hemY+8*u, hx-shW*1.6, hemY);
-      ctx.lineTo(hx-shW*0.8, hipY);
-      ctx.closePath(); FS();
-      // pleats
-      ctx.strokeStyle='rgba(0,0,0,0.10)'; ctx.lineWidth=1*u;
-      for (const f of [-0.6,0,0.6]){ ctx.beginPath(); ctx.moveTo(hx+f*shW, hipY); ctx.lineTo(hx+f*shW*2, hemY); ctx.stroke(); }
-      ctx.strokeStyle=OC; ctx.lineWidth=ow;
-    } else {
-      // Bottoms first (behind top hem)
-      if (cfg.outfit === 'casual') {           // long pants
-        ctx.fillStyle = grad(bot, hx-hipHalf, hx+hipHalf);
-        for (const sgn of [-1,1]) {
-          ctx.beginPath();
-          ctx.roundRect(hx + sgn*hipHalf*0.92 - hipHalf*0.7, hipY, hipHalf*0.7, (bottomY-hipY)*0.92, [3*u,3*u,5*u,5*u]); FS();
-        }
-      } else {                                  // shorts
-        ctx.fillStyle = grad(bot, hx-hipHalf, hx+hipHalf);
-        ctx.beginPath();
-        ctx.roundRect(hx-hipHalf*1.05, hipY-torsoH*0.04, hipHalf*2.1, (bottomY-hipY)*0.34, [4*u,4*u,7*u,7*u]); FS();
-        ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1*u;
-        ctx.beginPath(); ctx.moveTo(hx, hipY+(bottomY-hipY)*0.10); ctx.lineTo(hx, hipY+(bottomY-hipY)*0.30); ctx.stroke();
-        ctx.strokeStyle=OC; ctx.lineWidth=ow;
+    const oUrl = this.cfg.outfitSprite;
+    if (oUrl && this.state !== 'sit' && this.state !== 'lie') {
+      _loadOutfit(oUrl);
+      if (_outfitReady(oUrl)) {
+        const sc = _outfitCache[oUrl];
+        const Wd = sc.width * (H / sc.height);
+        ctx.drawImage(sc, -Wd/2, -H, Wd, H);
+        return;
       }
-      // Top (tee)
-      ctx.fillStyle = grad(top, hx-shW, hx+shW);
-      ctx.beginPath();
-      ctx.roundRect(hx-shW, neckY+torsoH*0.02, shW*2, torsoH*0.92, [6*u,6*u,3*u,3*u]); FS();
-      // little sleeves
-      ctx.beginPath(); ctx.ellipse(hx-shW, neckY+torsoH*0.16, 5*u, 7*u, 0,0,Math.PI*2); FS();
-      ctx.beginPath(); ctx.ellipse(hx+shW, neckY+torsoH*0.16, 5*u, 7*u, 0,0,Math.PI*2); FS();
     }
-    // highlight
-    ctx.fillStyle='rgba(255,255,255,0.12)';
-    ctx.beginPath(); ctx.roundRect(hx-shW*0.7, neckY+torsoH*0.10, shW*0.4, torsoH*0.6, 4*u); ctx.fill();
+    const sp = (this.state==='sit' && SPRITE_SIT) ? SPRITE_SIT
+             : (this.state==='lie' && SPRITE_LIE) ? SPRITE_LIE
+             : SPRITE;
+    if (!sp) return;
+    const Wd = sp.width*(H/sp.height);
+    ctx.drawImage(sp, -Wd/2, -H, Wd, H);
   }
 
   // ── Face — FIXED eyes (brown, like the reference) ──────────────────────────
@@ -373,6 +318,23 @@ export class Character {
       ctx.fillStyle='#E8403A';
       for (const f of [-0.55,0,0.55]){ ctx.beginPath(); ctx.arc(hx+f*cw, cy-headRy*0.02, headRx*0.07,0,Math.PI*2); ctx.fill(); }
     }
+  }
+
+  _drawZzz(ctx, cx, cy, H, s) {
+    ctx.save(); ctx.textAlign='center';
+    // 3 Z's staggered in time, each floats up and fades
+    for (let i=0;i<3;i++){
+      const period = 2.2;
+      const ph = ((this.animTime * 0.5 + i * (period/3)) % period) / period; // 0..1
+      const size = (22 + i*8) * s;
+      const nx = cx + (22 + i*14) * s;
+      const ny = cy - H * 0.85 - ph * 55 * s;
+      ctx.globalAlpha = (1 - ph) * 0.95;
+      ctx.fillStyle = '#222222';
+      ctx.font = `bold ${size}px sans-serif`;
+      ctx.fillText('z', nx, ny);
+    }
+    ctx.globalAlpha = 1; ctx.restore();
   }
 
   _drawNotes(ctx, cx, headY, s) {
