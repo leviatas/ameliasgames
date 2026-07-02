@@ -1107,6 +1107,12 @@ body {
 .hub-card.sumo2p:hover { border-color: #FFC840; box-shadow: 0 18px 40px rgba(255,180,40,0.45); }
 .hub-card.cocinas2p { background: linear-gradient(135deg, #001A10 0%, #006040 100%); color: #80FFD0; }
 .hub-card.cocinas2p:hover { border-color: #40FFA0; box-shadow: 0 18px 40px rgba(40,255,140,0.4); }
+.hub-card.vuelo2p { background: linear-gradient(135deg, #102A38 0%, #2080A0 100%); color: #C0ECFF; }
+.hub-card.vuelo2p:hover { border-color: #60D0FF; box-shadow: 0 18px 40px rgba(96,208,255,0.45); }
+.hub-card.corazones2p { background: linear-gradient(135deg, #38101E 0%, #C03860 100%); color: #FFC8D8; }
+.hub-card.corazones2p:hover { border-color: #FF7098; box-shadow: 0 18px 40px rgba(255,112,152,0.45); }
+.hub-card.memoria2p { background: linear-gradient(135deg, #1E1038 0%, #6038B0 100%); color: #D8C8FF; }
+.hub-card.memoria2p:hover { border-color: #A078FF; box-shadow: 0 18px 40px rgba(160,120,255,0.45); }
 
 /* ── 3 Players hub card + submenu cards ── */
 .hub-card.tresp { background: linear-gradient(135deg, #40103A 0%, #A0206A 100%); color: #FFC0E8; }
@@ -1206,13 +1212,15 @@ body {
 .hub-card.jardin4p:hover { border-color: #80E080; box-shadow: 0 18px 40px rgba(128,224,128,0.45); }
 
 /* ── 2P game UI overlays ─────────────────────────────────────────────────── */
-#pong-ui, #globos-ui, #sumo-ui, #cocinas-ui {
+#pong-ui, #globos-ui, #sumo-ui, #cocinas-ui, #vuelo-ui, #corazones-ui, #memoria2p-ui {
   position: fixed; inset: 0; z-index: 25; pointer-events: none;
 }
-#pong-ui.hidden, #globos-ui.hidden, #sumo-ui.hidden, #cocinas-ui.hidden { display: none; }
-#pong-ui button, #globos-ui button, #sumo-ui button, #cocinas-ui button { pointer-events: all; }
+#pong-ui.hidden, #globos-ui.hidden, #sumo-ui.hidden, #cocinas-ui.hidden,
+#vuelo-ui.hidden, #corazones-ui.hidden, #memoria2p-ui.hidden { display: none; }
+#pong-ui button, #globos-ui button, #sumo-ui button, #cocinas-ui button,
+#vuelo-ui button, #corazones-ui button, #memoria2p-ui button { pointer-events: all; }
 
-#pong-exit, #globos-exit, #sumo-exit, #cocinas-exit {
+#pong-exit, #globos-exit, #sumo-exit, #cocinas-exit, #vuelo-exit, #corazones-exit, #memoria2p-exit {
   position: absolute; top: 16px; right: 16px;
   width: 44px; height: 44px; border-radius: 10px;
   background: rgba(0,0,0,0.5); color: #fff;
@@ -1220,5 +1228,5 @@ body {
   font-size: 1.1rem; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-#pong-exit:hover, #globos-exit:hover,
-#sumo-exit:hover, #cocinas-exit:hover { background: rgba(0,0,0,0.75); }
+#pong-exit:hover, #globos-exit:hover, #sumo-exit:hover, #cocinas-exit:hover,
+#vuelo-exit:hover, #corazones-exit:hover, #memoria2p-exit:hover { background: rgba(0,0,0,0.75); }

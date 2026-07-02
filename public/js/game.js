@@ -17,6 +17,9 @@ import { PongChibi }      from './PongChibi.js';
 import { Globos2P }       from './Globos2P.js';
 import { Sumo2P }         from './Sumo2P.js';
 import { Cocinas2P }      from './Cocinas2P.js';
+import { Vuelo2P }        from './Vuelo2P.js';
+import { Corazones2P }    from './Corazones2P.js';
+import { Memoria2P }      from './Memoria2P.js';
 import { ThreePlayers }   from './ThreePlayers.js';
 import { FourPlayers }    from './FourPlayers.js';
 import { getFridge, eatFood }    from './Pantry.js';
@@ -48,6 +51,9 @@ let pong     = null;
 let globos   = null;
 let sumo     = null;
 let cocinas  = null;
+let vuelo    = null;
+let corazones = null;
+let memoria2p = null;
 let tres     = null;
 let cuatro   = null;
 const _2pTouches = new Map(); // pointerId → 'p1' | 'p2'
@@ -285,11 +291,15 @@ function showHub() {
   hideTresSubmenu();
   hideCuatroSubmenu();
   pong = null; globos = null; sumo = null; cocinas = null; tres = null; cuatro = null;
+  vuelo = null; corazones = null; memoria2p = null;
   _2pTouches.clear();
   document.getElementById('pong-ui').classList.add('hidden');
   document.getElementById('globos-ui').classList.add('hidden');
   document.getElementById('sumo-ui').classList.add('hidden');
   document.getElementById('cocinas-ui').classList.add('hidden');
+  document.getElementById('vuelo-ui').classList.add('hidden');
+  document.getElementById('corazones-ui').classList.add('hidden');
+  document.getElementById('memoria2p-ui').classList.add('hidden');
   document.getElementById('tres-ui').classList.add('hidden');
   document.getElementById('cuatro-ui').classList.add('hidden');
   hideGestureMenu();
@@ -493,6 +503,9 @@ function _active2P() {
   if (mode === 'globos'  && globos) return globos;
   if (mode === 'sumo'    && sumo)   return sumo;
   if (mode === 'cocinas' && cocinas) return cocinas;
+  if (mode === 'vuelo'   && vuelo)  return vuelo;
+  if (mode === 'corazones' && corazones) return corazones;
+  if (mode === 'memoria2p' && memoria2p) return memoria2p;
   return null;
 }
 canvas.addEventListener('pointerdown', e => {
@@ -550,6 +563,12 @@ function exitPong()    { pong    = null; _exitVersus('pong-ui');    }
 function exitGlobos()  { globos  = null; _exitVersus('globos-ui');  }
 function exitSumo()    { sumo    = null; _exitVersus('sumo-ui');    }
 function exitCocinas() { cocinas = null; _exitVersus('cocinas-ui'); }
+function launchVuelo()     { vuelo     = new Vuelo2P(canvas);     _launchVersus('vuelo-ui',     'vuelo');     }
+function launchCorazones() { corazones = new Corazones2P(canvas); _launchVersus('corazones-ui', 'corazones'); }
+function launchMemoria2P() { memoria2p = new Memoria2P(canvas);   _launchVersus('memoria2p-ui', 'memoria2p'); }
+function exitVuelo()     { vuelo     = null; _exitVersus('vuelo-ui');     }
+function exitCorazones() { corazones = null; _exitVersus('corazones-ui'); }
+function exitMemoria2P() { memoria2p = null; _exitVersus('memoria2p-ui'); }
 
 // ── 3-Players submenu & launchers (share the versus launch/exit helpers) ─────
 function showTresSubmenu() {
@@ -763,6 +782,9 @@ function gameLoop(now) {
   if (mode === 'globos' && globos) { globos.update(delta); globos.render(ctx); return; }
   if (mode === 'sumo'   && sumo)   { sumo.update(delta);   sumo.render(ctx);   return; }
   if (mode === 'cocinas' && cocinas) { cocinas.update(delta); cocinas.render(ctx); return; }
+  if (mode === 'vuelo'  && vuelo)  { vuelo.update(delta);  vuelo.render(ctx);  return; }
+  if (mode === 'corazones' && corazones) { corazones.update(delta); corazones.render(ctx); return; }
+  if (mode === 'memoria2p' && memoria2p) { memoria2p.update(delta); memoria2p.render(ctx); return; }
   if (mode === 'tres'   && tres)   { tres.update(delta);   tres.render(ctx);   return; }
   if (mode === 'cuatro' && cuatro) { cuatro.update(delta); cuatro.render(ctx); return; }
   update(delta);
@@ -1563,11 +1585,17 @@ const vsPong    = document.getElementById('versus-pong');
 const vsGlobos  = document.getElementById('versus-globos');
 const vsSumo    = document.getElementById('versus-sumo');
 const vsCocinas = document.getElementById('versus-cocinas');
+const vsVuelo     = document.getElementById('versus-vuelo');
+const vsCorazones = document.getElementById('versus-corazones');
+const vsMemoria   = document.getElementById('versus-memoria');
 if (vsBack)    vsBack.addEventListener('click',    () => { hideVersusSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
 if (vsPong)    { vsPong.addEventListener('click',    launchPong);    vsPong.addEventListener('touchend',    e => { e.preventDefault(); launchPong();    }, { passive: false }); }
 if (vsGlobos)  { vsGlobos.addEventListener('click',  launchGlobos);  vsGlobos.addEventListener('touchend',  e => { e.preventDefault(); launchGlobos();  }, { passive: false }); }
 if (vsSumo)    { vsSumo.addEventListener('click',    launchSumo);    vsSumo.addEventListener('touchend',    e => { e.preventDefault(); launchSumo();    }, { passive: false }); }
 if (vsCocinas) { vsCocinas.addEventListener('click', launchCocinas); vsCocinas.addEventListener('touchend', e => { e.preventDefault(); launchCocinas(); }, { passive: false }); }
+if (vsVuelo)     { vsVuelo.addEventListener('click',     launchVuelo);     vsVuelo.addEventListener('touchend',     e => { e.preventDefault(); launchVuelo();     }, { passive: false }); }
+if (vsCorazones) { vsCorazones.addEventListener('click', launchCorazones); vsCorazones.addEventListener('touchend', e => { e.preventDefault(); launchCorazones(); }, { passive: false }); }
+if (vsMemoria)   { vsMemoria.addEventListener('click',   launchMemoria2P); vsMemoria.addEventListener('touchend',   e => { e.preventDefault(); launchMemoria2P(); }, { passive: false }); }
 
 const pongExitBtn    = document.getElementById('pong-exit');
 const globosExitBtn  = document.getElementById('globos-exit');
@@ -1577,6 +1605,12 @@ if (pongExitBtn)    pongExitBtn.addEventListener('click',    exitPong);
 if (globosExitBtn)  globosExitBtn.addEventListener('click',  exitGlobos);
 if (sumoExitBtn)    sumoExitBtn.addEventListener('click',    exitSumo);
 if (cocinasExitBtn) cocinasExitBtn.addEventListener('click', exitCocinas);
+const vueloExitBtn     = document.getElementById('vuelo-exit');
+const corazonesExitBtn = document.getElementById('corazones-exit');
+const memoria2pExitBtn = document.getElementById('memoria2p-exit');
+if (vueloExitBtn)     vueloExitBtn.addEventListener('click',     exitVuelo);
+if (corazonesExitBtn) corazonesExitBtn.addEventListener('click', exitCorazones);
+if (memoria2pExitBtn) memoria2pExitBtn.addEventListener('click', exitMemoria2P);
 
 window.addEventListener('keydown', e => {
   if (e.code !== 'Escape') return;
@@ -1584,6 +1618,9 @@ window.addEventListener('keydown', e => {
   else if (mode === 'globos'  && globos) { exitGlobos();  e.preventDefault(); }
   else if (mode === 'sumo'    && sumo)   { exitSumo();    e.preventDefault(); }
   else if (mode === 'cocinas' && cocinas){ exitCocinas(); e.preventDefault(); }
+  else if (mode === 'vuelo'   && vuelo)  { exitVuelo();   e.preventDefault(); }
+  else if (mode === 'corazones' && corazones) { exitCorazones(); e.preventDefault(); }
+  else if (mode === 'memoria2p' && memoria2p) { exitMemoria2P(); e.preventDefault(); }
   else if (mode === 'tres'    && tres)   { exitTres();    e.preventDefault(); }
   else if (mode === 'cuatro'  && cuatro) { exitCuatro();  e.preventDefault(); }
 });
