@@ -945,7 +945,7 @@ body {
     color: #fff;
   }
   /* keep the game from receiving input while rotated */
-  #hud, #cust-panel, #gesture-menu, #fridge-menu, #wardrobe-menu, #runner-ui, #match3-ui, #hole-ui, #cinema-ui, #helado-ui, #tienda-ui, #mob-ui, #galaga-ui { pointer-events: none; }
+  #hud, #cust-panel, #gesture-menu, #fridge-menu, #wardrobe-menu, #runner-ui, #match3-ui, #hole-ui, #cinema-ui, #helado-ui, #tienda-ui, #mob-ui, #galaga-ui, #tres-ui, #cuatro-ui { pointer-events: none; }
 }
 .rotate-icon {
   font-size: 4.5rem;
@@ -1086,6 +1086,16 @@ body {
 }
 #versus-submenu.hidden { display: none; }
 
+#tres-submenu {
+  position: fixed; inset: 0; z-index: 112;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #2e0a24 0%, #3e1a3a 40%, #2a0d1b 100%);
+  padding: 16px 12px 24px;
+  overflow-y: auto;
+}
+#tres-submenu.hidden { display: none; }
+
 /* Hub card colours for 2P games */
 .hub-card.versus   { background: linear-gradient(135deg, #1A0030 0%, #40006A 100%); color: #E8C0FF; }
 .hub-card.versus:hover { border-color: #CC80FF; box-shadow: 0 18px 40px rgba(160,60,255,0.45); }
@@ -1097,6 +1107,103 @@ body {
 .hub-card.sumo2p:hover { border-color: #FFC840; box-shadow: 0 18px 40px rgba(255,180,40,0.45); }
 .hub-card.cocinas2p { background: linear-gradient(135deg, #001A10 0%, #006040 100%); color: #80FFD0; }
 .hub-card.cocinas2p:hover { border-color: #40FFA0; box-shadow: 0 18px 40px rgba(40,255,140,0.4); }
+
+/* ── 3 Players hub card + submenu cards ── */
+.hub-card.tresp { background: linear-gradient(135deg, #40103A 0%, #A0206A 100%); color: #FFC0E8; }
+.hub-card.tresp:hover { border-color: #FF70C0; box-shadow: 0 18px 40px rgba(255,90,180,0.45); }
+.hub-card.carrera3p   { background: linear-gradient(135deg, #3A0A20 0%, #B02050 100%); color: #FFB8D0; }
+.hub-card.carrera3p:hover { border-color: #FF6D9F; box-shadow: 0 18px 40px rgba(255,93,143,0.45); }
+.hub-card.reflejos3p  { background: linear-gradient(135deg, #06251E 0%, #128A78 100%); color: #A8F0E4; }
+.hub-card.reflejos3p:hover { border-color: #39C7B4; box-shadow: 0 18px 40px rgba(57,199,180,0.45); }
+.hub-card.bomba3p     { background: linear-gradient(135deg, #2A1400 0%, #90480A 100%); color: #FFCF9A; }
+.hub-card.bomba3p:hover { border-color: #FF9A40; box-shadow: 0 18px 40px rgba(255,140,50,0.45); }
+.hub-card.estrellas3p { background: linear-gradient(135deg, #181040 0%, #5038B0 100%); color: #CFC4FF; }
+.hub-card.estrellas3p:hover { border-color: #8E7BFF; box-shadow: 0 18px 40px rgba(142,123,255,0.45); }
+.hub-card.globo3p    { background: linear-gradient(135deg, #301024 0%, #C02870 100%); color: #FFC8E0; }
+.hub-card.globo3p:hover { border-color: #FF74B8; box-shadow: 0 18px 40px rgba(255,116,184,0.45); }
+.hub-card.baile3p    { background: linear-gradient(135deg, #200A38 0%, #7020B0 100%); color: #E0C8FF; }
+.hub-card.baile3p:hover { border-color: #B060FF; box-shadow: 0 18px 40px rgba(176,96,255,0.45); }
+.hub-card.memoria3p  { background: linear-gradient(135deg, #0A1E38 0%, #2060B0 100%); color: #C0DCFF; }
+.hub-card.memoria3p:hover { border-color: #60A8FF; box-shadow: 0 18px 40px rgba(96,168,255,0.45); }
+.hub-card.centro3p   { background: linear-gradient(135deg, #38081A 0%, #B01040 100%); color: #FFC0D0; }
+.hub-card.centro3p:hover { border-color: #FF6080; box-shadow: 0 18px 40px rgba(255,96,128,0.45); }
+
+/* ── 3 Players controls (one big button per player at the bottom) ── */
+#tres-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+#tres-ui.hidden { display: none; }
+#tres-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#tres-exit {
+  position: absolute; top: 16px; right: 16px;
+  width: 44px; height: 44px; border-radius: 10px;
+  background: rgba(0,0,0,0.5); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-size: 1.1rem; cursor: pointer;
+}
+#tres-exit:hover { background: rgba(0,0,0,0.7); }
+#tres-btns {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 26vh; min-height: 96px; max-height: 190px;
+  display: flex; gap: 10px; padding: 8px 10px 10px;
+}
+.tres-btn {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 22px;
+  color: #fff;
+  border: 3px solid rgba(255,255,255,0.5);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  cursor: pointer; user-select: none;
+  font-family: inherit;
+}
+.tres-btn:active { transform: scale(0.96); filter: brightness(1.25); }
+.tres-btn-emoji { font-size: 2rem; line-height: 1; }
+.tres-btn-name  { font-weight: 800; font-size: 1rem; }
+.tres-btn-key   { font-size: 0.7rem; opacity: 0.75; }
+#tres-btn-0 { background: rgba(255,93,143,0.55);  border-color: #FF5D8F; }
+#tres-btn-1 { background: rgba(57,199,180,0.55);  border-color: #39C7B4; }
+#tres-btn-2 { background: rgba(142,123,255,0.55); border-color: #8E7BFF; }
+
+/* ── 4 Players submenu + controls (reuse .tres-btn button styling) ── */
+#cuatro-submenu {
+  position: fixed; inset: 0; z-index: 112;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #0a2e1e 0%, #1a3e30 40%, #0d2a1b 100%);
+  padding: 16px 12px 24px;
+  overflow-y: auto;
+}
+#cuatro-submenu.hidden { display: none; }
+#cuatro-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+#cuatro-ui.hidden { display: none; }
+#cuatro-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#cuatro-exit {
+  position: absolute; top: 16px; right: 16px;
+  width: 44px; height: 44px; border-radius: 10px;
+  background: rgba(0,0,0,0.5); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-size: 1.1rem; cursor: pointer;
+}
+#cuatro-exit:hover { background: rgba(0,0,0,0.7); }
+#cuatro-btns {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 26vh; min-height: 96px; max-height: 190px;
+  display: flex; gap: 8px; padding: 8px 10px 10px;
+}
+#cuatro-btn-0 { background: rgba(255,93,143,0.55);  border-color: #FF5D8F; }
+#cuatro-btn-1 { background: rgba(57,199,180,0.55);  border-color: #39C7B4; }
+#cuatro-btn-2 { background: rgba(142,123,255,0.55); border-color: #8E7BFF; }
+#cuatro-btn-3 { background: rgba(255,160,54,0.55);  border-color: #FFA036; }
+
+.hub-card.cuatrop { background: linear-gradient(135deg, #103024 0%, #20A060 100%); color: #C0FFD8; }
+.hub-card.cuatrop:hover { border-color: #50E890; box-shadow: 0 18px 40px rgba(80,232,144,0.45); }
+.hub-card.soga4p  { background: linear-gradient(135deg, #38102A 0%, #C04878 100%); color: #FFD0E0; }
+.hub-card.soga4p:hover { border-color: #FF88B8; box-shadow: 0 18px 40px rgba(255,136,184,0.45); }
+.hub-card.caramelos4p { background: linear-gradient(135deg, #2A0A30 0%, #9030B0 100%); color: #F0C8FF; }
+.hub-card.caramelos4p:hover { border-color: #D070FF; box-shadow: 0 18px 40px rgba(208,112,255,0.45); }
+.hub-card.sillas4p { background: linear-gradient(135deg, #30200A 0%, #B07820 100%); color: #FFE8C0; }
+.hub-card.sillas4p:hover { border-color: #FFC060; box-shadow: 0 18px 40px rgba(255,192,96,0.45); }
+.hub-card.jardin4p { background: linear-gradient(135deg, #0A300A 0%, #40A040 100%); color: #D0FFD0; }
+.hub-card.jardin4p:hover { border-color: #80E080; box-shadow: 0 18px 40px rgba(128,224,128,0.45); }
 
 /* ── 2P game UI overlays ─────────────────────────────────────────────────── */
 #pong-ui, #globos-ui, #sumo-ui, #cocinas-ui {

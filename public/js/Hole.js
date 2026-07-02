@@ -23,11 +23,19 @@ const TYPES = [
   { kind: 'building', min: 110, max: 150, w: 3  },
 ];
 
+// Todos los niveles tienen la misma cantidad de objetos para que el mejor
+// tiempo sea comparable entre partidas.
+const OBJ_COUNT = 240;
 const LEVELS = [
-  { n: 1, label: 'Parque',  emoji: '🌳', desc: 'Flores, árboles y bancos',        types: TYPES.slice(0, 10), count: 220, key: 'hole_best_1' },
-  { n: 2, label: 'Barrio',  emoji: '🏘️', desc: 'Autos, fuentes y casas',          types: TYPES.slice(0, 15), count: 240, key: 'hole_best_2' },
-  { n: 3, label: 'Ciudad',  emoji: '🏙️', desc: 'Edificios y todo lo que hay',     types: TYPES,              count: 260, key: 'hole_best_3' },
+  { n: 1, label: 'Parque',  emoji: '🌳', desc: 'Flores, árboles y bancos',        types: TYPES.slice(0, 10), count: OBJ_COUNT, key: 'hole_time_1' },
+  { n: 2, label: 'Barrio',  emoji: '🏘️', desc: 'Autos, fuentes y casas',          types: TYPES.slice(0, 15), count: OBJ_COUNT, key: 'hole_time_2' },
+  { n: 3, label: 'Ciudad',  emoji: '🏙️', desc: 'Edificios y todo lo que hay',     types: TYPES,              count: OBJ_COUNT, key: 'hole_time_3' },
 ];
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 const PETALS = ['#FF6B9D', '#FF5D5D', '#B86DD6', '#FFFFFF', '#FFA94D'];
 const CARCOL = ['#E8503A', '#3A7BE8', '#21B0A8', '#F2C037', '#F0EDE6', '#9B6DD6'];
@@ -44,6 +52,8 @@ export class Hole {
     this._selectBtns = [];
     this._replayBtns = [];
     this.t = 0;
+    this.elapsed = 0;
+    this.newRecord = false;
     this.score = 0;
     this.over  = false;
     this.allEaten = false;
@@ -60,6 +70,8 @@ export class Hole {
     this._level = lvl;
     this._phase = 'playing';
     this.t         = 0;
+    this.elapsed   = 0;
+    this.newRecord = false;
     this.score     = 0;
     this.over      = false;
     this.allEaten  = false;
@@ -152,6 +164,8 @@ export class Hole {
 
     if (this._phase === 'over') return;
 
+    this.elapsed += dt;
+
     // Movement
     let mx = 0, my = 0;
     if (this.touch) {
@@ -196,8 +210,12 @@ export class Hole {
     this.over     = allEaten;
     this.allEaten = allEaten;
     this._phase   = 'over';
+    // El récord es el menor tiempo en comerse todo
     const best = +(localStorage.getItem(this._level.key) || 0);
-    if (this.score > best) localStorage.setItem(this._level.key, this.score);
+    if (allEaten && (best === 0 || this.elapsed < best)) {
+      this.newRecord = true;
+      localStorage.setItem(this._level.key, this.elapsed.toFixed(1));
+    }
   }
 
   _consume(o) {
@@ -220,12 +238,16 @@ export class Hole {
     const V = this._view(), { W, H, scale } = V;
 
     ctx.fillStyle = '#9CCB6B'; ctx.fillRect(0, 0, W, H);
-    const tile = 120 * scale;
-    const ox = ((-this.hole.x * scale + W / 2) % tile + tile) % tile;
-    const oy = ((-this.hole.y * scale + H / 2) % tile + tile) % tile;
-    for (let y = oy - tile; y < H; y += tile) for (let x = ox - tile; x < W; x += tile) {
-      const gx = Math.round((x - ox) / tile), gy = Math.round((y - oy) / tile);
-      if ((gx + gy) % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(x, y, tile, tile); }
+    // Checker anchored to the world grid so tiles keep their colour as the hole moves
+    const tileW = 120;
+    const gx0 = Math.floor((this.hole.x - W / 2 / scale) / tileW), gx1 = Math.floor((this.hole.x + W / 2 / scale) / tileW);
+    const gy0 = Math.floor((this.hole.y - H / 2 / scale) / tileW), gy1 = Math.floor((this.hole.y + H / 2 / scale) / tileW);
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
+      if (((gx + gy) % 2 + 2) % 2 === 0) {
+        const s = this._toScreen(gx * tileW, gy * tileW, V);
+        ctx.fillRect(s.x, s.y, tileW * scale + 0.5, tileW * scale + 0.5);
+      }
     }
     const tl = this._toScreen(0, 0, V), br = this._toScreen(WORLD_W, WORLD_H, V);
     ctx.strokeStyle = 'rgba(90,120,60,0.6)'; ctx.lineWidth = 6;
@@ -277,7 +299,7 @@ export class Hole {
     ctx.fillText('⬤ Agujero Glotón', W / 2, H * 0.1);
     ctx.font = `bold ${Math.round(16 * s)}px system-ui, sans-serif`;
     ctx.fillStyle = '#2d5a1a';
-    ctx.fillText('Elegí un nivel — ¡comete todo sin límite de tiempo!', W / 2, H * 0.18);
+    ctx.fillText(`Elegí un nivel — ¡comete los ${OBJ_COUNT} objetos lo más rápido que puedas!`, W / 2, H * 0.18);
 
     // Cards
     const cardW = Math.min(W * 0.82, 420 * s);
@@ -317,12 +339,12 @@ export class Hole {
       ctx.fillStyle = 'rgba(255,255,255,0.82)';
       ctx.fillText(lvl.desc, bx + 62 * s, by + bh * 0.68);
 
-      // Best score badge
+      // Best time badge
       if (best > 0) {
         ctx.textAlign = 'right';
         ctx.font = `bold ${Math.round(12 * s)}px system-ui, sans-serif`;
         ctx.fillStyle = '#FFD23F';
-        ctx.fillText(`⬤ ${best}`, bx + bw - 14 * s, by + bh / 2);
+        ctx.fillText(`⏱ ${fmtTime(best)}`, bx + bw - 14 * s, by + bh / 2);
       }
     }
   }
@@ -335,15 +357,16 @@ export class Hole {
 
     ctx.fillStyle = '#fff';
     ctx.font = `900 ${Math.round(52 * s)}px system-ui, sans-serif`;
-    ctx.fillText('¡Todo comido!', W / 2, H * 0.34);
+    ctx.fillText('¡Todo comido!', W / 2, H * 0.32);
 
     ctx.font = `bold ${Math.round(28 * s)}px system-ui, sans-serif`;
-    ctx.fillText(`Puntaje: ${this.score}`, W / 2, H * 0.46);
+    ctx.fillText(`⏱ Tu tiempo: ${fmtTime(this.elapsed)}`, W / 2, H * 0.44);
 
     const best = +(localStorage.getItem(this._level.key) || 0);
     ctx.fillStyle = '#FFD23F';
     ctx.font = `bold ${Math.round(18 * s)}px system-ui, sans-serif`;
-    ctx.fillText(`Mejor en ${this._level.label}: ${best}`, W / 2, H * 0.54);
+    if (this.newRecord) ctx.fillText('🎉 ¡Nuevo récord!', W / 2, H * 0.53);
+    else if (best > 0)  ctx.fillText(`Mejor en ${this._level.label}: ${fmtTime(best)}`, W / 2, H * 0.53);
 
     // Replay button
     const bw = Math.min(W * 0.5, 260 * s), bh = Math.round(50 * s);
@@ -391,7 +414,7 @@ export class Hole {
     ctx.fillText(`⬤ ${this.score}`, 18 * s, 42 * s);
     ctx.font = `bold ${15 * s}px system-ui, sans-serif`;
     ctx.fillStyle = '#3a5a28';
-    ctx.fillText(`Mejor: ${best}`, 18 * s, 64 * s);
+    ctx.fillText(`⏱ ${fmtTime(this.elapsed)}${best > 0 ? `  ·  Mejor: ${fmtTime(best)}` : ''}`, 18 * s, 64 * s);
 
     // Level badge (top right)
     if (this._level) {

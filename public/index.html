@@ -94,6 +94,16 @@
         <div class="hub-name">2 Players</div>
         <div class="hub-desc">Jugá de a dos</div>
       </button>
+      <button class="hub-card tresp" data-game="tres">
+        <div class="hub-emoji">👯</div>
+        <div class="hub-name">3 Players</div>
+        <div class="hub-desc">Jugá de a tres</div>
+      </button>
+      <button class="hub-card cuatrop" data-game="cuatro">
+        <div class="hub-emoji">🎉</div>
+        <div class="hub-name">4 Players</div>
+        <div class="hub-desc">Jugá de a cuatro</div>
+      </button>
     </div>
   </div>
 
@@ -273,6 +283,105 @@
     </div>
   </div>
 
+  <!-- 3 Players submenu (choose 3P game) -->
+  <div id="tres-submenu" class="hidden">
+    <button id="tres-back" class="corner-back">← Juegos</button>
+    <h1 class="select-title">👯 3 Players</h1>
+    <p class="select-subtitle">Elegí un juego para tres</p>
+    <div class="hub-grid">
+      <button class="hub-card carrera3p" id="tres-go-carrera">
+        <div class="hub-emoji">🏁</div>
+        <div class="hub-name">Carrera Loca</div>
+        <div class="hub-desc">Tocá rapidísimo y llegá primera</div>
+      </button>
+      <button class="hub-card reflejos3p" id="tres-go-reflejos">
+        <div class="hub-emoji">⚡</div>
+        <div class="hub-name">Reflejos</div>
+        <div class="hub-desc">Tocá cuando se ponga verde</div>
+      </button>
+      <button class="hub-card bomba3p" id="tres-go-bomba">
+        <div class="hub-emoji">💣</div>
+        <div class="hub-name">La Bomba</div>
+        <div class="hub-desc">¡Pasala antes de que explote!</div>
+      </button>
+      <button class="hub-card estrellas3p" id="tres-go-estrellas">
+        <div class="hub-emoji">⭐</div>
+        <div class="hub-name">Cazaestrellas</div>
+        <div class="hub-desc">Atrapá la estrella primero</div>
+      </button>
+      <button class="hub-card globo3p" id="tres-go-globo">
+        <div class="hub-emoji">🎈</div>
+        <div class="hub-name">Globo Gigante</div>
+        <div class="hub-desc">Inflalo grande… ¡sin que explote!</div>
+      </button>
+      <button class="hub-card baile3p" id="tres-go-baile">
+        <div class="hub-emoji">💃</div>
+        <div class="hub-name">Fiesta de Baile</div>
+        <div class="hub-desc">Seguí el ritmo de las figuras</div>
+      </button>
+      <button class="hub-card memoria3p" id="tres-go-memoria">
+        <div class="hub-emoji">🧠</div>
+        <div class="hub-name">Memoria Mágica</div>
+        <div class="hub-desc">Repitan la secuencia en equipo</div>
+      </button>
+      <button class="hub-card centro3p" id="tres-go-centro">
+        <div class="hub-emoji">💘</div>
+        <div class="hub-name">Justo al Corazón</div>
+        <div class="hub-desc">Pará la flecha en el centro</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 3 Players controls (one big button per player) -->
+  <div id="tres-ui" class="hidden">
+    <button id="tres-exit" title="Salir">✕</button>
+    <div id="tres-btns">
+      <button class="tres-btn" id="tres-btn-0"><span class="tres-btn-emoji">🦄</span><span class="tres-btn-name">Jugador 1</span><span class="tres-btn-key">tecla A</span></button>
+      <button class="tres-btn" id="tres-btn-1"><span class="tres-btn-emoji">🐰</span><span class="tres-btn-name">Jugador 2</span><span class="tres-btn-key">Espacio</span></button>
+      <button class="tres-btn" id="tres-btn-2"><span class="tres-btn-emoji">🦋</span><span class="tres-btn-name">Jugador 3</span><span class="tres-btn-key">tecla L</span></button>
+    </div>
+  </div>
+
+  <!-- 4 Players submenu (choose 4P game) -->
+  <div id="cuatro-submenu" class="hidden">
+    <button id="cuatro-back" class="corner-back">← Juegos</button>
+    <h1 class="select-title">🎉 4 Players</h1>
+    <p class="select-subtitle">Elegí un juego para cuatro</p>
+    <div class="hub-grid">
+      <button class="hub-card soga4p" id="cuatro-go-soga">
+        <div class="hub-emoji">🎀</div>
+        <div class="hub-name">Tira y Afloja</div>
+        <div class="hub-desc">Equipo Rosa contra Equipo Violeta</div>
+      </button>
+      <button class="hub-card caramelos4p" id="cuatro-go-caramelos">
+        <div class="hub-emoji">🍭</div>
+        <div class="hub-name">Frasco de Caramelos</div>
+        <div class="hub-desc">Sacá de a uno… ¡cuidado con el ácido!</div>
+      </button>
+      <button class="hub-card sillas4p" id="cuatro-go-sillas">
+        <div class="hub-emoji">🧁</div>
+        <div class="hub-name">Sillas Musicales</div>
+        <div class="hub-desc">Siempre falta un cupcake</div>
+      </button>
+      <button class="hub-card jardin4p" id="cuatro-go-jardin">
+        <div class="hub-emoji">🌸</div>
+        <div class="hub-name">Jardín de Flores</div>
+        <div class="hub-desc">Cortá tu flor en el momento justo</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 4 Players controls (one big button per player) -->
+  <div id="cuatro-ui" class="hidden">
+    <button id="cuatro-exit" title="Salir">✕</button>
+    <div id="cuatro-btns">
+      <button class="tres-btn" id="cuatro-btn-0"><span class="tres-btn-emoji">🦄</span><span class="tres-btn-name">Jugador 1</span><span class="tres-btn-key">tecla A</span></button>
+      <button class="tres-btn" id="cuatro-btn-1"><span class="tres-btn-emoji">🐰</span><span class="tres-btn-name">Jugador 2</span><span class="tres-btn-key">tecla F</span></button>
+      <button class="tres-btn" id="cuatro-btn-2"><span class="tres-btn-emoji">🦋</span><span class="tres-btn-name">Jugador 3</span><span class="tres-btn-key">tecla J</span></button>
+      <button class="tres-btn" id="cuatro-btn-3"><span class="tres-btn-emoji">🐱</span><span class="tres-btn-name">Jugador 4</span><span class="tres-btn-key">tecla L</span></button>
+    </div>
+  </div>
+
   <!-- Hole submenu (choose which hole game) -->
   <div id="hole-submenu" class="hidden">
     <button id="hole-submenu-back" class="corner-back">← Juegos</button>
@@ -348,7 +457,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.35.1</div>
+  <div id="app-version">v2.37.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">

@@ -17,6 +17,8 @@ import { PongChibi }      from './PongChibi.js';
 import { Globos2P }       from './Globos2P.js';
 import { Sumo2P }         from './Sumo2P.js';
 import { Cocinas2P }      from './Cocinas2P.js';
+import { ThreePlayers }   from './ThreePlayers.js';
+import { FourPlayers }    from './FourPlayers.js';
 import { getFridge, eatFood }    from './Pantry.js';
 import { getCoins, getWardrobe, getEquippedId, setEquippedId } from './Wallet.js';
 
@@ -46,9 +48,11 @@ let pong     = null;
 let globos   = null;
 let sumo     = null;
 let cocinas  = null;
+let tres     = null;
+let cuatro   = null;
 const _2pTouches = new Map(); // pointerId → 'p1' | 'p2'
 let holeFrom = 'hub';        // 'hub' | 'world'
-let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas'
+let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas' | 'tres'
 let savedPos = null;         // exterior pos when inside a house
 
 let lastTime    = 0;
@@ -278,12 +282,16 @@ function showHub() {
   if (galaga) { galaga.destroy(); galaga = null; }
   hideHoleSubmenu();
   hideVersusSubmenu();
-  pong = null; globos = null; sumo = null; cocinas = null;
+  hideTresSubmenu();
+  hideCuatroSubmenu();
+  pong = null; globos = null; sumo = null; cocinas = null; tres = null; cuatro = null;
   _2pTouches.clear();
   document.getElementById('pong-ui').classList.add('hidden');
   document.getElementById('globos-ui').classList.add('hidden');
   document.getElementById('sumo-ui').classList.add('hidden');
   document.getElementById('cocinas-ui').classList.add('hidden');
+  document.getElementById('tres-ui').classList.add('hidden');
+  document.getElementById('cuatro-ui').classList.add('hidden');
   hideGestureMenu();
   hideFridgeMenu();
   hideWardrobeMenu();
@@ -543,6 +551,36 @@ function exitGlobos()  { globos  = null; _exitVersus('globos-ui');  }
 function exitSumo()    { sumo    = null; _exitVersus('sumo-ui');    }
 function exitCocinas() { cocinas = null; _exitVersus('cocinas-ui'); }
 
+// ── 3-Players submenu & launchers (share the versus launch/exit helpers) ─────
+function showTresSubmenu() {
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('tres-submenu').classList.remove('hidden');
+}
+function hideTresSubmenu() {
+  document.getElementById('tres-submenu').classList.add('hidden');
+}
+function launchTres(gameMode) {
+  hideTresSubmenu();
+  tres = new ThreePlayers(canvas, gameMode);
+  _launchVersus('tres-ui', 'tres');
+}
+function exitTres() { tres = null; _exitVersus('tres-ui'); }
+
+// ── 4-Players submenu & launchers ─────────────────────────────────────────────
+function showCuatroSubmenu() {
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('cuatro-submenu').classList.remove('hidden');
+}
+function hideCuatroSubmenu() {
+  document.getElementById('cuatro-submenu').classList.add('hidden');
+}
+function launchCuatro(gameMode) {
+  hideCuatroSubmenu();
+  cuatro = new FourPlayers(canvas, gameMode);
+  _launchVersus('cuatro-ui', 'cuatro');
+}
+function exitCuatro() { cuatro = null; _exitVersus('cuatro-ui'); }
+
 // ── Cinema (watch movies, entered from the world) ────────────────────────────
 function enterCinema() {
   if (mode !== 'exterior') return;
@@ -725,6 +763,8 @@ function gameLoop(now) {
   if (mode === 'globos' && globos) { globos.update(delta); globos.render(ctx); return; }
   if (mode === 'sumo'   && sumo)   { sumo.update(delta);   sumo.render(ctx);   return; }
   if (mode === 'cocinas' && cocinas) { cocinas.update(delta); cocinas.render(ctx); return; }
+  if (mode === 'tres'   && tres)   { tres.update(delta);   tres.render(ctx);   return; }
+  if (mode === 'cuatro' && cuatro) { cuatro.update(delta); cuatro.render(ctx); return; }
   update(delta);
   render();
 }
@@ -1544,12 +1584,75 @@ window.addEventListener('keydown', e => {
   else if (mode === 'globos'  && globos) { exitGlobos();  e.preventDefault(); }
   else if (mode === 'sumo'    && sumo)   { exitSumo();    e.preventDefault(); }
   else if (mode === 'cocinas' && cocinas){ exitCocinas(); e.preventDefault(); }
+  else if (mode === 'tres'    && tres)   { exitTres();    e.preventDefault(); }
+  else if (mode === 'cuatro'  && cuatro) { exitCuatro();  e.preventDefault(); }
+});
+
+// ── 3-Players submenu buttons ─────────────────────────────────────────────────
+const tresBack = document.getElementById('tres-back');
+if (tresBack) tresBack.addEventListener('click', () => { hideTresSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
+[['tres-go-carrera', 'carrera'], ['tres-go-reflejos', 'reflejos'], ['tres-go-bomba', 'bomba'], ['tres-go-estrellas', 'estrellas'],
+ ['tres-go-globo', 'globo'], ['tres-go-baile', 'baile'], ['tres-go-memoria', 'memoria'], ['tres-go-centro', 'centro']].forEach(([id, m]) => {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const go = () => launchTres(m);
+  btn.addEventListener('click', go);
+  btn.addEventListener('touchend', e => { e.preventDefault(); go(); }, { passive: false });
+});
+const tresExitBtn = document.getElementById('tres-exit');
+if (tresExitBtn) tresExitBtn.addEventListener('click', exitTres);
+
+// Player buttons: pointerdown (not click) so taps feel instant in the tap races
+for (let i = 0; i < 3; i++) {
+  const btn = document.getElementById(`tres-btn-${i}`);
+  if (btn) btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (mode === 'tres' && tres) tres.press(i);
+  });
+}
+// Keyboard: A / Space / L map to players 1 / 2 / 3
+window.addEventListener('keydown', e => {
+  if (mode !== 'tres' || !tres || e.repeat) return;
+  if      (e.code === 'KeyA')  { tres.press(0); e.preventDefault(); }
+  else if (e.code === 'Space') { tres.press(1); e.preventDefault(); }
+  else if (e.code === 'KeyL')  { tres.press(2); e.preventDefault(); }
+});
+
+// ── 4-Players submenu buttons ─────────────────────────────────────────────────
+const cuatroBack = document.getElementById('cuatro-back');
+if (cuatroBack) cuatroBack.addEventListener('click', () => { hideCuatroSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
+[['cuatro-go-soga', 'soga'], ['cuatro-go-caramelos', 'caramelos'], ['cuatro-go-sillas', 'sillas'], ['cuatro-go-jardin', 'jardin']].forEach(([id, m]) => {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const go = () => launchCuatro(m);
+  btn.addEventListener('click', go);
+  btn.addEventListener('touchend', e => { e.preventDefault(); go(); }, { passive: false });
+});
+const cuatroExitBtn = document.getElementById('cuatro-exit');
+if (cuatroExitBtn) cuatroExitBtn.addEventListener('click', exitCuatro);
+
+for (let i = 0; i < 4; i++) {
+  const btn = document.getElementById(`cuatro-btn-${i}`);
+  if (btn) btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (mode === 'cuatro' && cuatro) cuatro.press(i);
+  });
+}
+// Keyboard: A / F / J / L map to players 1 / 2 / 3 / 4
+window.addEventListener('keydown', e => {
+  if (mode !== 'cuatro' || !cuatro || e.repeat) return;
+  if      (e.code === 'KeyA') { cuatro.press(0); e.preventDefault(); }
+  else if (e.code === 'KeyF') { cuatro.press(1); e.preventDefault(); }
+  else if (e.code === 'KeyJ') { cuatro.press(2); e.preventDefault(); }
+  else if (e.code === 'KeyL') { cuatro.press(3); e.preventDefault(); }
 });
 
 // Hub (game chooser)
 document.querySelectorAll('.hub-card').forEach(card => {
   if (card.closest('#hole-submenu'))   return;
   if (card.closest('#versus-submenu')) return;
+  if (card.closest('#tres-submenu'))   return;
+  if (card.closest('#cuatro-submenu')) return;
   const go = () => {
     const g = card.dataset.game;
     if (g === 'runner') launchRunner();
@@ -1561,6 +1664,8 @@ document.querySelectorAll('.hub-card').forEach(card => {
     else if (g === 'tienda')  launchTienda();
     else if (g === 'mob')     launchMob();
     else if (g === 'versus')  showVersusSubmenu();
+    else if (g === 'tres')    showTresSubmenu();
+    else if (g === 'cuatro')  showCuatroSubmenu();
     else launchWorld();
   };
   card.addEventListener('click', go);
