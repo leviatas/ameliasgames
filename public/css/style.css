@@ -1076,6 +1076,18 @@ body {
 }
 
 /* ── Versus submenu (2P game picker) ─────────────────────────────────────── */
+#uno-submenu {
+  position: fixed; inset: 0; z-index: 112;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #241030 0%, #34204a 40%, #1b0d2a 100%);
+  padding: 16px 12px 24px;
+  overflow-y: auto;
+}
+#uno-submenu.hidden { display: none; }
+.hub-card.unop { background: linear-gradient(135deg, #2A1038 0%, #7828A0 100%); color: #ECC8FF; }
+.hub-card.unop:hover { border-color: #C878FF; box-shadow: 0 18px 40px rgba(200,120,255,0.45); }
+
 #versus-submenu {
   position: fixed; inset: 0; z-index: 112;
   display: flex; flex-direction: column;

@@ -59,11 +59,6 @@
         <div class="hub-name">Cocina con Viole</div>
         <div class="hub-desc">Buscá ingredientes y cociná</div>
       </button>
-      <button class="hub-card match3" data-game="match3">
-        <div class="hub-emoji">🍬</div>
-        <div class="hub-name">Dulces de Labubu</div>
-        <div class="hub-desc">Uní 3 dulces iguales</div>
-      </button>
       <button class="hub-card hole" data-game="hole">
         <div class="hub-emoji">🕳️</div>
         <div class="hub-name">Agujero glotón</div>
@@ -79,15 +74,10 @@
         <div class="hub-name">Tienda de Ropa</div>
         <div class="hub-desc">Comprá ropa con tus monedas</div>
       </button>
-      <button class="hub-card mob" data-game="mob">
-        <div class="hub-emoji">👾</div>
-        <div class="hub-name">Mob Control</div>
-        <div class="hub-desc">Derribá a los amigos antes de que lleguen</div>
-      </button>
-      <button class="hub-card galaga" data-game="galaga">
-        <div class="hub-emoji">🚀</div>
-        <div class="hub-name">Space Galaga</div>
-        <div class="hub-desc">Destruí la invasión alienígena</div>
+      <button class="hub-card unop" data-game="uno">
+        <div class="hub-emoji">🕹️</div>
+        <div class="hub-name">1 Player</div>
+        <div class="hub-desc">Juegos para vos sola</div>
       </button>
       <button class="hub-card versus" data-game="versus">
         <div class="hub-emoji">🎮</div>
@@ -252,6 +242,30 @@
   <!-- Match-3 mini-game controls -->
   <div id="match3-ui" class="hidden">
     <button id="match3-exit" title="Salir">✕</button>
+  </div>
+
+  <!-- 1 Player submenu (choose solo game) -->
+  <div id="uno-submenu" class="hidden">
+    <button id="uno-back" class="corner-back">← Juegos</button>
+    <h1 class="select-title">🕹️ 1 Player</h1>
+    <p class="select-subtitle">Elegí un juego para vos</p>
+    <div class="hub-grid">
+      <button class="hub-card match3" id="uno-match3">
+        <div class="hub-emoji">🍬</div>
+        <div class="hub-name">Dulces de Labubu</div>
+        <div class="hub-desc">Uní 3 dulces iguales</div>
+      </button>
+      <button class="hub-card mob" id="uno-mob">
+        <div class="hub-emoji">👾</div>
+        <div class="hub-name">Mob Control</div>
+        <div class="hub-desc">Derribá a los amigos antes de que lleguen</div>
+      </button>
+      <button class="hub-card galaga" id="uno-galaga">
+        <div class="hub-emoji">🚀</div>
+        <div class="hub-name">Space Galaga</div>
+        <div class="hub-desc">Destruí la invasión alienígena</div>
+      </button>
+    </div>
   </div>
 
   <!-- Versus submenu (choose 2P game) -->
@@ -487,7 +501,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.38.0</div>
+  <div id="app-version">v2.39.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">

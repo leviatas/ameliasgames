@@ -287,6 +287,7 @@ function showHub() {
   if (mob)    { mob.destroy(); mob = null; }
   if (galaga) { galaga.destroy(); galaga = null; }
   hideHoleSubmenu();
+  hideUnoSubmenu();
   hideVersusSubmenu();
   hideTresSubmenu();
   hideCuatroSubmenu();
@@ -530,6 +531,15 @@ canvas.addEventListener('pointermove', e => {
     _2pTouches.delete(e.pointerId);
   })
 );
+
+// ── 1-Player submenu ──────────────────────────────────────────────────────────
+function showUnoSubmenu() {
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('uno-submenu').classList.remove('hidden');
+}
+function hideUnoSubmenu() {
+  document.getElementById('uno-submenu').classList.add('hidden');
+}
 
 // ── Versus submenu & 2P game launchers ───────────────────────────────────────
 function showVersusSubmenu() {
@@ -1655,6 +1665,17 @@ window.addEventListener('keydown', e => {
   else if (e.code === 'KeyL')  { tres.press(2); e.preventDefault(); }
 });
 
+// ── 1-Player submenu buttons ──────────────────────────────────────────────────
+const unoBack = document.getElementById('uno-back');
+if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
+[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga]].forEach(([id, launch]) => {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const go = () => { hideUnoSubmenu(); launch(); };
+  btn.addEventListener('click', go);
+  btn.addEventListener('touchend', e => { e.preventDefault(); go(); }, { passive: false });
+});
+
 // ── 4-Players submenu buttons ─────────────────────────────────────────────────
 const cuatroBack = document.getElementById('cuatro-back');
 if (cuatroBack) cuatroBack.addEventListener('click', () => { hideCuatroSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
@@ -1687,6 +1708,7 @@ window.addEventListener('keydown', e => {
 // Hub (game chooser)
 document.querySelectorAll('.hub-card').forEach(card => {
   if (card.closest('#hole-submenu'))   return;
+  if (card.closest('#uno-submenu'))    return;
   if (card.closest('#versus-submenu')) return;
   if (card.closest('#tres-submenu'))   return;
   if (card.closest('#cuatro-submenu')) return;
@@ -1700,6 +1722,7 @@ document.querySelectorAll('.hub-card').forEach(card => {
     else if (g === 'helado')  launchHelado();
     else if (g === 'tienda')  launchTienda();
     else if (g === 'mob')     launchMob();
+    else if (g === 'uno')     showUnoSubmenu();
     else if (g === 'versus')  showVersusSubmenu();
     else if (g === 'tres')    showTresSubmenu();
     else if (g === 'cuatro')  showCuatroSubmenu();

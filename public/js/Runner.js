@@ -337,7 +337,13 @@ export class Runner {
       const b = this._obsBox(o, G);
       if (!aabb(db, b)) continue;
       if (o.type === 'skate')      { this.boostTime = 5; this.obstacles.splice(k, 1); continue; }
-      if (o.type === 'platform')   { if (dog.platform !== o && feet > b.y + 4 && !boosting) { this._die(); } continue; }
+      if (o.type === 'platform')   {
+        // Sólo muere al chocar de frente contra el costado de la plataforma;
+        // bajarse por el borde (la caja aún se solapa mientras cae) no mata.
+        const frontHit = db.x + db.w < b.x + 30 * G.scale;
+        if (dog.platform !== o && frontHit && feet > b.y + 4 && !boosting) { this._die(); }
+        continue;
+      }
       // low / high obstacle
       if (boosting) { this.obstacles.splice(k, 1); }   // invulnerable → smash through
       else { this._die(); break; }
