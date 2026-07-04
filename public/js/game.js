@@ -20,8 +20,13 @@ import { Cocinas2P }      from './Cocinas2P.js';
 import { Vuelo2P }        from './Vuelo2P.js';
 import { Corazones2P }    from './Corazones2P.js';
 import { Memoria2P }      from './Memoria2P.js';
+import { TresEnRaya }     from './TresEnRaya.js';
+import { Conecta4 }       from './Conecta4.js';
+import { PiedraPapelTijera } from './PiedraPapelTijera.js';
+import { Ahorcado }       from './Ahorcado.js';
 import { ThreePlayers }   from './ThreePlayers.js';
 import { FourPlayers }    from './FourPlayers.js';
+import { NetSession }     from './Net.js';
 import { getFridge, eatFood }    from './Pantry.js';
 import { getCoins, getWardrobe, getEquippedId, setEquippedId } from './Wallet.js';
 
@@ -54,9 +59,22 @@ let cocinas  = null;
 let vuelo    = null;
 let corazones = null;
 let memoria2p = null;
+let tresenraya = null;
+let conecta4  = null;
+let ppt       = null;
+let ahorcado  = null;
 let tres     = null;
 let cuatro   = null;
 const _2pTouches = new Map(); // pointerId → 'p1' | 'p2'
+
+// ── Online 2P (WebSocket relay, room-code pairing) ───────────────────────────
+let netSession     = null;         // NetSession instance, or null when playing locally
+let netRole        = null;         // 'host' | 'guest' | null
+let netGameKey     = null;         // 'globos' | 'sumo' — which 2P game is networked
+let netPendingGameKey = null;      // game the online-setup screen currently targets
+let netScale       = null;         // guest-only: {scale, offX, offY} to map host↔local canvas
+let netSendAccum   = 0;            // host-only: throttle accumulator for state broadcasts
+const NET_STATE_HZ = 30;
 let holeFrom = 'hub';        // 'hub' | 'world'
 let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas' | 'tres'
 let savedPos = null;         // exterior pos when inside a house
@@ -273,10 +291,11 @@ function saveState() {
 let runnerFrom  = 'tv';    // 'tv' (from a house) | 'hub' (standalone)
 let cocinaFrom  = 'hub';   // 'kitchen' (from a house) | 'hub' (standalone)
 
-function showHub() {
+function showHub(menuId = 'hub-screen') {
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   inGame = false;
   mode   = 'exterior';
+  _resetNetState();
   runner = null;
   cocina = null;
   match3 = null;
@@ -293,6 +312,7 @@ function showHub() {
   hideCuatroSubmenu();
   pong = null; globos = null; sumo = null; cocinas = null; tres = null; cuatro = null;
   vuelo = null; corazones = null; memoria2p = null;
+  tresenraya = null; conecta4 = null; ppt = null; ahorcado = null;
   _2pTouches.clear();
   document.getElementById('pong-ui').classList.add('hidden');
   document.getElementById('globos-ui').classList.add('hidden');
@@ -301,6 +321,10 @@ function showHub() {
   document.getElementById('vuelo-ui').classList.add('hidden');
   document.getElementById('corazones-ui').classList.add('hidden');
   document.getElementById('memoria2p-ui').classList.add('hidden');
+  document.getElementById('tresenraya-ui').classList.add('hidden');
+  document.getElementById('conecta4-ui').classList.add('hidden');
+  document.getElementById('ppt-ui').classList.add('hidden');
+  document.getElementById('ahorcado-ui').classList.add('hidden');
   document.getElementById('tres-ui').classList.add('hidden');
   document.getElementById('cuatro-ui').classList.add('hidden');
   hideGestureMenu();
@@ -318,7 +342,9 @@ function showHub() {
   document.getElementById('galaga-ui').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
-  document.getElementById('hub-screen').classList.remove('hidden');
+  document.getElementById('online-setup').classList.add('hidden');
+  document.getElementById('online-disconnect-banner').classList.add('hidden');
+  document.getElementById(menuId).classList.remove('hidden');
 }
 
 function launchWorld() {
@@ -368,7 +394,7 @@ function launchMatch3() {
 function exitMatch3() {
   document.getElementById('match3-ui').classList.add('hidden');
   match3 = null;
-  showHub();
+  showHub('uno-submenu');
 }
 
 // ── Ice-cream shop mini-game ─────────────────────────────────────────────────
@@ -425,7 +451,7 @@ function launchMob() {
 function exitMob() {
   document.getElementById('mob-ui').classList.add('hidden');
   if (mob) { mob.destroy(); mob = null; }
-  showHub();
+  showHub('uno-submenu');
 }
 
 // ── Hole mini-game ───────────────────────────────────────────────────────────
@@ -457,7 +483,7 @@ function exitHole() {
     document.getElementById('hud').classList.remove('hidden');
     lastTime = performance.now();
   } else {
-    showHub();
+    showHub('hole-submenu');
   }
 }
 
@@ -477,7 +503,7 @@ function launchHole2() {
 function exitHole2() {
   document.getElementById('hole2-ui').classList.add('hidden');
   hole2 = null;
-  showHub();
+  showHub('hole-submenu');
 }
 
 // ── Galaga — space shooter ────────────────────────────────────────────────────
@@ -495,7 +521,7 @@ function launchGalaga() {
 function exitGalaga() {
   document.getElementById('galaga-ui').classList.add('hidden');
   if (galaga) { galaga.destroy(); galaga = null; }
-  showHub();
+  showHub('uno-submenu');
 }
 
 // ── 2-Player shared pointer router ───────────────────────────────────────────
@@ -507,30 +533,110 @@ function _active2P() {
   if (mode === 'vuelo'   && vuelo)  return vuelo;
   if (mode === 'corazones' && corazones) return corazones;
   if (mode === 'memoria2p' && memoria2p) return memoria2p;
+  if (mode === 'tresenraya' && tresenraya) return tresenraya;
+  if (mode === 'conecta4' && conecta4) return conecta4;
+  if (mode === 'ppt'     && ppt)     return ppt;
+  if (mode === 'ahorcado' && ahorcado) return ahorcado;
   return null;
 }
+// Games with one shared centered board (not split left/right on a single
+// device) — any local tap should count for whoever's turn it is, not
+// whichever half of the screen it lands on.
+const SHARED_BOARD_MODES = new Set(['memoria2p', 'tresenraya', 'conecta4', 'ahorcado']);
 canvas.addEventListener('pointerdown', e => {
   const g = _active2P(); if (!g) return;
   e.preventDefault();
   const p = canvasPoint(e);
+  if (netRole) {
+    _2pTouches.set(e.pointerId, true);
+    const hp = netToHostPoint(p.x, p.y);
+    if (netRole === 'host') { g.pointerDown(hp.x, hp.y, 'p1'); }
+    else {
+      netSession.send({ k: 'i', op: 'd', x: hp.x, y: hp.y });
+      g.pointerDown(hp.x, hp.y, 'p2'); // optimistic local echo — masks round-trip lag, host corrects on next broadcast
+    }
+    return;
+  }
   const who = p.x < canvas.width / 2 ? 'p1' : 'p2';
   _2pTouches.set(e.pointerId, who);
-  g.pointerDown(p.x, p.y, who);
+  g.pointerDown(p.x, p.y, SHARED_BOARD_MODES.has(mode) ? undefined : who);
 });
 canvas.addEventListener('pointermove', e => {
   const g = _active2P(); if (!g) return;
   const who = _2pTouches.get(e.pointerId); if (!who) return;
   const p = canvasPoint(e);
+  if (netRole) {
+    const hp = netToHostPoint(p.x, p.y);
+    if (netRole === 'host') { g.pointerMove(hp.x, hp.y, 'p1'); }
+    else {
+      netSession.send({ k: 'i', op: 'm', x: hp.x, y: hp.y });
+      g.pointerMove(hp.x, hp.y, 'p2');
+    }
+    return;
+  }
   g.pointerMove(p.x, p.y, who);
 });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
   canvas.addEventListener(ev, e => {
     const g = _active2P(); if (!g) return;
     const who = _2pTouches.get(e.pointerId); if (!who) return;
-    g.pointerUp(who);
+    if (netRole) {
+      if (netRole === 'host') { g.pointerUp('p1'); }
+      else { netSession.send({ k: 'i', op: 'u' }); g.pointerUp('p2'); }
+    } else {
+      g.pointerUp(who);
+    }
     _2pTouches.delete(e.pointerId);
   })
 );
+
+// ── Online 2P networking helpers ─────────────────────────────────────────────
+// Host-authoritative: the room's host runs the real simulation for both
+// players and streams snapshots to the guest; the guest only forwards its
+// own touches (mapped into the host's coordinate space) and renders whatever
+// the host last sent.
+function _updateNetScale(hostW, hostH) {
+  const scale = Math.min(canvas.width / hostW, canvas.height / hostH);
+  netScale = {
+    scale, W: hostW, H: hostH,
+    offX: (canvas.width  - hostW * scale) / 2,
+    offY: (canvas.height - hostH * scale) / 2,
+  };
+}
+function netToHostPoint(x, y) {
+  if (netRole !== 'guest' || !netScale) return { x, y };
+  return { x: (x - netScale.offX) / netScale.scale, y: (y - netScale.offY) / netScale.scale };
+}
+function _renderGuestFrame(g) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!netScale) return;
+  ctx.setTransform(netScale.scale, 0, 0, netScale.scale, netScale.offX, netScale.offY);
+  g.render(ctx);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+function _run2PFrame(g, delta) {
+  if (!netRole) { g.update(delta); g.render(ctx); return; }
+  if (netRole === 'host') {
+    g.update(delta);
+    netSendAccum += delta;
+    if (netSendAccum >= 1 / NET_STATE_HZ) {
+      netSendAccum = 0;
+      netSession.send({ k: 's', s: g.getNetState() });
+    }
+    g.render(ctx);
+  } else {
+    _renderGuestFrame(g);
+  }
+}
+function _resetNetState() {
+  if (netSession) { netSession.close(); netSession = null; }
+  netRole = null; netGameKey = null; netScale = null; netSendAccum = 0;
+}
+function _showOnlineDisconnect() {
+  document.getElementById('online-disconnect-banner').classList.remove('hidden');
+}
 
 // ── 1-Player submenu ──────────────────────────────────────────────────────────
 function showUnoSubmenu() {
@@ -560,25 +666,33 @@ function _launchVersus(uiId, modeStr) {
   lastTime = performance.now();
   if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
 }
-function _exitVersus(uiId) {
+function _exitVersus(uiId, menuId = 'versus-submenu') {
   document.getElementById(uiId).classList.add('hidden');
   _2pTouches.clear();
-  showHub();
+  showHub(menuId);
 }
 function launchPong()    { pong    = new PongChibi(canvas); _launchVersus('pong-ui',    'pong');   }
 function launchGlobos()  { globos  = new Globos2P(canvas);  _launchVersus('globos-ui',  'globos'); }
 function launchSumo()    { sumo    = new Sumo2P(canvas);    _launchVersus('sumo-ui',    'sumo');   }
 function launchCocinas() { cocinas = new Cocinas2P(canvas); _launchVersus('cocinas-ui', 'cocinas');}
-function exitPong()    { pong    = null; _exitVersus('pong-ui');    }
-function exitGlobos()  { globos  = null; _exitVersus('globos-ui');  }
-function exitSumo()    { sumo    = null; _exitVersus('sumo-ui');    }
-function exitCocinas() { cocinas = null; _exitVersus('cocinas-ui'); }
+function exitPong()    { _resetNetState(); pong    = null; _exitVersus('pong-ui');    }
+function exitGlobos()  { _resetNetState(); globos  = null; _exitVersus('globos-ui');  }
+function exitSumo()    { _resetNetState(); sumo    = null; _exitVersus('sumo-ui');    }
+function exitCocinas() { _resetNetState(); cocinas = null; _exitVersus('cocinas-ui'); }
 function launchVuelo()     { vuelo     = new Vuelo2P(canvas);     _launchVersus('vuelo-ui',     'vuelo');     }
 function launchCorazones() { corazones = new Corazones2P(canvas); _launchVersus('corazones-ui', 'corazones'); }
 function launchMemoria2P() { memoria2p = new Memoria2P(canvas);   _launchVersus('memoria2p-ui', 'memoria2p'); }
-function exitVuelo()     { vuelo     = null; _exitVersus('vuelo-ui');     }
-function exitCorazones() { corazones = null; _exitVersus('corazones-ui'); }
-function exitMemoria2P() { memoria2p = null; _exitVersus('memoria2p-ui'); }
+function exitVuelo()     { _resetNetState(); vuelo     = null; _exitVersus('vuelo-ui');     }
+function exitCorazones() { _resetNetState(); corazones = null; _exitVersus('corazones-ui'); }
+function exitMemoria2P() { _resetNetState(); memoria2p = null; _exitVersus('memoria2p-ui'); }
+function launchTresEnRaya() { tresenraya = new TresEnRaya(canvas); _launchVersus('tresenraya-ui', 'tresenraya'); }
+function launchConecta4()   { conecta4   = new Conecta4(canvas);   _launchVersus('conecta4-ui',   'conecta4');   }
+function launchPPT()        { ppt        = new PiedraPapelTijera(canvas); _launchVersus('ppt-ui', 'ppt');        }
+function launchAhorcado()   { ahorcado   = new Ahorcado(canvas);   _launchVersus('ahorcado-ui',   'ahorcado');   }
+function exitTresEnRaya() { _resetNetState(); tresenraya = null; _exitVersus('tresenraya-ui'); }
+function exitConecta4()   { _resetNetState(); conecta4   = null; _exitVersus('conecta4-ui');   }
+function exitPPT()        { _resetNetState(); ppt        = null; _exitVersus('ppt-ui');        }
+function exitAhorcado()   { _resetNetState(); ahorcado   = null; _exitVersus('ahorcado-ui');   }
 
 // ── 3-Players submenu & launchers (share the versus launch/exit helpers) ─────
 function showTresSubmenu() {
@@ -593,7 +707,7 @@ function launchTres(gameMode) {
   tres = new ThreePlayers(canvas, gameMode);
   _launchVersus('tres-ui', 'tres');
 }
-function exitTres() { tres = null; _exitVersus('tres-ui'); }
+function exitTres() { tres = null; _exitVersus('tres-ui', 'tres-submenu'); }
 
 // ── 4-Players submenu & launchers ─────────────────────────────────────────────
 function showCuatroSubmenu() {
@@ -608,7 +722,7 @@ function launchCuatro(gameMode) {
   cuatro = new FourPlayers(canvas, gameMode);
   _launchVersus('cuatro-ui', 'cuatro');
 }
-function exitCuatro() { cuatro = null; _exitVersus('cuatro-ui'); }
+function exitCuatro() { cuatro = null; _exitVersus('cuatro-ui', 'cuatro-submenu'); }
 
 // ── Cinema (watch movies, entered from the world) ────────────────────────────
 function enterCinema() {
@@ -788,13 +902,17 @@ function gameLoop(now) {
   if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
   if (mode === 'tienda' && tienda) { tienda.update(delta); tienda.render(ctx); return; }
   if (mode === 'mob'    && mob)    { mob.update(delta);    mob.render(ctx);    return; }
-  if (mode === 'pong'   && pong)   { pong.update(delta);   pong.render(ctx);   return; }
-  if (mode === 'globos' && globos) { globos.update(delta); globos.render(ctx); return; }
-  if (mode === 'sumo'   && sumo)   { sumo.update(delta);   sumo.render(ctx);   return; }
-  if (mode === 'cocinas' && cocinas) { cocinas.update(delta); cocinas.render(ctx); return; }
-  if (mode === 'vuelo'  && vuelo)  { vuelo.update(delta);  vuelo.render(ctx);  return; }
-  if (mode === 'corazones' && corazones) { corazones.update(delta); corazones.render(ctx); return; }
-  if (mode === 'memoria2p' && memoria2p) { memoria2p.update(delta); memoria2p.render(ctx); return; }
+  if (mode === 'pong'   && pong)   { _run2PFrame(pong, delta);   return; }
+  if (mode === 'globos' && globos) { _run2PFrame(globos, delta); return; }
+  if (mode === 'sumo'   && sumo)   { _run2PFrame(sumo, delta);   return; }
+  if (mode === 'cocinas' && cocinas) { _run2PFrame(cocinas, delta); return; }
+  if (mode === 'vuelo'  && vuelo)  { _run2PFrame(vuelo, delta);  return; }
+  if (mode === 'corazones' && corazones) { _run2PFrame(corazones, delta); return; }
+  if (mode === 'memoria2p' && memoria2p) { _run2PFrame(memoria2p, delta); return; }
+  if (mode === 'tresenraya' && tresenraya) { _run2PFrame(tresenraya, delta); return; }
+  if (mode === 'conecta4' && conecta4) { _run2PFrame(conecta4, delta); return; }
+  if (mode === 'ppt'     && ppt)     { _run2PFrame(ppt, delta);     return; }
+  if (mode === 'ahorcado' && ahorcado) { _run2PFrame(ahorcado, delta); return; }
   if (mode === 'tres'   && tres)   { tres.update(delta);   tres.render(ctx);   return; }
   if (mode === 'cuatro' && cuatro) { cuatro.update(delta); cuatro.render(ctx); return; }
   update(delta);
@@ -1598,6 +1716,10 @@ const vsCocinas = document.getElementById('versus-cocinas');
 const vsVuelo     = document.getElementById('versus-vuelo');
 const vsCorazones = document.getElementById('versus-corazones');
 const vsMemoria   = document.getElementById('versus-memoria');
+const vsTresEnRaya = document.getElementById('versus-tresenraya');
+const vsConecta4   = document.getElementById('versus-conecta4');
+const vsPPT        = document.getElementById('versus-ppt');
+const vsAhorcado   = document.getElementById('versus-ahorcado');
 if (vsBack)    vsBack.addEventListener('click',    () => { hideVersusSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
 if (vsPong)    { vsPong.addEventListener('click',    launchPong);    vsPong.addEventListener('touchend',    e => { e.preventDefault(); launchPong();    }, { passive: false }); }
 if (vsGlobos)  { vsGlobos.addEventListener('click',  launchGlobos);  vsGlobos.addEventListener('touchend',  e => { e.preventDefault(); launchGlobos();  }, { passive: false }); }
@@ -1606,6 +1728,151 @@ if (vsCocinas) { vsCocinas.addEventListener('click', launchCocinas); vsCocinas.a
 if (vsVuelo)     { vsVuelo.addEventListener('click',     launchVuelo);     vsVuelo.addEventListener('touchend',     e => { e.preventDefault(); launchVuelo();     }, { passive: false }); }
 if (vsCorazones) { vsCorazones.addEventListener('click', launchCorazones); vsCorazones.addEventListener('touchend', e => { e.preventDefault(); launchCorazones(); }, { passive: false }); }
 if (vsMemoria)   { vsMemoria.addEventListener('click',   launchMemoria2P); vsMemoria.addEventListener('touchend',   e => { e.preventDefault(); launchMemoria2P(); }, { passive: false }); }
+if (vsTresEnRaya) { vsTresEnRaya.addEventListener('click', launchTresEnRaya); vsTresEnRaya.addEventListener('touchend', e => { e.preventDefault(); launchTresEnRaya(); }, { passive: false }); }
+if (vsConecta4)   { vsConecta4.addEventListener('click',   launchConecta4);   vsConecta4.addEventListener('touchend',   e => { e.preventDefault(); launchConecta4();   }, { passive: false }); }
+if (vsPPT)        { vsPPT.addEventListener('click',        launchPPT);        vsPPT.addEventListener('touchend',        e => { e.preventDefault(); launchPPT();        }, { passive: false }); }
+if (vsAhorcado)   { vsAhorcado.addEventListener('click',   launchAhorcado);   vsAhorcado.addEventListener('touchend',   e => { e.preventDefault(); launchAhorcado();   }, { passive: false }); }
+
+// ── Online play: room-code create/join (all 11 versus games) ─────────────────
+const ONLINE_GAMES = {
+  pong:      { title: '🏓 Pong Chibi — Online',        build: () => new PongChibi(canvas),  uiId: 'pong-ui',      apply: v => { pong      = v; } },
+  globos:    { title: '🎈 Tiro al Globo — Online',      build: () => new Globos2P(canvas),   uiId: 'globos-ui',    apply: v => { globos    = v; } },
+  sumo:      { title: '🥊 Sumo Chibi — Online',         build: () => new Sumo2P(canvas),     uiId: 'sumo-ui',      apply: v => { sumo      = v; } },
+  cocinas:   { title: '👨‍🍳 Batalla Cocinas — Online',   build: () => new Cocinas2P(canvas),  uiId: 'cocinas-ui',   apply: v => { cocinas   = v; } },
+  vuelo:     { title: '🦋 Mariposas al Vuelo — Online', build: () => new Vuelo2P(canvas),    uiId: 'vuelo-ui',     apply: v => { vuelo     = v; } },
+  corazones: { title: '💖 Lluvia de Corazones — Online',build: () => new Corazones2P(canvas),uiId: 'corazones-ui', apply: v => { corazones = v; } },
+  memoria2p: { title: '🎴 Memoria Duelo — Online',      build: () => new Memoria2P(canvas),  uiId: 'memoria2p-ui', apply: v => { memoria2p = v; } },
+  tresenraya:{ title: '❌ Tres en Raya — Online',       build: () => new TresEnRaya(canvas), uiId: 'tresenraya-ui',apply: v => { tresenraya = v; } },
+  conecta4:  { title: '🔵 Conecta 4 — Online',          build: () => new Conecta4(canvas),   uiId: 'conecta4-ui',  apply: v => { conecta4  = v; } },
+  ppt:       { title: '✊ Piedra, Papel o Tijera — Online', build: () => new PiedraPapelTijera(canvas), uiId: 'ppt-ui', apply: v => { ppt = v; } },
+  ahorcado:  { title: '🎪 Ahorcado — Online',           build: () => new Ahorcado(canvas),   uiId: 'ahorcado-ui',  apply: v => { ahorcado  = v; } },
+};
+
+function _wireOnlineBtn(id, gameKey) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = () => _openOnlineSetup(gameKey);
+  el.addEventListener('click', open);
+  el.addEventListener('touchend', e => { e.preventDefault(); open(); }, { passive: false });
+}
+_wireOnlineBtn('versus-pong-online',      'pong');
+_wireOnlineBtn('versus-globos-online',    'globos');
+_wireOnlineBtn('versus-sumo-online',      'sumo');
+_wireOnlineBtn('versus-cocinas-online',   'cocinas');
+_wireOnlineBtn('versus-vuelo-online',     'vuelo');
+_wireOnlineBtn('versus-corazones-online', 'corazones');
+_wireOnlineBtn('versus-memoria-online',   'memoria2p');
+_wireOnlineBtn('versus-tresenraya-online','tresenraya');
+_wireOnlineBtn('versus-conecta4-online',  'conecta4');
+_wireOnlineBtn('versus-ppt-online',       'ppt');
+_wireOnlineBtn('versus-ahorcado-online',  'ahorcado');
+
+function _showOnlineStep(stepId) {
+  ['online-choose', 'online-waiting', 'online-join-form', 'online-status']
+    .forEach(id => document.getElementById(id).classList.toggle('hidden', id !== stepId));
+}
+
+function _openOnlineSetup(gameKey) {
+  netPendingGameKey = gameKey;
+  document.getElementById('online-title').textContent = ONLINE_GAMES[gameKey].title;
+  _showOnlineStep('online-choose');
+  document.getElementById('hub-screen').classList.add('hidden');
+  hideVersusSubmenu();
+  document.getElementById('online-setup').classList.remove('hidden');
+}
+
+function _closeOnlineSetup() {
+  _resetNetState();
+  document.getElementById('online-setup').classList.add('hidden');
+  showHub('versus-submenu');
+}
+
+const ONLINE_ERROR_MESSAGES = {
+  'not-found':      'Código no encontrado. Revisalo e intentá de nuevo.',
+  'full':           'Esa sala ya tiene dos jugadores.',
+  'game-mismatch':  'Ese código es de otro juego.',
+  'connect-failed': 'No se pudo conectar. Probá de nuevo.',
+};
+function _showOnlineError(reason) {
+  if (netSession) { netSession.close(); netSession = null; }
+  _showOnlineStep('online-status');
+  document.getElementById('online-status-msg').textContent = ONLINE_ERROR_MESSAGES[reason] || 'Ocurrió un error.';
+  document.getElementById('online-status-back').classList.remove('hidden');
+}
+
+function _startOnlineMatch(gameKey, role) {
+  netRole = role;
+  netGameKey = gameKey;
+  document.getElementById('online-setup').classList.add('hidden');
+  const g = ONLINE_GAMES[gameKey];
+  g.apply(g.build());
+  _launchVersus(g.uiId, gameKey);
+}
+
+document.getElementById('online-back').addEventListener('click', _closeOnlineSetup);
+document.getElementById('online-cancel-wait').addEventListener('click', _closeOnlineSetup);
+document.getElementById('online-cancel-join').addEventListener('click', () => _showOnlineStep('online-choose'));
+document.getElementById('online-status-back').addEventListener('click', () => _showOnlineStep('online-choose'));
+
+document.getElementById('online-create-btn').addEventListener('click', async () => {
+  _resetNetState();
+  netSession = new NetSession(netPendingGameKey);
+  _showOnlineStep('online-waiting');
+  document.getElementById('online-code-display').textContent = '····';
+  netSession.onCode     = code => { document.getElementById('online-code-display').textContent = code; };
+  netSession.onReady    = role => _startOnlineMatch(netPendingGameKey, role);
+  netSession.onPeerLeft = () => _showOnlineDisconnect();
+  netSession.onError    = reason => _showOnlineError(reason);
+  netSession.onMessage  = data => _handleNetMessage(data);
+  try { await netSession.createRoom(); } catch { _showOnlineError('connect-failed'); }
+});
+
+document.getElementById('online-join-btn').addEventListener('click', () => {
+  _showOnlineStep('online-join-form');
+  const input = document.getElementById('online-code-input');
+  input.value = '';
+  setTimeout(() => input.focus(), 50);
+});
+
+document.getElementById('online-join-confirm').addEventListener('click', async () => {
+  const code = document.getElementById('online-code-input').value.trim().toUpperCase();
+  if (code.length !== 4) { alert('Ingresá el código de 4 letras/números'); return; }
+  _resetNetState();
+  netSession = new NetSession(netPendingGameKey);
+  _showOnlineStep('online-status');
+  document.getElementById('online-status-msg').textContent = 'Conectando…';
+  document.getElementById('online-status-back').classList.add('hidden');
+  netSession.onReady    = role => _startOnlineMatch(netPendingGameKey, role);
+  netSession.onPeerLeft = () => _showOnlineDisconnect();
+  netSession.onError    = reason => _showOnlineError(reason);
+  netSession.onMessage  = data => _handleNetMessage(data);
+  try { await netSession.joinRoom(code); } catch { _showOnlineError('connect-failed'); }
+});
+
+function _handleNetMessage(data) {
+  const g = _active2P(); if (!g) return;
+  if (data.k === 's') {
+    g.setNetState(data.s);
+    _updateNetScale(data.s.W, data.s.H);
+  } else if (data.k === 'i' && netRole === 'host') {
+    if (data.op === 'd') g.pointerDown(data.x, data.y, 'p2');
+    else if (data.op === 'm') g.pointerMove(data.x, data.y, 'p2');
+    else if (data.op === 'u') g.pointerUp('p2');
+  }
+}
+
+const ONLINE_EXIT_FNS = {
+  pong: () => exitPong(), globos: () => exitGlobos(), sumo: () => exitSumo(),
+  cocinas: () => exitCocinas(), vuelo: () => exitVuelo(),
+  corazones: () => exitCorazones(), memoria2p: () => exitMemoria2P(),
+  tresenraya: () => exitTresEnRaya(), conecta4: () => exitConecta4(),
+  ppt: () => exitPPT(), ahorcado: () => exitAhorcado(),
+};
+document.getElementById('online-disconnect-back').addEventListener('click', () => {
+  document.getElementById('online-disconnect-banner').classList.add('hidden');
+  const exitFn = ONLINE_EXIT_FNS[netGameKey];
+  if (exitFn) exitFn();
+});
 
 const pongExitBtn    = document.getElementById('pong-exit');
 const globosExitBtn  = document.getElementById('globos-exit');
@@ -1621,6 +1888,14 @@ const memoria2pExitBtn = document.getElementById('memoria2p-exit');
 if (vueloExitBtn)     vueloExitBtn.addEventListener('click',     exitVuelo);
 if (corazonesExitBtn) corazonesExitBtn.addEventListener('click', exitCorazones);
 if (memoria2pExitBtn) memoria2pExitBtn.addEventListener('click', exitMemoria2P);
+const tresenrayaExitBtn = document.getElementById('tresenraya-exit');
+const conecta4ExitBtn   = document.getElementById('conecta4-exit');
+const pptExitBtn        = document.getElementById('ppt-exit');
+const ahorcadoExitBtn   = document.getElementById('ahorcado-exit');
+if (tresenrayaExitBtn) tresenrayaExitBtn.addEventListener('click', exitTresEnRaya);
+if (conecta4ExitBtn)   conecta4ExitBtn.addEventListener('click',   exitConecta4);
+if (pptExitBtn)        pptExitBtn.addEventListener('click',        exitPPT);
+if (ahorcadoExitBtn)   ahorcadoExitBtn.addEventListener('click',   exitAhorcado);
 
 window.addEventListener('keydown', e => {
   if (e.code !== 'Escape') return;
@@ -1631,6 +1906,10 @@ window.addEventListener('keydown', e => {
   else if (mode === 'vuelo'   && vuelo)  { exitVuelo();   e.preventDefault(); }
   else if (mode === 'corazones' && corazones) { exitCorazones(); e.preventDefault(); }
   else if (mode === 'memoria2p' && memoria2p) { exitMemoria2P(); e.preventDefault(); }
+  else if (mode === 'tresenraya' && tresenraya) { exitTresEnRaya(); e.preventDefault(); }
+  else if (mode === 'conecta4' && conecta4) { exitConecta4(); e.preventDefault(); }
+  else if (mode === 'ppt'     && ppt)     { exitPPT();      e.preventDefault(); }
+  else if (mode === 'ahorcado' && ahorcado) { exitAhorcado(); e.preventDefault(); }
   else if (mode === 'tres'    && tres)   { exitTres();    e.preventDefault(); }
   else if (mode === 'cuatro'  && cuatro) { exitCuatro();  e.preventDefault(); }
 });

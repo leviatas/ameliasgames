@@ -220,4 +220,21 @@ export class Sumo2P {
     if (player === 'p1') this._p1Drag = null;
     else                  this._p2Drag = null;
   }
+
+  // ── Online sync: host broadcasts this every frame, guest applies it ──────
+  getNetState() {
+    return {
+      W: this.W, H: this.H, ring: this.ring,
+      p1: this.p1, p2: this.p2, wins: this.wins,
+      phase: this.phase, countdown: this.countdown, countTimer: this.countTimer,
+      flashMsg: this.flashMsg, flashTimer: this.flashTimer,
+    };
+  }
+
+  setNetState(s) {
+    this.W = s.W; this.H = s.H; this.ring = s.ring;
+    this.p1 = s.p1; this.p2 = s.p2; this.wins = s.wins;
+    this.phase = s.phase; this.countdown = s.countdown; this.countTimer = s.countTimer;
+    this.flashMsg = s.flashMsg; this.flashTimer = s.flashTimer;
+  }
 }

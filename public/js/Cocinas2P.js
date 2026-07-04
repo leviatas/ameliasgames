@@ -290,4 +290,25 @@ export class Cocinas2P {
 
   pointerMove() {}
   pointerUp() {}
+
+  // ── Online sync: host broadcasts this every frame, guest applies it ──────
+  getNetState() {
+    return {
+      W: this.W, H: this.H,
+      recipe: this.recipe, grid: this.grid,
+      p1tray: this.p1tray, p2tray: this.p2tray,
+      phase: this.phase, roundWinner: this.roundWinner, roundTimer: this.roundTimer,
+      wins: this.wins,
+      layout: this._layout, trayLayout: this._trayLayout,
+    };
+  }
+
+  setNetState(s) {
+    this.W = s.W; this.H = s.H;
+    this.recipe = s.recipe; this.grid = s.grid;
+    this.p1tray = s.p1tray; this.p2tray = s.p2tray;
+    this.phase = s.phase; this.roundWinner = s.roundWinner; this.roundTimer = s.roundTimer;
+    this.wins = s.wins;
+    this._layout = s.layout; this._trayLayout = s.trayLayout;
+  }
 }

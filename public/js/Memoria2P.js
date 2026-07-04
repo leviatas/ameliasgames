@@ -142,8 +142,13 @@ export class Memoria2P {
     }
   }
 
-  pointerDown(cx, cy) {
+  pointerDown(cx, cy, player) {
     if (this.phase === 'over') { this._reset(); return; }
+    // On a shared local screen anyone's tap advances whoever's turn it is —
+    // that's fine, they're taking turns on one device. Online, each player
+    // has their own device, so a tap must match the current turn or it's
+    // the other player's remote reaching into your turn.
+    if (player && player !== this.turn) return;
     if (this.lock > 0 || this.picks.length >= 2) return;
 
     const G = this._grid();
@@ -169,4 +174,21 @@ export class Memoria2P {
   }
   pointerMove() {}
   pointerUp() {}
+
+  // ── Online sync: host broadcasts this every frame, guest applies it ──────
+  getNetState() {
+    return {
+      W: this.W, H: this.H,
+      phase: this.phase, turn: this.turn, score: this.score,
+      picks: this.picks, lock: this.lock, lockAction: this.lockAction,
+      winner: this.winner, t: this.t, cards: this.cards,
+    };
+  }
+
+  setNetState(s) {
+    this.W = s.W; this.H = s.H;
+    this.phase = s.phase; this.turn = s.turn; this.score = s.score;
+    this.picks = s.picks; this.lock = s.lock; this.lockAction = s.lockAction;
+    this.winner = s.winner; this.t = s.t; this.cards = s.cards;
+  }
 }

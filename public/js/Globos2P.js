@@ -75,7 +75,7 @@ export class Globos2P {
 
   _pop(balloon, player) {
     balloon.popped = true;
-    if (balloon.player === player) this.score[player]++;
+    this.score[player]++;
     const colors = balloon.player === 'p1'
       ? ['#FF4488', '#FF88BB', '#FFAACC']
       : ['#4488FF', '#88BBFF', '#AACCFF'];
@@ -194,7 +194,7 @@ export class Globos2P {
   pointerDown(cx, cy, player) {
     if (this.phase === 'over') { this._reset(); return; }
     for (const b of this.balloons) {
-      if (b.popped) continue;
+      if (b.popped || b.player !== player) continue;
       if (Math.hypot(cx - b.x, cy - b.y) < b.r * 1.5) {
         this._pop(b, player);
         return;
@@ -204,4 +204,19 @@ export class Globos2P {
 
   pointerMove() {}
   pointerUp() {}
+
+  // ── Online sync: host broadcasts this every frame, guest applies it ──────
+  getNetState() {
+    return {
+      W: this.W, H: this.H,
+      score: this.score, timeLeft: this.timeLeft, phase: this.phase,
+      balloons: this.balloons, particles: this.particles,
+    };
+  }
+
+  setNetState(s) {
+    this.W = s.W; this.H = s.H;
+    this.score = s.score; this.timeLeft = s.timeLeft; this.phase = s.phase;
+    this.balloons = s.balloons; this.particles = s.particles;
+  }
 }

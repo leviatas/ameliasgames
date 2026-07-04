@@ -721,17 +721,19 @@ body {
 #tienda-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #tienda-ui.hidden { display: none; }
 #tienda-ui button { pointer-events: all; }
-#tienda-exit {
-  position: absolute;
-  top: 12px; right: 12px;
-  width: 38px; height: 38px;
-  border: 0; border-radius: 50%;
-  background: rgba(0,0,0,0.45);
-  color: #fff; font-size: 1rem; font-weight: 700;
-  cursor: pointer; z-index: 26;
-  -webkit-tap-highlight-color: transparent;
+/* ── Shared "volver al menú" button (top of every mini-game) ── */
+.game-menu-btn {
+  position: absolute; top: 14px; right: 14px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.5); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-size: 0.92rem; font-weight: 700;
+  cursor: pointer; pointer-events: all;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  z-index: 26;
 }
-#tienda-exit:hover { background: rgba(0,0,0,0.65); }
+.game-menu-btn:hover { background: rgba(0,0,0,0.75); }
 
 /* ── Hub card — tienda ── */
 .hub-card.tienda { background: linear-gradient(135deg, #FFB6C8 0%, #F0C0F0 100%); color: #5A0040; }
@@ -750,14 +752,6 @@ body {
 #galaga-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #galaga-ui.hidden { display: none; }
 #galaga-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
-#galaga-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer;
-}
-#galaga-exit:hover { background: rgba(0,0,0,0.7); }
 .galaga-btn {
   position: absolute;
   bottom: 18px;
@@ -798,40 +792,13 @@ body {
 .runner-btn:active { transform: scale(0.94); background: rgba(255,255,255,0.42); }
 #runner-duck { left: 28px;  background: rgba(90,150,255,0.32); }
 #runner-jump { right: 28px; background: rgba(110,210,120,0.34); }
-#runner-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer;
-}
-#runner-exit:hover { background: rgba(0,0,0,0.7); }
-
 /* ── Cooking mini-game UI ── */
 #cocina-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #cocina-ui.hidden { display: none; }
-#cocina-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer; pointer-events: all;
-  -webkit-tap-highlight-color: transparent;
-}
-#cocina-exit:hover { background: rgba(0,0,0,0.7); }
 
 /* ── Match-3 mini-game ── */
 #match3-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #match3-ui.hidden { display: none; }
-#match3-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer; pointer-events: all;
-  -webkit-tap-highlight-color: transparent;
-}
-#match3-exit:hover { background: rgba(0,0,0,0.7); }
 #match3-hint {
   position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
   background: rgba(0,0,0,0.4); color: #fff; padding: 4px 12px; border-radius: 999px;
@@ -841,15 +808,8 @@ body {
 /* ── Hole mini-game ── */
 #hole-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #hole-ui.hidden { display: none; }
-#hole-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer; pointer-events: all;
-  -webkit-tap-highlight-color: transparent;
-}
-#hole-exit:hover { background: rgba(0,0,0,0.7); }
+#hole2-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+#hole2-ui.hidden { display: none; }
 #hole-hint {
   position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
   background: rgba(0,0,0,0.4); color: #fff; padding: 4px 12px; border-radius: 999px;
@@ -859,15 +819,6 @@ body {
 /* ── Ice-cream shop ── */
 #helado-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #helado-ui.hidden { display: none; }
-#helado-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer; pointer-events: all;
-  -webkit-tap-highlight-color: transparent;
-}
-#helado-exit:hover { background: rgba(0,0,0,0.7); }
 
 /* ── Cinema ── */
 #cinema-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
@@ -1125,6 +1076,14 @@ body {
 .hub-card.corazones2p:hover { border-color: #FF7098; box-shadow: 0 18px 40px rgba(255,112,152,0.45); }
 .hub-card.memoria2p { background: linear-gradient(135deg, #1E1038 0%, #6038B0 100%); color: #D8C8FF; }
 .hub-card.memoria2p:hover { border-color: #A078FF; box-shadow: 0 18px 40px rgba(160,120,255,0.45); }
+.hub-card.tresenraya { background: linear-gradient(135deg, #301818 0%, #A04040 100%); color: #FFCFCF; }
+.hub-card.tresenraya:hover { border-color: #FF8080; box-shadow: 0 18px 40px rgba(255,90,90,0.45); }
+.hub-card.conecta4 { background: linear-gradient(135deg, #101830 0%, #2050B0 100%); color: #C0D8FF; }
+.hub-card.conecta4:hover { border-color: #60A0FF; box-shadow: 0 18px 40px rgba(80,140,255,0.45); }
+.hub-card.ppt { background: linear-gradient(135deg, #302010 0%, #B07020 100%); color: #FFE0C0; }
+.hub-card.ppt:hover { border-color: #FFB060; box-shadow: 0 18px 40px rgba(255,160,80,0.45); }
+.hub-card.ahorcado { background: linear-gradient(135deg, #1C2A18 0%, #4A8038 100%); color: #DFFFD0; }
+.hub-card.ahorcado:hover { border-color: #90E070; box-shadow: 0 18px 40px rgba(140,220,100,0.45); }
 
 /* ── 3 Players hub card + submenu cards ── */
 .hub-card.tresp { background: linear-gradient(135deg, #40103A 0%, #A0206A 100%); color: #FFC0E8; }
@@ -1150,14 +1109,6 @@ body {
 #tres-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #tres-ui.hidden { display: none; }
 #tres-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
-#tres-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer;
-}
-#tres-exit:hover { background: rgba(0,0,0,0.7); }
 #tres-btns {
   position: absolute; left: 0; right: 0; bottom: 0;
   height: 26vh; min-height: 96px; max-height: 190px;
@@ -1194,14 +1145,6 @@ body {
 #cuatro-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #cuatro-ui.hidden { display: none; }
 #cuatro-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
-#cuatro-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer;
-}
-#cuatro-exit:hover { background: rgba(0,0,0,0.7); }
 #cuatro-btns {
   position: absolute; left: 0; right: 0; bottom: 0;
   height: 26vh; min-height: 96px; max-height: 190px;
@@ -1224,21 +1167,90 @@ body {
 .hub-card.jardin4p:hover { border-color: #80E080; box-shadow: 0 18px 40px rgba(128,224,128,0.45); }
 
 /* ── 2P game UI overlays ─────────────────────────────────────────────────── */
-#pong-ui, #globos-ui, #sumo-ui, #cocinas-ui, #vuelo-ui, #corazones-ui, #memoria2p-ui {
+#pong-ui, #globos-ui, #sumo-ui, #cocinas-ui, #vuelo-ui, #corazones-ui, #memoria2p-ui,
+#tresenraya-ui, #conecta4-ui, #ppt-ui, #ahorcado-ui {
   position: fixed; inset: 0; z-index: 25; pointer-events: none;
 }
 #pong-ui.hidden, #globos-ui.hidden, #sumo-ui.hidden, #cocinas-ui.hidden,
-#vuelo-ui.hidden, #corazones-ui.hidden, #memoria2p-ui.hidden { display: none; }
+#vuelo-ui.hidden, #corazones-ui.hidden, #memoria2p-ui.hidden,
+#tresenraya-ui.hidden, #conecta4-ui.hidden, #ppt-ui.hidden, #ahorcado-ui.hidden { display: none; }
 #pong-ui button, #globos-ui button, #sumo-ui button, #cocinas-ui button,
-#vuelo-ui button, #corazones-ui button, #memoria2p-ui button { pointer-events: all; }
+#vuelo-ui button, #corazones-ui button, #memoria2p-ui button,
+#tresenraya-ui button, #conecta4-ui button, #ppt-ui button, #ahorcado-ui button { pointer-events: all; }
 
-#pong-exit, #globos-exit, #sumo-exit, #cocinas-exit, #vuelo-exit, #corazones-exit, #memoria2p-exit {
-  position: absolute; top: 16px; right: 16px;
-  width: 44px; height: 44px; border-radius: 10px;
-  background: rgba(0,0,0,0.5); color: #fff;
-  border: 1px solid rgba(255,255,255,0.3);
-  font-size: 1.1rem; cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+/* ── Online-play entry point on the 2P game cards ───────────────────────── */
+.hub-card-wrap { position: relative; }
+.hub-online-btn {
+  position: absolute; top: -8px; right: -8px; z-index: 2;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(135deg, #2E9BFF 0%, #1560D0 100%);
+  border: 2px solid rgba(255,255,255,0.85);
+  color: #fff; font-size: 1rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 0.15s;
 }
-#pong-exit:hover, #globos-exit:hover, #sumo-exit:hover, #cocinas-exit:hover,
-#vuelo-exit:hover, #corazones-exit:hover, #memoria2p-exit:hover { background: rgba(0,0,0,0.75); }
+.hub-online-btn:hover { transform: scale(1.12); }
+
+/* ── Online match setup (create/join room code) ─────────────────────────── */
+#online-setup {
+  position: fixed; inset: 0; z-index: 130;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #061428 0%, #0c2c4a 45%, #06182e 100%);
+  padding: 16px 12px 24px;
+}
+#online-setup.hidden { display: none; }
+.online-panel {
+  width: min(92vw, 420px);
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  text-align: center;
+}
+#online-title { color: #fff; font-size: 1.5rem; font-weight: 800; margin: 0 0 4px; }
+.online-step { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+.online-step.hidden { display: none; }
+.online-hint { color: #A0D0FF; font-size: 0.95rem; margin: 0; }
+.online-big-btn {
+  width: 100%; padding: 16px; border-radius: 14px; border: none;
+  background: linear-gradient(135deg, #2E9BFF 0%, #1560D0 100%);
+  color: #fff; font-size: 1.05rem; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 0.15s;
+}
+.online-big-btn:hover { transform: translateY(-2px); }
+.online-cancel-btn {
+  padding: 10px 20px; border-radius: 10px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.25);
+  color: #fff; font-size: 0.9rem; cursor: pointer;
+}
+.online-code {
+  font-size: 3rem; font-weight: 900; letter-spacing: 10px;
+  color: #FFD700; background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,215,0,0.5); border-radius: 16px;
+  padding: 14px 22px;
+}
+.online-code-input {
+  width: 100%; max-width: 220px; text-align: center;
+  font-size: 2rem; font-weight: 800; letter-spacing: 8px;
+  text-transform: uppercase; color: #fff;
+  background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 14px; padding: 12px;
+}
+.online-code-input:focus { outline: none; border-color: #2E9BFF; }
+.online-spinner { position: relative; padding-left: 22px; }
+.online-spinner::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  width: 14px; height: 14px; margin-top: -7px;
+  border: 2px solid rgba(160,208,255,0.3); border-top-color: #A0D0FF;
+  border-radius: 50%; animation: onlineSpin 0.8s linear infinite;
+}
+@keyframes onlineSpin { to { transform: rotate(360deg); } }
+
+/* Peer-disconnected banner shown over an in-progress online match */
+#online-disconnect-banner {
+  position: fixed; inset: 0; z-index: 140;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; background: rgba(6,20,40,0.92); color: #fff; text-align: center; padding: 20px;
+}
+#online-disconnect-banner.hidden { display: none; }

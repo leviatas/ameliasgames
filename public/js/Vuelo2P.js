@@ -190,4 +190,21 @@ export class Vuelo2P {
   }
   pointerMove() {}
   pointerUp() {}
+
+  // ── Online sync: host broadcasts this every frame, guest applies it ──────
+  getNetState() {
+    return {
+      W: this.W, H: this.H,
+      phase: this.phase, countdown: this.countdown, countTimer: this.countTimer,
+      winner: this.winner, t: this.t,
+      lanes: this.lanes,
+    };
+  }
+
+  setNetState(s) {
+    this.W = s.W; this.H = s.H;
+    this.phase = s.phase; this.countdown = s.countdown; this.countTimer = s.countTimer;
+    this.winner = s.winner; this.t = s.t;
+    this.lanes = s.lanes;
+  }
 }

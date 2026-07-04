@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { logVisit, listVisits } = require('./visits-db');
+const { attachNetRelay } = require('./net-relay');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +36,7 @@ app.post('/api/visits', (req, res) => {
   res.json(listVisits(100));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Avatar World running at http://0.0.0.0:${PORT}`);
 });
+attachNetRelay(httpServer);

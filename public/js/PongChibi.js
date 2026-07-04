@@ -230,4 +230,25 @@ export class PongChibi {
     if (player === 'p1') { this._p1Drag = null; this.p1.vy = 0; }
     else                  { this._p2Drag = null; this.p2.vy = 0; }
   }
+
+  // ── Online sync: host broadcasts this every frame, guest applies it ──────
+  getNetState() {
+    return {
+      W: this.W, H: this.H,
+      PADDLE_W: this.PADDLE_W, PADDLE_H: this.PADDLE_H, BALL_R: this.BALL_R,
+      P1_X: this.P1_X, P2_X: this.P2_X,
+      score: this.score, phase: this.phase,
+      countdown: this.countdown, countTimer: this.countTimer, goalTimer: this.goalTimer,
+      p1: this.p1, p2: this.p2, ball: this.ball,
+    };
+  }
+
+  setNetState(s) {
+    this.W = s.W; this.H = s.H;
+    this.PADDLE_W = s.PADDLE_W; this.PADDLE_H = s.PADDLE_H; this.BALL_R = s.BALL_R;
+    this.P1_X = s.P1_X; this.P2_X = s.P2_X;
+    this.score = s.score; this.phase = s.phase;
+    this.countdown = s.countdown; this.countTimer = s.countTimer; this.goalTimer = s.goalTimer;
+    this.p1 = s.p1; this.p2 = s.p2; this.ball = s.ball;
+  }
 }

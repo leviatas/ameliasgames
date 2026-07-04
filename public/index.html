@@ -229,19 +229,19 @@
 
   <!-- Dog runner mini-game controls -->
   <div id="runner-ui" class="hidden">
-    <button id="runner-exit" title="Salir">✕</button>
+    <button id="runner-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
     <button id="runner-duck" class="runner-btn" title="Agacharse">⬇</button>
     <button id="runner-jump" class="runner-btn" title="Saltar">⬆</button>
   </div>
 
   <!-- Cooking mini-game controls -->
   <div id="cocina-ui" class="hidden">
-    <button id="cocina-exit" title="Salir">✕</button>
+    <button id="cocina-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Match-3 mini-game controls -->
   <div id="match3-ui" class="hidden">
-    <button id="match3-exit" title="Salir">✕</button>
+    <button id="match3-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- 1 Player submenu (choose solo game) -->
@@ -274,41 +274,94 @@
     <h1 class="select-title">🎮 2 Players</h1>
     <p class="select-subtitle">Elegí un juego para dos</p>
     <div class="hub-grid">
-      <button class="hub-card pong2p" id="versus-pong">
-        <div class="hub-emoji">🏓</div>
-        <div class="hub-name">Pong Chibi</div>
-        <div class="hub-desc">Paleta vs paleta</div>
-      </button>
-      <button class="hub-card globos2p" id="versus-globos">
-        <div class="hub-emoji">🎈</div>
-        <div class="hub-name">Tiro al Globo</div>
-        <div class="hub-desc">Pinchalos antes de que escapen</div>
-      </button>
-      <button class="hub-card sumo2p" id="versus-sumo">
-        <div class="hub-emoji">🥊</div>
-        <div class="hub-name">Sumo Chibi</div>
-        <div class="hub-desc">Empujá al rival fuera del ring</div>
-      </button>
-      <button class="hub-card cocinas2p" id="versus-cocinas">
-        <div class="hub-emoji">👨‍🍳</div>
-        <div class="hub-name">Batalla Cocinas</div>
-        <div class="hub-desc">Armá la receta antes que tu rival</div>
-      </button>
-      <button class="hub-card vuelo2p" id="versus-vuelo">
-        <div class="hub-emoji">🦋</div>
-        <div class="hub-name">Mariposas al Vuelo</div>
-        <div class="hub-desc">Aleteá entre las flores y llegá primera</div>
-      </button>
-      <button class="hub-card corazones2p" id="versus-corazones">
-        <div class="hub-emoji">💖</div>
-        <div class="hub-name">Lluvia de Corazones</div>
-        <div class="hub-desc">Atrapá corazones, esquivá arañas</div>
-      </button>
-      <button class="hub-card memoria2p" id="versus-memoria">
-        <div class="hub-emoji">🎴</div>
-        <div class="hub-name">Memoria Duelo</div>
-        <div class="hub-desc">Encontrá más parejas que tu rival</div>
-      </button>
+      <div class="hub-card-wrap">
+        <button class="hub-card pong2p" id="versus-pong">
+          <div class="hub-emoji">🏓</div>
+          <div class="hub-name">Pong Chibi</div>
+          <div class="hub-desc">Paleta vs paleta</div>
+        </button>
+        <button class="hub-online-btn" id="versus-pong-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card globos2p" id="versus-globos">
+          <div class="hub-emoji">🎈</div>
+          <div class="hub-name">Tiro al Globo</div>
+          <div class="hub-desc">Pinchalos antes de que escapen</div>
+        </button>
+        <button class="hub-online-btn" id="versus-globos-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card sumo2p" id="versus-sumo">
+          <div class="hub-emoji">🥊</div>
+          <div class="hub-name">Sumo Chibi</div>
+          <div class="hub-desc">Empujá al rival fuera del ring</div>
+        </button>
+        <button class="hub-online-btn" id="versus-sumo-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card cocinas2p" id="versus-cocinas">
+          <div class="hub-emoji">👨‍🍳</div>
+          <div class="hub-name">Batalla Cocinas</div>
+          <div class="hub-desc">Armá la receta antes que tu rival</div>
+        </button>
+        <button class="hub-online-btn" id="versus-cocinas-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card vuelo2p" id="versus-vuelo">
+          <div class="hub-emoji">🦋</div>
+          <div class="hub-name">Mariposas al Vuelo</div>
+          <div class="hub-desc">Aleteá entre las flores y llegá primera</div>
+        </button>
+        <button class="hub-online-btn" id="versus-vuelo-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card corazones2p" id="versus-corazones">
+          <div class="hub-emoji">💖</div>
+          <div class="hub-name">Lluvia de Corazones</div>
+          <div class="hub-desc">Atrapá corazones, esquivá arañas</div>
+        </button>
+        <button class="hub-online-btn" id="versus-corazones-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card memoria2p" id="versus-memoria">
+          <div class="hub-emoji">🎴</div>
+          <div class="hub-name">Memoria Duelo</div>
+          <div class="hub-desc">Encontrá más parejas que tu rival</div>
+        </button>
+        <button class="hub-online-btn" id="versus-memoria-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card tresenraya" id="versus-tresenraya">
+          <div class="hub-emoji">❌</div>
+          <div class="hub-name">Tres en Raya</div>
+          <div class="hub-desc">Alineá tres y ganá, por turnos</div>
+        </button>
+        <button class="hub-online-btn" id="versus-tresenraya-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card conecta4" id="versus-conecta4">
+          <div class="hub-emoji">🔵</div>
+          <div class="hub-name">Conecta 4</div>
+          <div class="hub-desc">Soltá fichas y alineá 4</div>
+        </button>
+        <button class="hub-online-btn" id="versus-conecta4-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card ppt" id="versus-ppt">
+          <div class="hub-emoji">✊</div>
+          <div class="hub-name">Piedra, Papel o Tijera</div>
+          <div class="hub-desc">Mejor de 5 rondas</div>
+        </button>
+        <button class="hub-online-btn" id="versus-ppt-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card ahorcado" id="versus-ahorcado">
+          <div class="hub-emoji">🎪</div>
+          <div class="hub-name">Ahorcado</div>
+          <div class="hub-desc">Adivinen la palabra por turnos</div>
+        </button>
+        <button class="hub-online-btn" id="versus-ahorcado-online" title="Jugar online con código">🌐</button>
+      </div>
     </div>
   </div>
 
@@ -363,7 +416,7 @@
 
   <!-- 3 Players controls (one big button per player) -->
   <div id="tres-ui" class="hidden">
-    <button id="tres-exit" title="Salir">✕</button>
+    <button id="tres-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
     <div id="tres-btns">
       <button class="tres-btn" id="tres-btn-0"><span class="tres-btn-emoji">🦄</span><span class="tres-btn-name">Jugador 1</span><span class="tres-btn-key">tecla A</span></button>
       <button class="tres-btn" id="tres-btn-1"><span class="tres-btn-emoji">🐰</span><span class="tres-btn-name">Jugador 2</span><span class="tres-btn-key">Espacio</span></button>
@@ -402,7 +455,7 @@
 
   <!-- 4 Players controls (one big button per player) -->
   <div id="cuatro-ui" class="hidden">
-    <button id="cuatro-exit" title="Salir">✕</button>
+    <button id="cuatro-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
     <div id="cuatro-btns">
       <button class="tres-btn" id="cuatro-btn-0"><span class="tres-btn-emoji">🦄</span><span class="tres-btn-name">Jugador 1</span><span class="tres-btn-key">tecla A</span></button>
       <button class="tres-btn" id="cuatro-btn-1"><span class="tres-btn-emoji">🐰</span><span class="tres-btn-name">Jugador 2</span><span class="tres-btn-key">tecla F</span></button>
@@ -432,62 +485,121 @@
 
   <!-- Hole mini-game controls -->
   <div id="hole-ui" class="hidden">
-    <button id="hole-exit" title="Salir">✕</button>
+    <button id="hole-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Hole2 — Festín de comidas controls -->
   <div id="hole2-ui" class="hidden">
-    <button id="hole2-exit" title="Salir">✕</button>
+    <button id="hole2-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Pong Chibi controls -->
   <div id="pong-ui" class="hidden">
-    <button id="pong-exit" title="Salir">✕</button>
+    <button id="pong-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Tiro al Globo controls -->
   <div id="globos-ui" class="hidden">
-    <button id="globos-exit" title="Salir">✕</button>
+    <button id="globos-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Sumo Chibi controls -->
   <div id="sumo-ui" class="hidden">
-    <button id="sumo-exit" title="Salir">✕</button>
+    <button id="sumo-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Batalla de Cocinas controls -->
   <div id="cocinas-ui" class="hidden">
-    <button id="cocinas-exit" title="Salir">✕</button>
+    <button id="cocinas-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Mariposas al Vuelo controls -->
   <div id="vuelo-ui" class="hidden">
-    <button id="vuelo-exit" title="Salir">✕</button>
+    <button id="vuelo-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Lluvia de Corazones controls -->
   <div id="corazones-ui" class="hidden">
-    <button id="corazones-exit" title="Salir">✕</button>
+    <button id="corazones-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Memoria Duelo controls -->
   <div id="memoria2p-ui" class="hidden">
-    <button id="memoria2p-exit" title="Salir">✕</button>
+    <button id="memoria2p-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Tres en Raya controls -->
+  <div id="tresenraya-ui" class="hidden">
+    <button id="tresenraya-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Conecta 4 controls -->
+  <div id="conecta4-ui" class="hidden">
+    <button id="conecta4-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Piedra, Papel o Tijera controls -->
+  <div id="ppt-ui" class="hidden">
+    <button id="ppt-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Ahorcado controls -->
+  <div id="ahorcado-ui" class="hidden">
+    <button id="ahorcado-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Online match setup (create/join room code) -->
+  <div id="online-setup" class="hidden">
+    <button id="online-back" class="corner-back">← Volver</button>
+    <div class="online-panel">
+      <h2 id="online-title">Jugar Online</h2>
+
+      <div id="online-choose" class="online-step">
+        <button id="online-create-btn" class="online-big-btn">🔑 Crear código</button>
+        <button id="online-join-btn" class="online-big-btn">🔢 Unirse con código</button>
+      </div>
+
+      <div id="online-waiting" class="online-step hidden">
+        <p class="online-hint">Compartí este código con la otra persona:</p>
+        <div id="online-code-display" class="online-code"></div>
+        <p class="online-hint online-spinner">Esperando rival…</p>
+        <button id="online-cancel-wait" class="online-cancel-btn">Cancelar</button>
+      </div>
+
+      <div id="online-join-form" class="online-step hidden">
+        <p class="online-hint">Ingresá el código:</p>
+        <input id="online-code-input" class="online-code-input" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD" />
+        <button id="online-join-confirm" class="online-big-btn">Conectar</button>
+        <button id="online-cancel-join" class="online-cancel-btn">Cancelar</button>
+      </div>
+
+      <div id="online-status" class="online-step hidden">
+        <p id="online-status-msg" class="online-hint"></p>
+        <button id="online-status-back" class="online-cancel-btn hidden">Volver</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Peer-disconnected banner (shown over an online match if the rival drops) -->
+  <div id="online-disconnect-banner" class="hidden">
+    <p style="font-size:2.2rem;">📡</p>
+    <p style="font-size:1.1rem; font-weight:700;">Se desconectó el rival</p>
+    <button id="online-disconnect-back" class="online-big-btn" style="width:auto; padding:12px 28px;">Volver al menú</button>
   </div>
 
   <!-- Ice-cream shop controls -->
   <div id="helado-ui" class="hidden">
-    <button id="helado-exit" title="Salir">✕</button>
+    <button id="helado-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Clothing store controls -->
   <div id="tienda-ui" class="hidden">
-    <button id="tienda-exit" title="Salir">✕</button>
+    <button id="tienda-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Mob Control controls -->
   <div id="mob-ui" class="hidden">
-    <button id="mob-exit" title="Salir">✕</button>
+    <button id="mob-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Cinema controls -->
@@ -501,11 +613,11 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.39.0</div>
+  <div id="app-version">v2.43.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">
-    <button id="galaga-exit" title="Salir">✕</button>
+    <button id="galaga-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
     <button id="galaga-left"  class="galaga-btn" title="Izquierda">◀</button>
     <button id="galaga-fire"  class="galaga-btn galaga-fire-btn" title="Disparar">🔥</button>
     <button id="galaga-right" class="galaga-btn" title="Derecha">▶</button>

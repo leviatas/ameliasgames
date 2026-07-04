@@ -180,4 +180,21 @@ export class Corazones2P {
   }
   pointerMove(cx, cy, player) { this._moveBasket(cx, player); }
   pointerUp() {}
+
+  // ── Online sync: host broadcasts this every frame, guest applies it ──────
+  getNetState() {
+    return {
+      W: this.W, H: this.H,
+      phase: this.phase, countdown: this.countdown, countTimer: this.countTimer,
+      timeLeft: this.timeLeft, t: this.t, winner: this.winner,
+      floats: this.floats, lanes: this.lanes,
+    };
+  }
+
+  setNetState(s) {
+    this.W = s.W; this.H = s.H;
+    this.phase = s.phase; this.countdown = s.countdown; this.countTimer = s.countTimer;
+    this.timeLeft = s.timeLeft; this.t = s.t; this.winner = s.winner;
+    this.floats = s.floats; this.lanes = s.lanes;
+  }
 }
