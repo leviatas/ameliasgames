@@ -75,6 +75,17 @@ let netPendingGameKey = null;      // game the online-setup screen currently tar
 let netScale       = null;         // guest-only: {scale, offX, offY} to map host↔local canvas
 let netSendAccum   = 0;            // host-only: throttle accumulator for state broadcasts
 const NET_STATE_HZ = 30;
+// guest-only: rolling buffer of {recvT, s} snapshots, drawn from a point slightly
+// in the past so we always have two real snapshots to interpolate between —
+// this is what turns "new position every 33ms" into smooth per-frame motion.
+let netSnapshots      = [];
+const NET_RENDER_DELAY_MS = 90;
+// guest-only: top-level getNetState() keys touched by our own optimistic
+// pointer echo, held fresh for a short TTL so the smoothing above never makes
+// the guest's own paddle/drag feel laggy — only the *other* entities (which
+// we don't control locally) render from the delayed/interpolated buffer.
+let netLocalOverrides = new Map(); // key → { value, expiresAt }
+const NET_LOCAL_OVERRIDE_TTL_MS = 200;
 let holeFrom = 'hub';        // 'hub' | 'world'
 let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas' | 'tres'
 let savedPos = null;         // exterior pos when inside a house
@@ -553,7 +564,10 @@ canvas.addEventListener('pointerdown', e => {
     if (netRole === 'host') { g.pointerDown(hp.x, hp.y, 'p1'); }
     else {
       netSession.send({ k: 'i', op: 'd', x: hp.x, y: hp.y });
-      g.pointerDown(hp.x, hp.y, 'p2'); // optimistic local echo — masks round-trip lag, host corrects on next broadcast
+      // optimistic local echo — masks round-trip lag; _captureLocalEcho keeps
+      // whatever this touches rendering from our fresh local value instead of
+      // the network-smoothed one until the host's broadcast catches up.
+      _captureLocalEcho(g, () => g.pointerDown(hp.x, hp.y, 'p2'));
     }
     return;
   }
@@ -570,7 +584,7 @@ canvas.addEventListener('pointermove', e => {
     if (netRole === 'host') { g.pointerMove(hp.x, hp.y, 'p1'); }
     else {
       netSession.send({ k: 'i', op: 'm', x: hp.x, y: hp.y });
-      g.pointerMove(hp.x, hp.y, 'p2');
+      _captureLocalEcho(g, () => g.pointerMove(hp.x, hp.y, 'p2'));
     }
     return;
   }
@@ -582,7 +596,7 @@ canvas.addEventListener('pointermove', e => {
     const who = _2pTouches.get(e.pointerId); if (!who) return;
     if (netRole) {
       if (netRole === 'host') { g.pointerUp('p1'); }
-      else { netSession.send({ k: 'i', op: 'u' }); g.pointerUp('p2'); }
+      else { netSession.send({ k: 'i', op: 'u' }); _captureLocalEcho(g, () => g.pointerUp('p2')); }
     } else {
       g.pointerUp(who);
     }
@@ -607,11 +621,81 @@ function netToHostPoint(x, y) {
   if (netRole !== 'guest' || !netScale) return { x, y };
   return { x: (x - netScale.offX) / netScale.scale, y: (y - netScale.offY) / netScale.scale };
 }
+// Only leaf fields named like a physics/animation quantity get interpolated —
+// picking this by *value* (e.g. "both endpoints are integers") looked
+// appealing but false-positives the moment a continuous value lands on a
+// round number (a ball reset dead-center at x=300.0 would freeze instead of
+// glide). Discrete state (scores, turns, board cells, win counts, indices)
+// always snaps straight to the newer value.
+const NET_LERP_KEYS = new Set(['x', 'y', 'vx', 'vy', 't']);
+function _lerpValue(a, b, t, key) {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return key !== undefined && !NET_LERP_KEYS.has(key) ? b : a + (b - a) * t;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return b;
+    return b.map((v, i) => _lerpValue(a[i], v, t, key));
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const out = {};
+    for (const k of Object.keys(b)) out[k] = _lerpValue(a[k], b[k], t, k);
+    return out;
+  }
+  return b;
+}
+// Runs a local optimistic pointer echo (guest only) and remembers whichever
+// top-level state keys it changed, so render-time smoothing (see
+// _sampleNetState/_renderGuestFrame) can keep showing the fresh local edit
+// instead of a stale, delayed one for exactly those keys.
+function _captureLocalEcho(g, mutate) {
+  // Compare serialized content, not references: several games mutate their
+  // net-state objects (e.g. this.p2.y = ...) in place, so a reference check
+  // would never see the change.
+  const before = g.getNetState();
+  const beforeJSON = {};
+  for (const k of Object.keys(before)) beforeJSON[k] = JSON.stringify(before[k]);
+  mutate();
+  const after = g.getNetState();
+  const now = performance.now();
+  for (const k of Object.keys(after)) {
+    if (JSON.stringify(after[k]) !== beforeJSON[k]) {
+      netLocalOverrides.set(k, { value: after[k], expiresAt: now + NET_LOCAL_OVERRIDE_TTL_MS });
+    }
+  }
+}
+function _applyNetLocalOverrides(s) {
+  if (netLocalOverrides.size === 0) return s;
+  const now = performance.now();
+  const out = { ...s };
+  for (const [k, o] of netLocalOverrides) {
+    if (o.expiresAt < now) { netLocalOverrides.delete(k); continue; }
+    out[k] = o.value;
+  }
+  return out;
+}
+function _sampleNetState() {
+  const buf = netSnapshots;
+  if (buf.length === 0) return null;
+  if (buf.length === 1) return buf[0].s;
+  const renderT = performance.now() - NET_RENDER_DELAY_MS;
+  if (renderT <= buf[0].recvT) return buf[0].s;
+  for (let i = 0; i < buf.length - 1; i++) {
+    const a = buf[i], b = buf[i + 1];
+    if (renderT <= b.recvT) {
+      const span = b.recvT - a.recvT;
+      const t = span > 0 ? (renderT - a.recvT) / span : 1;
+      return _lerpValue(a.s, b.s, t);
+    }
+  }
+  return buf[buf.length - 1].s; // buffer underrun (network hiccup) — hold newest
+}
 function _renderGuestFrame(g) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!netScale) return;
+  const s = _sampleNetState();
+  if (s) g.setNetState(_applyNetLocalOverrides(s));
   ctx.setTransform(netScale.scale, 0, 0, netScale.scale, netScale.offX, netScale.offY);
   g.render(ctx);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -633,6 +717,7 @@ function _run2PFrame(g, delta) {
 function _resetNetState() {
   if (netSession) { netSession.close(); netSession = null; }
   netRole = null; netGameKey = null; netScale = null; netSendAccum = 0;
+  netSnapshots = []; netLocalOverrides.clear();
 }
 function _showOnlineDisconnect() {
   document.getElementById('online-disconnect-banner').classList.remove('hidden');
@@ -1852,7 +1937,11 @@ document.getElementById('online-join-confirm').addEventListener('click', async (
 function _handleNetMessage(data) {
   const g = _active2P(); if (!g) return;
   if (data.k === 's') {
-    g.setNetState(data.s);
+    netSnapshots.push({ recvT: performance.now(), s: data.s });
+    // Drop snapshots that fall entirely before the current render window,
+    // keeping one extra as the left bracket for interpolation.
+    const cutoff = performance.now() - NET_RENDER_DELAY_MS - (1000 / NET_STATE_HZ) * 2;
+    while (netSnapshots.length > 2 && netSnapshots[1].recvT < cutoff) netSnapshots.shift();
     _updateNetScale(data.s.W, data.s.H);
   } else if (data.k === 'i' && netRole === 'host') {
     if (data.op === 'd') g.pointerDown(data.x, data.y, 'p2');
