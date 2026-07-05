@@ -425,7 +425,7 @@ export class FourPlayers {
       ctx.fillRect(cx - G.W / 8 + 5 * sc, 120 * sc, G.W / 4 - 10 * sc, G.contentH - 120 * sc);
       const size = this._flowerSize(f);
       if (size <= 0) continue;
-      const fs = (14 + size * 44) * sc;
+      const fs = (14 + size * 44 * 1.3) * sc;
       const droop = f.st === 'wilt' ? (1 - size) * 0.6 : 0;   // se inclina al marchitarse
       // tallo
       ctx.strokeStyle = '#3E8E41'; ctx.lineWidth = 3 * sc;
@@ -439,10 +439,6 @@ export class FourPlayers {
       ctx.font = `${fs}px serif`;
       ctx.fillText(f.kind, 0, 0);
       ctx.restore();
-      if (f.st === 'peak') {
-        ctx.fillStyle = '#FFD23A'; ctx.font = `900 ${15 * sc}px system-ui, sans-serif`;
-        ctx.fillText('✨ ¡AHORA! ✨', cx, floorY - fs * 2 - 16 * sc);
-      }
     }
   }
 
