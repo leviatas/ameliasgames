@@ -72,7 +72,7 @@ export class PongChibi {
         b.y > this.p1.y - PADDLE_H / 2 - BALL_R &&
         b.y < this.p1.y + PADDLE_H / 2 + BALL_R) {
       b.x = P1_X + PADDLE_W + BALL_R;
-      const speed = Math.hypot(b.vx, b.vy) * 1.10;
+      const speed = Math.hypot(b.vx, b.vy) * 1.25;
       const rel   = (b.y - this.p1.y) / (PADDLE_H / 2);
       const ang   = rel * Math.PI * 0.36;
       b.vx =  Math.cos(ang) * speed;
@@ -84,17 +84,12 @@ export class PongChibi {
         b.y > this.p2.y - PADDLE_H / 2 - BALL_R &&
         b.y < this.p2.y + PADDLE_H / 2 + BALL_R) {
       b.x = P2_X - BALL_R;
-      const speed = Math.hypot(b.vx, b.vy) * 1.10;
+      const speed = Math.hypot(b.vx, b.vy) * 1.25;
       const rel   = (b.y - this.p2.y) / (PADDLE_H / 2);
       const ang   = rel * Math.PI * 0.36;
       b.vx = -Math.cos(ang) * speed;
       b.vy =  Math.sin(ang) * speed + this.p2.vy * 0.3;
     }
-
-    // Max speed cap
-    const maxSpd = W * 0.85;
-    const spd = Math.hypot(b.vx, b.vy);
-    if (spd > maxSpd) { b.vx = b.vx / spd * maxSpd; b.vy = b.vy / spd * maxSpd; }
 
     if (b.x < 0)    { this.score.p2++; this._afterScore(); }
     else if (b.x > W) { this.score.p1++; this._afterScore(); }
