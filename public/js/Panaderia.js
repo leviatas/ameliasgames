@@ -14,6 +14,20 @@ import { Sound }     from './Sound.js';
 import { addCoins }  from './Wallet.js';
 import { Character } from './Character.js';
 
+// ── Sprites PNG ilustrados (con fallback vectorial mientras cargan) ──────────
+const ASSET = (name) => `/assets/panaderia/${name}.png`;
+function loadImg(name) { const im = new Image(); im.src = ASSET(name); return im; }
+function ready(img) { return img && img.complete && img.naturalWidth > 0; }
+const IMG = {
+  molino: loadImg('molino'), aspas: loadImg('aspas'), horno: loadImg('horno'),
+  mostrador: loadImg('mostrador'), arbusto: loadImg('arbusto'),
+  trigo: [loadImg('trigo_1'), loadImg('trigo_2'), loadImg('trigo_3')],
+  semilla: loadImg('semilla'), harina: loadImg('harina'), pan: loadImg('pan'),
+  granjero: loadImg('granjero'), molinero: loadImg('molinero'),
+  panadero: loadImg('panadero'), vendedor: loadImg('vendedor'),
+  clientes: [loadImg('cliente1'), loadImg('cliente2'), loadImg('cliente3'), loadImg('cliente4')],
+};
+
 const SAVE_KEY   = 'panaderia_state';
 const MAX_PLOTS  = 8;
 const GROW_TIME  = 10;    // seg. para que el trigo madure
@@ -110,8 +124,11 @@ export class Panaderia {
     const counter = { x: bld.x + W * 0.012, y: bld.y + H * 0.235, w: bld.w - W * 0.024, h: H * 0.065 };
     const oven = { x: bld.x + bld.w * 0.5 - W * 0.065, y: bld.y + bld.h * 0.62, w: W * 0.13, h: H * 0.20 };
 
+    // caja de dibujo del mostrador (sprite ~1.82:1) centrada en su zona
+    const cbH = H * 0.19;
+    const counterBox = { cx: counter.x + counter.w / 2, w: cbH * 1.82, h: cbH, bottom: counter.y + counter.h + 40 * s };
     // clientes en fila detrás del mostrador
-    const custXs = [counter.x + counter.w * 0.22, counter.x + counter.w * 0.52, counter.x + counter.w * 0.82];
+    const custXs = [counterBox.cx - counterBox.w * 0.32, counterBox.cx, counterBox.cx + counterBox.w * 0.32];
     const custY  = counter.y - 6 * s;
 
     // botones de la tienda: barra única a lo ancho, pegada abajo (no tapa nada)
@@ -124,7 +141,14 @@ export class Panaderia {
       shop.push({ ...it, x: W * 0.02 + i * (bw + sgap), y: sy, w: bw, h: bh });
     });
 
-    return { W, H, s, plotRects, bush, seedZone, mill, bld, counter, oven, custXs, custY, shop };
+    return { W, H, s, plotRects, bush, seedZone, mill, bld, counter, counterBox, oven, custXs, custY, shop };
+  }
+
+  // dibuja una imagen anclada abajo-centro con una altura dada (mantiene aspecto)
+  _imgH(ctx, img, cx, bottomY, h) {
+    const w = h * (img.naturalWidth / img.naturalHeight);
+    ctx.drawImage(img, cx - w / 2, bottomY - h, w, h);
+    return w;
   }
 
   _inRect(px, py, r) { return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h; }
@@ -601,14 +625,26 @@ export class Panaderia {
 
       if (p.state === 'grow') {
         const frac = p.t / GROW_TIME;
-        this._drawWheatRows(ctx, r, frac, s);
+        const stage = frac < 0.5 ? 0 : 1;
+        if (ready(IMG.trigo[stage])) {
+          const grow = 0.72 + 0.28 * Math.min(1, (frac - stage * 0.5) * 2 + 0.35);
+          this._imgH(ctx, IMG.trigo[stage], r.x + r.w / 2, r.y + r.h - 4 * s,
+            Math.min(r.h * (stage === 0 ? 0.52 : 0.86) * grow, r.h));
+        } else {
+          this._drawWheatRows(ctx, r, frac, s);
+        }
         // barrita de progreso
         ctx.fillStyle = 'rgba(0,0,0,0.18)';
         ctx.beginPath(); ctx.roundRect(r.x + 6 * s, r.y + r.h - 10 * s, r.w - 12 * s, 6 * s, 3 * s); ctx.fill();
         ctx.fillStyle = '#8FE36B';
         ctx.beginPath(); ctx.roundRect(r.x + 6 * s, r.y + r.h - 10 * s, (r.w - 12 * s) * frac, 6 * s, 3 * s); ctx.fill();
       } else if (p.state === 'ready') {
-        this._drawWheatRows(ctx, r, 1, s, true);
+        if (ready(IMG.trigo[2])) {
+          const sway = Math.sin(p.t * 3) * 1.5 * s;
+          this._imgH(ctx, IMG.trigo[2], r.x + r.w / 2 + sway, r.y + r.h - 4 * s, r.h * 0.98);
+        } else {
+          this._drawWheatRows(ctx, r, 1, s, true);
+        }
         // brillito de "listo"
         const pulse = 0.5 + Math.sin(p.t * 5) * 0.5;
         ctx.strokeStyle = `rgba(255,235,110,${0.35 + pulse * 0.5})`;
@@ -646,25 +682,29 @@ export class Panaderia {
     const { s } = L;
     const b = L.bush;
     const shake = this.bushShake > 0 ? Math.sin(this.t * 40) * 4 * s : 0;
-    // tronquito
-    ctx.fillStyle = '#8A5A30';
-    ctx.fillRect(b.x - 5 * s, b.y + b.r * 0.3, 10 * s, b.r * 0.55);
-    // follaje
-    for (const [dx, dy, rr] of [[-0.45, 0.05, 0.62], [0.45, 0.05, 0.62], [0, -0.35, 0.72], [0, 0.15, 0.8]]) {
-      ctx.fillStyle = '#4E9048';
-      ctx.beginPath(); ctx.arc(b.x + dx * b.r + shake, b.y + dy * b.r, b.r * rr, 0, Math.PI * 2); ctx.fill();
-    }
-    // espiguitas doradas asomando (para que se entienda que da semillas)
-    ctx.fillStyle = '#F2CE5A';
-    for (const [dx, dy] of [[-0.4, -0.4], [0.15, -0.65], [0.5, -0.25], [-0.05, -0.1]]) {
-      ctx.beginPath(); ctx.ellipse(b.x + dx * b.r + shake, b.y + dy * b.r, 4 * s, 8 * s, 0.4, 0, Math.PI * 2); ctx.fill();
+    if (ready(IMG.arbusto)) {
+      this._imgH(ctx, IMG.arbusto, b.x + shake, b.y + b.r, b.r * 2.15);
+    } else {
+      // tronquito
+      ctx.fillStyle = '#8A5A30';
+      ctx.fillRect(b.x - 5 * s, b.y + b.r * 0.3, 10 * s, b.r * 0.55);
+      // follaje
+      for (const [dx, dy, rr] of [[-0.45, 0.05, 0.62], [0.45, 0.05, 0.62], [0, -0.35, 0.72], [0, 0.15, 0.8]]) {
+        ctx.fillStyle = '#4E9048';
+        ctx.beginPath(); ctx.arc(b.x + dx * b.r + shake, b.y + dy * b.r, b.r * rr, 0, Math.PI * 2); ctx.fill();
+      }
+      // espiguitas doradas asomando (para que se entienda que da semillas)
+      ctx.fillStyle = '#F2CE5A';
+      for (const [dx, dy] of [[-0.4, -0.4], [0.15, -0.65], [0.5, -0.25], [-0.05, -0.1]]) {
+        ctx.beginPath(); ctx.ellipse(b.x + dx * b.r + shake, b.y + dy * b.r, 4 * s, 8 * s, 0.4, 0, Math.PI * 2); ctx.fill();
+      }
     }
     ctx.fillStyle = '#3A5A20'; ctx.font = `bold ${13 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('Semillas', b.x, b.y + b.r + 18 * s);
 
     // granjero contratado, al lado del arbusto
-    if (this.workers.granjero) this._drawWorker(ctx, b.x + b.r * 1.7, b.y + b.r * 0.5, '🧑‍🌾', L);
+    if (this.workers.granjero) this._drawWorker(ctx, b.x + b.r * 1.8, b.y + b.r * 0.95, 'granjero', L);
   }
 
   _drawSeeds(ctx, L) {
@@ -678,10 +718,15 @@ export class Panaderia {
       ctx.save();
       ctx.translate(gx, gy + bob);
       ctx.rotate(0.5);
-      ctx.fillStyle = '#C89A50';
-      ctx.beginPath(); ctx.ellipse(0, 0, 6.5 * s, 10 * s, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#8A6A30'; ctx.lineWidth = 1.5 * s;
-      ctx.beginPath(); ctx.moveTo(0, -8 * s); ctx.lineTo(0, 8 * s); ctx.stroke();
+      if (ready(IMG.semilla)) {
+        const h = 24 * s, w = h * (IMG.semilla.naturalWidth / IMG.semilla.naturalHeight);
+        ctx.drawImage(IMG.semilla, -w / 2, -h / 2, w, h);
+      } else {
+        ctx.fillStyle = '#C89A50';
+        ctx.beginPath(); ctx.ellipse(0, 0, 6.5 * s, 10 * s, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#8A6A30'; ctx.lineWidth = 1.5 * s;
+        ctx.beginPath(); ctx.moveTo(0, -8 * s); ctx.lineTo(0, 8 * s); ctx.stroke();
+      }
       ctx.restore();
       // aura para invitar el tap
       if (t >= 1) {
@@ -696,49 +741,64 @@ export class Panaderia {
     const m = L.mill;
     const cx = m.x + m.w / 2, topY = m.y + m.h * 0.18;
 
-    // torre
-    ctx.fillStyle = '#E8D5B0';
-    ctx.beginPath();
-    ctx.moveTo(m.x + m.w * 0.12, m.y + m.h);
-    ctx.lineTo(m.x + m.w * 0.28, topY);
-    ctx.lineTo(m.x + m.w * 0.72, topY);
-    ctx.lineTo(m.x + m.w * 0.88, m.y + m.h);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#B09060'; ctx.lineWidth = 2.5 * s; ctx.stroke();
-    // techo
-    ctx.fillStyle = '#C0563A';
-    ctx.beginPath();
-    ctx.moveTo(m.x + m.w * 0.2, topY);
-    ctx.lineTo(cx, m.y);
-    ctx.lineTo(m.x + m.w * 0.8, topY);
-    ctx.closePath(); ctx.fill();
-    // puerta y ventana
-    ctx.fillStyle = '#7A5228';
-    ctx.beginPath(); ctx.roundRect(cx - 10 * s, m.y + m.h - 30 * s, 20 * s, 30 * s, [8 * s, 8 * s, 0, 0]); ctx.fill();
-    ctx.fillStyle = '#F8ECC8';
-    ctx.beginPath(); ctx.arc(cx, m.y + m.h * 0.45, 8 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#B09060'; ctx.lineWidth = 2 * s; ctx.stroke();
+    if (ready(IMG.molino) && ready(IMG.aspas)) {
+      // torre ilustrada (anclada al piso del rect del molino)
+      const towerH = m.h;
+      const towerW = this._imgH(ctx, IMG.molino, cx, m.y + m.h, towerH);
+      // aspas giratorias delante del techo
+      const hubX = cx, hubY = m.y + towerH * 0.16;
+      const bladeH = towerH * 0.78;
+      const bladeW = bladeH * (IMG.aspas.naturalWidth / IMG.aspas.naturalHeight);
+      ctx.save();
+      ctx.translate(hubX, hubY);
+      ctx.rotate(this.millAngle);
+      ctx.drawImage(IMG.aspas, -bladeW / 2, -bladeH / 2, bladeW, bladeH);
+      ctx.restore();
+    } else {
+      // torre
+      ctx.fillStyle = '#E8D5B0';
+      ctx.beginPath();
+      ctx.moveTo(m.x + m.w * 0.12, m.y + m.h);
+      ctx.lineTo(m.x + m.w * 0.28, topY);
+      ctx.lineTo(m.x + m.w * 0.72, topY);
+      ctx.lineTo(m.x + m.w * 0.88, m.y + m.h);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#B09060'; ctx.lineWidth = 2.5 * s; ctx.stroke();
+      // techo
+      ctx.fillStyle = '#C0563A';
+      ctx.beginPath();
+      ctx.moveTo(m.x + m.w * 0.2, topY);
+      ctx.lineTo(cx, m.y);
+      ctx.lineTo(m.x + m.w * 0.8, topY);
+      ctx.closePath(); ctx.fill();
+      // puerta y ventana
+      ctx.fillStyle = '#7A5228';
+      ctx.beginPath(); ctx.roundRect(cx - 10 * s, m.y + m.h - 30 * s, 20 * s, 30 * s, [8 * s, 8 * s, 0, 0]); ctx.fill();
+      ctx.fillStyle = '#F8ECC8';
+      ctx.beginPath(); ctx.arc(cx, m.y + m.h * 0.45, 8 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#B09060'; ctx.lineWidth = 2 * s; ctx.stroke();
 
-    // aspas giratorias
-    const hubX = cx, hubY = topY + 6 * s;
-    ctx.save();
-    ctx.translate(hubX, hubY);
-    ctx.rotate(this.millAngle);
-    for (let k = 0; k < 4; k++) {
-      ctx.rotate(Math.PI / 2);
-      ctx.fillStyle = '#F5E8CC';
-      ctx.strokeStyle = '#B09060'; ctx.lineWidth = 2 * s;
-      ctx.beginPath(); ctx.roundRect(-6 * s, -m.h * 0.46, 12 * s, m.h * 0.44, 5 * s); ctx.fill(); ctx.stroke();
-      // travesaños
-      ctx.strokeStyle = 'rgba(176,144,96,0.6)'; ctx.lineWidth = 1.5 * s;
-      for (let j = 1; j < 4; j++) {
-        ctx.beginPath(); ctx.moveTo(-6 * s, -m.h * 0.46 + (m.h * 0.44 * j) / 4);
-        ctx.lineTo(6 * s, -m.h * 0.46 + (m.h * 0.44 * j) / 4); ctx.stroke();
+      // aspas giratorias
+      const hubX = cx, hubY = topY + 6 * s;
+      ctx.save();
+      ctx.translate(hubX, hubY);
+      ctx.rotate(this.millAngle);
+      for (let k = 0; k < 4; k++) {
+        ctx.rotate(Math.PI / 2);
+        ctx.fillStyle = '#F5E8CC';
+        ctx.strokeStyle = '#B09060'; ctx.lineWidth = 2 * s;
+        ctx.beginPath(); ctx.roundRect(-6 * s, -m.h * 0.46, 12 * s, m.h * 0.44, 5 * s); ctx.fill(); ctx.stroke();
+        // travesaños
+        ctx.strokeStyle = 'rgba(176,144,96,0.6)'; ctx.lineWidth = 1.5 * s;
+        for (let j = 1; j < 4; j++) {
+          ctx.beginPath(); ctx.moveTo(-6 * s, -m.h * 0.46 + (m.h * 0.44 * j) / 4);
+          ctx.lineTo(6 * s, -m.h * 0.46 + (m.h * 0.44 * j) / 4); ctx.stroke();
+        }
       }
+      ctx.restore();
+      ctx.fillStyle = '#7A5228';
+      ctx.beginPath(); ctx.arc(hubX, hubY, 6 * s, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.restore();
-    ctx.fillStyle = '#7A5228';
-    ctx.beginPath(); ctx.arc(hubX, hubY, 6 * s, 0, Math.PI * 2); ctx.fill();
 
     // progreso de molienda
     if (this.mill.busy) {
@@ -749,7 +809,7 @@ export class Panaderia {
     ctx.textAlign = 'center';
     ctx.fillText('Molino', cx, m.y + m.h + (this.mill.busy ? 30 : 16) * s);
 
-    if (this.workers.molinero) this._drawWorker(ctx, m.x - 16 * s, m.y + m.h - 20 * s, '🧑‍🏭', L);
+    if (this.workers.molinero) this._drawWorker(ctx, m.x - 18 * s, m.y + m.h, 'molinero', L);
   }
 
   _drawBakery(ctx, L) {
@@ -789,72 +849,96 @@ export class Panaderia {
 
     // ── mostrador ──
     const c = L.counter;
-    ctx.fillStyle = '#B07840';
-    ctx.beginPath(); ctx.roundRect(c.x, c.y, c.w, c.h, 6 * s); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.fillRect(c.x, c.y, c.w, c.h * 0.3);
-    ctx.strokeStyle = '#7A5228'; ctx.lineWidth = 2 * s;
-    ctx.beginPath(); ctx.roundRect(c.x, c.y, c.w, c.h, 6 * s); ctx.stroke();
+    const cb = L.counterBox;
+    let shelfY;   // línea donde se apoyan los panes
+    if (ready(IMG.mostrador)) {
+      this._imgH(ctx, IMG.mostrador, cb.cx, cb.bottom, cb.h);
+      shelfY = cb.bottom - cb.h * 0.62;
+    } else {
+      ctx.fillStyle = '#B07840';
+      ctx.beginPath(); ctx.roundRect(cb.cx - cb.w / 2, cb.bottom - cb.h * 0.75, cb.w, cb.h * 0.75, 6 * s); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(cb.cx - cb.w / 2, cb.bottom - cb.h * 0.75, cb.w, cb.h * 0.2);
+      ctx.strokeStyle = '#7A5228'; ctx.lineWidth = 2 * s;
+      ctx.beginPath(); ctx.roundRect(cb.cx - cb.w / 2, cb.bottom - cb.h * 0.75, cb.w, cb.h * 0.75, 6 * s); ctx.stroke();
+      shelfY = cb.bottom - cb.h * 0.75;
+    }
 
     // panes sobre el mostrador
     const nShow = Math.min(this.inv.bread, 6);
     for (let k = 0; k < nShow; k++) {
-      this._drawBread(ctx, c.x + 20 * s + k * 26 * s, c.y - 6 * s, s);
+      this._drawBread(ctx, cb.cx - cb.w * 0.36 + k * 28 * s, shelfY, s);
     }
     if (this.inv.bread > 6) {
       ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${14 * s}px system-ui, sans-serif`;
       ctx.textAlign = 'left';
-      ctx.fillText(`×${this.inv.bread}`, c.x + 20 * s + 6 * 26 * s, c.y - 4 * s);
+      ctx.fillText(`×${this.inv.bread}`, cb.cx - cb.w * 0.36 + 6 * 28 * s, shelfY - 2 * s);
     }
     ctx.fillStyle = '#7A4A18'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Mostrador', c.x + c.w / 2, c.y + c.h + 14 * s);
+    ctx.fillText('Mostrador', cb.cx, cb.bottom + 14 * s);
 
-    if (this.workers.vendedor) this._drawWorker(ctx, c.x + 14 * s, c.y + c.h + 26 * s, '🧑‍💼', L);
+    if (this.workers.vendedor) this._drawWorker(ctx, cb.cx - cb.w * 0.62, cb.bottom - 4 * s, 'vendedor', L);
 
     // ── horno ──
     const o = L.oven;
-    ctx.fillStyle = '#A65A38';
-    ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, 8 * s); ctx.fill();
-    // ladrillos
-    ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1.5 * s;
-    for (let ry = o.y + o.h * 0.2; ry < o.y + o.h; ry += o.h * 0.2) {
-      ctx.beginPath(); ctx.moveTo(o.x + 3 * s, ry); ctx.lineTo(o.x + o.w - 3 * s, ry); ctx.stroke();
-    }
-    // boca del horno
-    const doorW = o.w * 0.62, doorH = o.h * 0.52;
-    const dx = o.x + o.w / 2, dy0 = o.y + o.h * 0.72;
-    ctx.fillStyle = '#3A2010';
-    ctx.beginPath();
-    ctx.moveTo(dx - doorW / 2, dy0);
-    ctx.lineTo(dx - doorW / 2, dy0 - doorH * 0.4);
-    ctx.arc(dx, dy0 - doorH * 0.4, doorW / 2, Math.PI, 0);
-    ctx.lineTo(dx + doorW / 2, dy0);
-    ctx.closePath(); ctx.fill();
-    // fuego cuando hornea
-    if (this.oven.busy) {
-      for (let k = 0; k < 3; k++) {
-        const fx = dx + (k - 1) * doorW * 0.22;
-        const fh = (10 + Math.sin(this.t * 9 + k * 2.4) * 4) * s;
-        ctx.fillStyle = k === 1 ? '#FFD24A' : '#FF8A3A';
-        ctx.beginPath();
-        ctx.moveTo(fx - 6 * s, dy0);
-        ctx.quadraticCurveTo(fx, dy0 - fh * 2, fx + 6 * s, dy0);
-        ctx.closePath(); ctx.fill();
+    const dx = o.x + o.w / 2;
+    if (ready(IMG.horno)) {
+      const oh = o.h * 1.28;
+      this._imgH(ctx, IMG.horno, dx, o.y + o.h, oh);
+      // brillo pulsante en la boca cuando hornea
+      if (this.oven.busy) {
+        const pulse = 0.25 + Math.abs(Math.sin(this.t * 6)) * 0.25;
+        const g = ctx.createRadialGradient(dx, o.y + o.h * 0.62, 2 * s, dx, o.y + o.h * 0.62, o.w * 0.32);
+        g.addColorStop(0, `rgba(255,190,80,${pulse})`);
+        g.addColorStop(1, 'rgba(255,190,80,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(dx, o.y + o.h * 0.62, o.w * 0.32, 0, Math.PI * 2); ctx.fill();
       }
+    } else {
+      ctx.fillStyle = '#A65A38';
+      ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, 8 * s); ctx.fill();
+      // ladrillos
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1.5 * s;
+      for (let ry = o.y + o.h * 0.2; ry < o.y + o.h; ry += o.h * 0.2) {
+        ctx.beginPath(); ctx.moveTo(o.x + 3 * s, ry); ctx.lineTo(o.x + o.w - 3 * s, ry); ctx.stroke();
+      }
+      // boca del horno
+      const doorW = o.w * 0.62, doorH = o.h * 0.52;
+      const dy0 = o.y + o.h * 0.72;
+      ctx.fillStyle = '#3A2010';
+      ctx.beginPath();
+      ctx.moveTo(dx - doorW / 2, dy0);
+      ctx.lineTo(dx - doorW / 2, dy0 - doorH * 0.4);
+      ctx.arc(dx, dy0 - doorH * 0.4, doorW / 2, Math.PI, 0);
+      ctx.lineTo(dx + doorW / 2, dy0);
+      ctx.closePath(); ctx.fill();
+      // fuego cuando hornea
+      if (this.oven.busy) {
+        for (let k = 0; k < 3; k++) {
+          const fx = dx + (k - 1) * doorW * 0.22;
+          const fh = (10 + Math.sin(this.t * 9 + k * 2.4) * 4) * s;
+          ctx.fillStyle = k === 1 ? '#FFD24A' : '#FF8A3A';
+          ctx.beginPath();
+          ctx.moveTo(fx - 6 * s, dy0);
+          ctx.quadraticCurveTo(fx, dy0 - fh * 2, fx + 6 * s, dy0);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+      // chimenea
+      ctx.fillStyle = '#8A4A28';
+      ctx.fillRect(o.x + o.w * 0.7, o.y - 16 * s, 12 * s, 18 * s);
+    }
+    if (this.oven.busy) {
       const frac = this.oven.t / OVEN_TIME;
       this._progressBar(ctx, dx - 34 * s, o.y + o.h + 8 * s, 68 * s, 9 * s, frac, '#FF8A3A', s);
-    }
-    // chimenea con humo
-    ctx.fillStyle = '#8A4A28';
-    ctx.fillRect(o.x + o.w * 0.7, o.y - 16 * s, 12 * s, 18 * s);
-    if (this.oven.busy) {
-      ctx.fillStyle = 'rgba(220,220,220,0.55)';
+      // humo de la chimenea
       for (let k = 0; k < 3; k++) {
         const ph = (this.t * 30 + k * 26) % 80;
         ctx.globalAlpha = 0.5 * (1 - ph / 80);
+        ctx.fillStyle = 'rgba(220,220,220,0.8)';
         ctx.beginPath();
-        ctx.arc(o.x + o.w * 0.7 + 6 * s + Math.sin((ph + k * 20) * 0.1) * 5 * s, o.y - 20 * s - ph * s * 0.5, (6 + ph * 0.12) * s, 0, Math.PI * 2);
+        ctx.arc(o.x + o.w * 0.72 + Math.sin((ph + k * 20) * 0.1) * 5 * s, o.y - o.h * 0.34 - ph * s * 0.5, (6 + ph * 0.12) * s, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
@@ -863,17 +947,22 @@ export class Panaderia {
     ctx.textAlign = 'center';
     ctx.fillText('Horno', dx, o.y + o.h + (this.oven.busy ? 30 : 16) * s);
 
-    if (this.workers.panadero) this._drawWorker(ctx, o.x - 18 * s, o.y + o.h - 14 * s, '🧑‍🍳', L);
+    if (this.workers.panadero) this._drawWorker(ctx, o.x - 20 * s, o.y + o.h, 'panadero', L);
   }
 
   _drawBread(ctx, x, y, s) {
+    if (ready(IMG.pan)) {
+      const w = 30 * s, h = w * (IMG.pan.naturalHeight / IMG.pan.naturalWidth);
+      ctx.drawImage(IMG.pan, x - w / 2, y - h, w, h);
+      return;
+    }
     ctx.fillStyle = '#E0A050';
-    ctx.beginPath(); ctx.ellipse(x, y, 12 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y - 8 * s, 12 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#B87828'; ctx.lineWidth = 1.5 * s;
     for (const k of [-1, 0, 1]) {
       ctx.beginPath();
-      ctx.moveTo(x + k * 5 * s - 2 * s, y - 5 * s);
-      ctx.lineTo(x + k * 5 * s + 2 * s, y + 2 * s);
+      ctx.moveTo(x + k * 5 * s - 2 * s, y - 13 * s);
+      ctx.lineTo(x + k * 5 * s + 2 * s, y - 6 * s);
       ctx.stroke();
     }
   }
@@ -889,24 +978,29 @@ export class Panaderia {
     ctx.globalAlpha = c.leaving ? Math.max(0, 1 - c.gone / 0.8) : c.appear;
 
     const bounce = c.leaving && c.happy ? Math.abs(Math.sin(this.t * 10)) * 5 * s : 0;
-    // cuerpo
-    ctx.fillStyle = body;
-    ctx.beginPath(); ctx.ellipse(x, y - 24 * s - bounce, 20 * s, 26 * s, 0, 0, Math.PI * 2); ctx.fill();
-    // cabeza
-    ctx.fillStyle = '#FFE0C8';
-    ctx.beginPath(); ctx.arc(x, y - 62 * s - bounce, 17 * s, 0, Math.PI * 2); ctx.fill();
-    // pelo
-    ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.arc(x, y - 66 * s - bounce, 17 * s, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
-    // cara
-    ctx.fillStyle = '#4A3020';
-    ctx.beginPath(); ctx.arc(x - 6 * s, y - 63 * s - bounce, 2 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x + 6 * s, y - 63 * s - bounce, 2 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#4A3020'; ctx.lineWidth = 1.5 * s;
-    ctx.beginPath();
-    if (c.leaving && !c.happy) ctx.arc(x, y - 52 * s - bounce, 5 * s, Math.PI * 1.15, Math.PI * 1.85);
-    else ctx.arc(x, y - 58 * s - bounce, 5 * s, Math.PI * 0.15, Math.PI * 0.85);
-    ctx.stroke();
+    const sprite = IMG.clientes[c.seed % IMG.clientes.length];
+    if (ready(sprite)) {
+      this._imgH(ctx, sprite, x, y - bounce, 112 * s);
+    } else {
+      // cuerpo
+      ctx.fillStyle = body;
+      ctx.beginPath(); ctx.ellipse(x, y - 24 * s - bounce, 20 * s, 26 * s, 0, 0, Math.PI * 2); ctx.fill();
+      // cabeza
+      ctx.fillStyle = '#FFE0C8';
+      ctx.beginPath(); ctx.arc(x, y - 62 * s - bounce, 17 * s, 0, Math.PI * 2); ctx.fill();
+      // pelo
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.arc(x, y - 66 * s - bounce, 17 * s, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+      // cara
+      ctx.fillStyle = '#4A3020';
+      ctx.beginPath(); ctx.arc(x - 6 * s, y - 63 * s - bounce, 2 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 6 * s, y - 63 * s - bounce, 2 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#4A3020'; ctx.lineWidth = 1.5 * s;
+      ctx.beginPath();
+      if (c.leaving && !c.happy) ctx.arc(x, y - 52 * s - bounce, 5 * s, Math.PI * 1.15, Math.PI * 1.85);
+      else ctx.arc(x, y - 58 * s - bounce, 5 * s, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.stroke();
+    }
 
     // burbuja de pedido + barra de paciencia
     if (!c.leaving) {
@@ -952,11 +1046,18 @@ export class Panaderia {
       ctx.beginPath(); ctx.arc(bx, by, 15 * s, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#E0A050'; ctx.lineWidth = 2 * s; ctx.stroke();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      if (label) {
+      if (this.task.type === 'oven' && ready(IMG.harina)) {
+        // bolsita de harina rumbo al horno
+        const h = 22 * s, w = h * (IMG.harina.naturalWidth / IMG.harina.naturalHeight);
+        ctx.drawImage(IMG.harina, bx - w / 2, by - h / 2, w, h);
+      } else if (this.task.type === 'customer' && ready(IMG.pan)) {
+        const w = 22 * s, h = w * (IMG.pan.naturalHeight / IMG.pan.naturalWidth);
+        ctx.drawImage(IMG.pan, bx - w / 2, by - h / 2, w, h);
+      } else if (label) {
         ctx.font = `${16 * s}px system-ui, sans-serif`;
         ctx.fillText(label, bx, by + 1 * s);
       } else {
-        // bolsita de harina para el horno
+        // bolsita de harina para el horno (respaldo dibujado)
         ctx.fillStyle = '#F5EFE0';
         ctx.beginPath(); ctx.roundRect(bx - 7 * s, by - 5 * s, 14 * s, 11 * s, 3 * s); ctx.fill();
         ctx.strokeStyle = '#B09060'; ctx.lineWidth = 1.5 * s; ctx.stroke();
@@ -967,12 +1068,20 @@ export class Panaderia {
     }
   }
 
-  _drawWorker(ctx, x, y, emoji, L) {
+  // Dibuja un trabajador contratado en su estación (sprite, con emoji de respaldo).
+  // x = centro, bottomY = línea de piso donde apoyan los pies.
+  _drawWorker(ctx, x, bottomY, key, L) {
     const { s } = L;
     const bob = Math.sin(this.t * 3 + x * 0.05) * 3 * s;
+    const sprite = IMG[key];
+    if (ready(sprite)) {
+      this._imgH(ctx, sprite, x, bottomY + bob, 82 * s);
+      return;
+    }
+    const emoji = { granjero: '🧑‍🌾', molinero: '🧑‍🏭', panadero: '🧑‍🍳', vendedor: '🧑‍💼' }[key] || '🧑';
     ctx.font = `${30 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, x, y + bob);
+    ctx.fillText(emoji, x, bottomY - 15 * s + bob);
     ctx.textBaseline = 'alphabetic';
   }
 
@@ -1024,13 +1133,18 @@ export class Panaderia {
       ctx.fillStyle = 'rgba(255,255,255,0.88)';
       ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fill();
       if (icon === 'sack') {
-        // bolsita de harina dibujada (no hay emoji lindo de harina)
         const bx = x + 12 * s, by = y + h / 2;
-        ctx.fillStyle = '#F5EFE0';
-        ctx.beginPath(); ctx.roundRect(bx - 7 * s, by - 6 * s, 14 * s, 13 * s, 4 * s); ctx.fill();
-        ctx.strokeStyle = '#B09060'; ctx.lineWidth = 1.5 * s; ctx.stroke();
-        ctx.fillStyle = '#E8D5B0';
-        ctx.beginPath(); ctx.ellipse(bx, by - 7 * s, 5 * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill();
+        if (ready(IMG.harina)) {
+          const ih = 22 * s, iw = ih * (IMG.harina.naturalWidth / IMG.harina.naturalHeight);
+          ctx.drawImage(IMG.harina, bx - iw / 2, by - ih / 2, iw, ih);
+        } else {
+          // bolsita de harina dibujada (no hay emoji lindo de harina)
+          ctx.fillStyle = '#F5EFE0';
+          ctx.beginPath(); ctx.roundRect(bx - 7 * s, by - 6 * s, 14 * s, 13 * s, 4 * s); ctx.fill();
+          ctx.strokeStyle = '#B09060'; ctx.lineWidth = 1.5 * s; ctx.stroke();
+          ctx.fillStyle = '#E8D5B0';
+          ctx.beginPath(); ctx.ellipse(bx, by - 7 * s, 5 * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill();
+        }
       } else {
         ctx.textAlign = 'left';
         ctx.fillText(icon, x + 6 * s, y + h / 2 + 1 * s);
