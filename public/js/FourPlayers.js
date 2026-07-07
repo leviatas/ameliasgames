@@ -4,6 +4,8 @@
 // Caramelos (riesgo por turnos), Sillas Musicales (eliminación) y Jardín de
 // Flores (timing). game.js llama a press(i) cuando el jugador i toca su botón.
 
+import { Sound } from './Sound.js';
+
 const PLAYERS = [
   { name: 'Jugador 1', color: '#FF5D8F', racer: '🦄', key: 'A' },
   { name: 'Jugador 2', color: '#39C7B4', racer: '🐰', key: 'F' },
@@ -70,6 +72,7 @@ export class FourPlayers {
   _newSillasRound() {
     this.sil = { st: 'dance', t: 0, danceLen: 2 + Math.random() * 3, grabbed: [], out: null };
     this.frozen = [false, false, false, false];
+    Sound.musicStart();
   }
 
   _aliveCount() { return this.alive.filter(Boolean).length; }
@@ -205,7 +208,7 @@ export class FourPlayers {
         const sil = this.sil;
         sil.t += dt;
         if (sil.st === 'dance') {
-          if (sil.t >= sil.danceLen) { sil.st = 'grab'; sil.t = 0; }
+          if (sil.t >= sil.danceLen) { sil.st = 'grab'; sil.t = 0; Sound.musicStop(); }
         } else if (sil.st === 'grab') {
           if (sil.t >= 3) this._resolveSillas();
         } else if (sil.st === 'result') {
@@ -491,5 +494,5 @@ export class FourPlayers {
     ctx.fillText(line, cx, yy);
   }
 
-  destroy() {}
+  destroy() { Sound.musicStop(); }
 }
