@@ -265,6 +265,11 @@
         <div class="hub-name">Space Galaga</div>
         <div class="hub-desc">Destruí la invasión alienígena</div>
       </button>
+      <button class="hub-card panaderia" id="uno-panaderia">
+        <div class="hub-emoji">🍞</div>
+        <div class="hub-name">Panadería</div>
+        <div class="hub-desc">Cosechá trigo, horneá y vendé pan</div>
+      </button>
     </div>
   </div>
 
@@ -592,6 +597,11 @@
     <button id="helado-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
+  <!-- Bakery farm mini-game controls -->
+  <div id="panaderia-ui" class="hidden">
+    <button id="panaderia-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
   <!-- Clothing store controls -->
   <div id="tienda-ui" class="hidden">
     <button id="tienda-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
@@ -613,7 +623,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.43.3</div>
+  <div id="app-version">v2.44.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">
@@ -714,7 +724,7 @@
         'wallet_coins', 'wardrobe_items', 'wardrobe_equipped',
         'mimundo_state_v2', 'fridge_foods',
         'hole_best', 'cocina_best', 'match3_best',
-        'runner_level', 'runner_hearts', 'helado_best',
+        'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
       ];
       keys.forEach(k => localStorage.removeItem(k));
       location.reload();

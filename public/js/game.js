@@ -11,6 +11,7 @@ import { Hole2 }                 from './Hole2.js';
 import { Galaga }                from './Galaga.js';
 import { Cinema }                from './Cinema.js';
 import { Helado }                from './Helado.js';
+import { Panaderia }             from './Panaderia.js';
 import { Tienda, CATALOG as TIENDA_CATALOG } from './Tienda.js';
 import { Mob }                               from './Mob.js';
 import { PongChibi }      from './PongChibi.js';
@@ -50,6 +51,7 @@ let hole2    = null;
 let galaga   = null;
 let theater  = null;
 let helado   = null;
+let panaderia = null;
 let tienda   = null;
 let mob      = null;
 let pong     = null;
@@ -313,6 +315,7 @@ function showHub(menuId = 'hub-screen') {
   hole = null;
   theater = null;
   helado = null;
+  if (panaderia) { panaderia.destroy(); panaderia = null; }
   tienda = null;
   if (mob)    { mob.destroy(); mob = null; }
   if (galaga) { galaga.destroy(); galaga = null; }
@@ -348,6 +351,7 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('hole-ui').classList.add('hidden');
   document.getElementById('cinema-ui').classList.add('hidden');
   document.getElementById('helado-ui').classList.add('hidden');
+  document.getElementById('panaderia-ui').classList.add('hidden');
   document.getElementById('tienda-ui').classList.add('hidden');
   document.getElementById('mob-ui').classList.add('hidden');
   document.getElementById('galaga-ui').classList.add('hidden');
@@ -424,6 +428,24 @@ function exitHelado() {
   document.getElementById('helado-ui').classList.add('hidden');
   helado = null;
   showHub();
+}
+
+// ── Bakery farm mini-game ────────────────────────────────────────────────────
+function launchPanaderia() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('panaderia-ui').classList.remove('hidden');
+  panaderia = new Panaderia(canvas);
+  mode   = 'panaderia';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitPanaderia() {
+  document.getElementById('panaderia-ui').classList.add('hidden');
+  if (panaderia) { panaderia.destroy(); panaderia = null; }
+  showHub('uno-submenu');
 }
 
 // ── Clothing store ───────────────────────────────────────────────────────────
@@ -985,6 +1007,7 @@ function gameLoop(now) {
   if (mode === 'galaga' && galaga) { galaga.update(delta); galaga.render(ctx); return; }
   if (mode === 'cinema' && theater) { theater.update(delta); theater.render(ctx); return; }
   if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
+  if (mode === 'panaderia' && panaderia) { panaderia.update(delta); panaderia.render(ctx); return; }
   if (mode === 'tienda' && tienda) { tienda.update(delta); tienda.render(ctx); return; }
   if (mode === 'mob'    && mob)    { mob.update(delta);    mob.render(ctx);    return; }
   if (mode === 'pong'   && pong)   { _run2PFrame(pong, delta);   return; }
@@ -1711,6 +1734,15 @@ window.addEventListener('keydown', e => {
 // ── Ice-cream shop controls (tap palette / scoops / buttons) ─────────────────
 const heladoExit = document.getElementById('helado-exit');
 if (heladoExit) heladoExit.addEventListener('click', exitHelado);
+const panaderiaExit = document.getElementById('panaderia-exit');
+if (panaderiaExit) panaderiaExit.addEventListener('click', exitPanaderia);
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'panaderia' || !panaderia) return;
+  const p = canvasPoint(e); panaderia.pointer(p.x, p.y);
+});
+window.addEventListener('keydown', e => {
+  if (mode === 'panaderia' && panaderia && e.code === 'Escape') { exitPanaderia(); e.preventDefault(); }
+});
 canvas.addEventListener('pointerdown', e => {
   if (mode !== 'helado' || !helado) return;
   const p = canvasPoint(e); helado.pointer(p.x, p.y);
@@ -2036,7 +2068,7 @@ window.addEventListener('keydown', e => {
 // ── 1-Player submenu buttons ──────────────────────────────────────────────────
 const unoBack = document.getElementById('uno-back');
 if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
-[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga]].forEach(([id, launch]) => {
+[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga], ['uno-panaderia', launchPanaderia]].forEach(([id, launch]) => {
   const btn = document.getElementById(id);
   if (!btn) return;
   const go = () => { hideUnoSubmenu(); launch(); };

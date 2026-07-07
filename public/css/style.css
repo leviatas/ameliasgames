@@ -743,6 +743,15 @@ body {
 .hub-card.mob { background: linear-gradient(135deg, #1A0838 0%, #3C1070 100%); color: #D8C8FF; }
 .hub-card.mob:hover { border-color: #8A50FF; box-shadow: 0 18px 40px rgba(120,60,255,0.45); }
 
+/* ── Hub card — panadería ── */
+.hub-card.panaderia { background: linear-gradient(135deg, #FFE8B0 0%, #E8A860 100%); color: #5A3510; }
+.hub-card.panaderia:hover { border-color: #E0A050; box-shadow: 0 18px 40px rgba(224,160,80,0.45); }
+
+/* ── Panadería UI overlay ── */
+#panaderia-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+#panaderia-ui.hidden { display: none; }
+#panaderia-ui button { pointer-events: all; }
+
 /* ── Mob Control UI overlay ── */
 #mob-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #mob-ui.hidden { display: none; }
