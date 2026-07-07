@@ -437,7 +437,7 @@ function launchPanaderia() {
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('panaderia-ui').classList.remove('hidden');
-  panaderia = new Panaderia(canvas);
+  panaderia = new Panaderia(canvas, look);
   mode   = 'panaderia';
   lastTime = performance.now();
   if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);

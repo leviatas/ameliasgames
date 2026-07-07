@@ -1,16 +1,18 @@
 // ── Panadería: granja → molino → horno → mostrador ──────────────────────────
-// Juego de 1 jugador estilo "tycoon" relajado:
-//   1. Tocá el arbusto para que suelte semillas y juntalas.
-//   2. Plantá semillas en los campos; el trigo crece solo.
-//   3. Cosechá el trigo maduro y molelo en el molino → harina.
+// Juego de 1 jugador estilo granja de Android: tu personaje camina hasta
+// cada estación para hacer la acción que tocaste.
+//   1. Tocá el arbusto: el personaje va, lo sacude y suelta semillas.
+//   2. Tocá las semillas para que las junte; tocá un campo para plantar.
+//   3. Cosechá el trigo maduro y llevalo al molino → harina.
 //   4. Horneá la harina en el horno → pan.
 //   5. Los clientes llegan al mostrador y compran pan → dinero 💰.
 //   6. Con el dinero comprás más campos o trabajadores que automatizan
 //      cada tarea (granjero, molinero, panadero, vendedor).
 // El progreso (dinero, campos, trabajadores e inventario) se guarda solo.
 
-import { Sound }    from './Sound.js';
-import { addCoins } from './Wallet.js';
+import { Sound }     from './Sound.js';
+import { addCoins }  from './Wallet.js';
+import { Character } from './Character.js';
 
 const SAVE_KEY   = 'panaderia_state';
 const MAX_PLOTS  = 8;
@@ -33,9 +35,13 @@ const CUSTOMER_COLORS = [
 ];
 
 export class Panaderia {
-  constructor(canvas) {
+  constructor(canvas, look) {
     this.canvas = canvas;
     this.t = 0;
+    // personaje jugable: camina hasta el objetivo tocado y hace la acción
+    this.player = new Character(canvas.width * 0.30, canvas.height * 0.55, look);
+    this.dest = null;      // {x, y} destino de caminata
+    this.task = null;      // acción pendiente al llegar: {type, ...}
     this.msg = ''; this.msgT = 0;
     this.floats = [];          // textos flotantes de feedback
     this.groundSeeds = [];     // semillas sueltas para juntar
@@ -182,10 +188,19 @@ export class Panaderia {
   }
 
   // ── Input ──────────────────────────────────────────────────────────────────
+  // Los botones de la tienda responden al instante (son UI); todo lo demás
+  // manda al personaje caminando hasta el objetivo y la acción se hace al llegar.
+  _goTo(x, y, task = null) {
+    const H = this.canvas.height;
+    this.dest = { x, y: Math.max(H * 0.24, Math.min(H * 0.985, y)) };
+    this.task = task;
+  }
+
   pointer(px, py) {
     const L = this._layout();
+    const { s } = L;
 
-    // tienda
+    // tienda (UI instantánea, sin caminar)
     for (const b of L.shop) {
       if (!this._inRect(px, py, b)) continue;
       if (b.kind === 'field') {
@@ -209,65 +224,112 @@ export class Panaderia {
       return;
     }
 
-    // semillas sueltas
+    // semillas sueltas → ir a juntarla
     for (let i = this.groundSeeds.length - 1; i >= 0; i--) {
       const g = this.groundSeeds[i];
       const gx = g.t < 1 ? g.x + (g.tx - g.x) * g.t : g.tx;
       const gy = g.t < 1 ? g.y + (g.ty - g.y) * g.t : g.ty;
-      if (Math.hypot(px - gx, py - gy) < 26 * L.s) {
-        this._collectSeed(i);
-        this._float(gx, gy, '+1 🌱');
+      if (Math.hypot(px - gx, py - gy) < 26 * s) {
+        this._goTo(gx, gy + 8 * s, { type: 'seed', seed: g });
         return;
       }
     }
 
-    // arbusto
+    // arbusto → ir a sacudirlo
     if (Math.hypot(px - L.bush.x, py - L.bush.y) < L.bush.r * 1.25) {
-      if (this.bushCooldown > 0) return;
-      this.bushCooldown = 0.35;
-      this.bushShake = 0.4;
-      this._dropSeeds(L, 1 + (Math.random() < 0.35 ? 1 : 0));
-      Sound.undo();
+      this._goTo(L.bush.x + L.bush.r * 1.1, L.bush.y + L.bush.r * 0.55, { type: 'bush' });
       return;
     }
 
-    // campos
+    // campos → ir a plantar / cosechar
     for (let i = 0; i < this.plots.length; i++) {
-      if (!this._inRect(px, py, L.plotRects[i])) continue;
+      const r = L.plotRects[i];
+      if (!this._inRect(px, py, r)) continue;
       const p = this.plots[i];
-      if (p.state === 'ready') { this._harvest(i, L); }
-      else if (p.state === 'empty') {
-        if (this.inv.seed <= 0) { this._flash('Necesitás semillas 🌱'); return; }
-        this._plant(i);
-      }
+      if (p.state === 'empty' && this.inv.seed <= 0) { this._flash('Necesitás semillas 🌱'); return; }
+      if (p.state === 'grow') return;   // todavía está creciendo
+      this._goTo(r.x + r.w / 2, r.y + r.h + 12 * s, { type: 'plot', idx: i });
       return;
     }
 
-    // molino
+    // molino → llevar el trigo
     if (this._inRect(px, py, L.mill)) {
       if (this.mill.busy) return;
       if (this.inv.wheat <= 0) { this._flash('No tenés trigo 🌾'); return; }
-      this._loadMill(L);
+      this._goTo(L.mill.x + L.mill.w / 2, L.mill.y + L.mill.h + 14 * s, { type: 'mill' });
       return;
     }
 
-    // horno
+    // horno → llevar la harina
     if (this._inRect(px, py, L.oven)) {
       if (this.oven.busy) return;
       if (this.inv.flour <= 0) { this._flash('No tenés harina'); return; }
-      this._loadOven(L);
+      this._goTo(L.oven.x + L.oven.w / 2, L.oven.y + L.oven.h + 14 * s, { type: 'oven' });
       return;
     }
 
-    // clientes
+    // clientes → llevar el pan al mostrador
     for (let i = 0; i < this.customers.length && i < 3; i++) {
       const c = this.customers[i];
       if (c.leaving) continue;
-      const cx = L.custXs[i], cy = L.custY - 55 * L.s;
-      if (Math.hypot(px - cx, py - cy) < 55 * L.s) {
-        if (this.inv.bread >= c.want) this._sell(i, L);
-        else this._flash('Falta pan 🍞');
+      const cx = L.custXs[i], cy = L.custY - 55 * s;
+      if (Math.hypot(px - cx, py - cy) < 55 * s) {
+        if (this.inv.bread < c.want) { this._flash('Falta pan 🍞'); return; }
+        this._goTo(cx, L.counter.y + L.counter.h + 52 * s, { type: 'customer', cust: c });
         return;
+      }
+    }
+
+    // pasto libre → caminar hasta ahí
+    this._goTo(px, py, null);
+  }
+
+  // Ejecuta la acción pendiente cuando el personaje llega al destino,
+  // revalidando el estado (un trabajador pudo habérsela adelantado).
+  _doTask(L) {
+    const task = this.task;
+    this.task = null;
+    if (!task) return;
+    switch (task.type) {
+      case 'bush': {
+        if (this.bushCooldown > 0) return;
+        this.bushCooldown = 0.35;
+        this.bushShake = 0.4;
+        this._dropSeeds(L, 1 + (Math.random() < 0.35 ? 1 : 0));
+        Sound.undo();
+        break;
+      }
+      case 'seed': {
+        const i = this.groundSeeds.indexOf(task.seed);
+        if (i < 0) return;                       // ya la juntó el granjero
+        const g = this.groundSeeds[i];
+        this._collectSeed(i);
+        this._float(g.tx, g.ty, '+1 🌱');
+        break;
+      }
+      case 'plot': {
+        const p = this.plots[task.idx];
+        if (!p) return;
+        if (p.state === 'ready') this._harvest(task.idx, L);
+        else if (p.state === 'empty' && this.inv.seed > 0) this._plant(task.idx);
+        break;
+      }
+      case 'mill': {
+        if (!this.mill.busy && this.inv.wheat > 0) this._loadMill(L);
+        break;
+      }
+      case 'oven': {
+        if (!this.oven.busy && this.inv.flour > 0) this._loadOven(L);
+        break;
+      }
+      case 'customer': {
+        const i = this.customers.indexOf(task.cust);
+        if (i < 0 || task.cust.leaving) return;  // se fue o ya lo atendieron
+        if (this.inv.bread >= task.cust.want) {
+          this._sell(i, L);
+          this.player.playGesture('jump');
+        } else this._flash('Falta pan 🍞');
+        break;
       }
     }
   }
@@ -280,6 +342,27 @@ export class Panaderia {
     if (this.msgT > 0) this.msgT -= dt;
     if (this.bushShake > 0) this.bushShake -= dt;
     if (this.bushCooldown > 0) this.bushCooldown -= dt;
+
+    // ── personaje: caminar hasta el destino y hacer la acción al llegar ──
+    if (this.dest) {
+      const dx = this.dest.x - this.player.x, dy = this.dest.y - this.player.y;
+      const dist = Math.hypot(dx, dy);
+      const speed = 330 * L.s;
+      if (dist <= Math.max(6, speed * dt)) {
+        this.player.x = this.dest.x; this.player.y = this.dest.y;
+        this.player.isMoving = false;
+        this.dest = null;
+        this._doTask(L);
+      } else {
+        this.player.x += (dx / dist) * speed * dt;
+        this.player.y += (dy / dist) * speed * dt;
+        this.player.isMoving = true;
+        if (Math.abs(dx) > 2) this.player.facingDir = dx < 0 ? -1 : 1;
+      }
+    } else {
+      this.player.isMoving = false;
+    }
+    this.player.update(dt);
 
     // el arbusto suelta semillas solo, despacito
     this.seedAutoT -= dt;
@@ -410,6 +493,7 @@ export class Panaderia {
     this._drawSeeds(ctx, L);
     this._drawMill(ctx, L);
     this._drawBakery(ctx, L);
+    this._drawPlayer(ctx, L);
     this._drawShop(ctx, L);
     this._drawHUD(ctx, L);
 
@@ -839,6 +923,46 @@ export class Panaderia {
       this._progressBar(ctx, bx - bw / 2 + 6 * s, by + bh / 2 - 11 * s, bw - 12 * s, 6 * s, frac, col, s);
     }
     ctx.globalAlpha = 1;
+  }
+
+  _drawPlayer(ctx, L) {
+    const { H, s } = L;
+    // leve perspectiva: más chico arriba (lejos), más grande abajo (cerca)
+    const scaleOf = (wy) => s * (0.42 + 0.28 * (wy / H));
+    // marcador del destino mientras camina
+    if (this.dest) {
+      const pulse = 0.6 + Math.sin(this.t * 6) * 0.4;
+      ctx.strokeStyle = `rgba(255,255,255,${0.35 + pulse * 0.35})`;
+      ctx.lineWidth = 2.5 * s;
+      ctx.beginPath(); ctx.ellipse(this.dest.x, this.dest.y, 16 * s * pulse + 6 * s, (16 * s * pulse + 6 * s) * 0.4, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    this.player.draw(ctx, { x: 0, y: 0 }, scaleOf);
+    // burbujita con lo que va a hacer/llevar
+    if (this.task) {
+      const label = this.task.type === 'oven' ? null : {
+        bush: '🌳', seed: '🌱',
+        plot: this.plots[this.task.idx]?.state === 'ready' ? '🌾' : '🌱',
+        mill: '🌾', customer: '🍞',
+      }[this.task.type];
+      const sc = scaleOf(this.player.y);
+      const bx = this.player.x, by = this.player.y - 168 * sc;
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.arc(bx, by, 15 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#E0A050'; ctx.lineWidth = 2 * s; ctx.stroke();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (label) {
+        ctx.font = `${16 * s}px system-ui, sans-serif`;
+        ctx.fillText(label, bx, by + 1 * s);
+      } else {
+        // bolsita de harina para el horno
+        ctx.fillStyle = '#F5EFE0';
+        ctx.beginPath(); ctx.roundRect(bx - 7 * s, by - 5 * s, 14 * s, 11 * s, 3 * s); ctx.fill();
+        ctx.strokeStyle = '#B09060'; ctx.lineWidth = 1.5 * s; ctx.stroke();
+        ctx.fillStyle = '#E8D5B0';
+        ctx.beginPath(); ctx.ellipse(bx, by - 6 * s, 5 * s, 2.5 * s, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.textBaseline = 'alphabetic';
+    }
   }
 
   _drawWorker(ctx, x, y, emoji, L) {
