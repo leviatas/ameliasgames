@@ -100,10 +100,10 @@ export class Panaderia {
       plotRects.push({ x: fa.x + c * (pw + gap), y: fa.y + r * (ph + gap), w: pw, h: ph });
     }
 
-    const bush = { x: W * 0.095, y: H * 0.845, r: Math.min(W, H) * 0.075 };
-    const seedZone = { x: W * 0.17, y: H * 0.73, w: W * 0.26, h: H * 0.22 };
+    const bush = { x: W * 0.095, y: H * 0.76, r: Math.min(W, H) * 0.075 };
+    const seedZone = { x: W * 0.17, y: H * 0.68, w: W * 0.26, h: H * 0.17 };
 
-    const mill = { x: W * 0.525, y: H * 0.52, w: W * 0.105, h: H * 0.34 };
+    const mill = { x: W * 0.525, y: H * 0.47, w: W * 0.105, h: H * 0.34 };
 
     // edificio de la panadería (derecha): mostrador arriba, horno abajo
     const bld = { x: W * 0.655, y: H * 0.10, w: W * 0.335, h: H * 0.585 };
@@ -114,13 +114,14 @@ export class Panaderia {
     const custXs = [counter.x + counter.w * 0.22, counter.x + counter.w * 0.52, counter.x + counter.w * 0.82];
     const custY  = counter.y - 6 * s;
 
-    // botones de la tienda (abajo a la derecha)
+    // botones de la tienda: barra única a lo ancho, pegada abajo (no tapa nada)
     const shop = [];
-    const sx = W * 0.455, sy = H * 0.745, bw = W * 0.172, bh = H * 0.10, sgap = 8 * s;
-    const items = [{ kind: 'field' }, ...WORKERS.map(w => ({ kind: 'worker', w }))];
+    const sgap = 8 * s;
+    const sy = H * 0.885, bh = H * 0.10;
+    const bw = (W * 0.96 - sgap * 4) / 5;
+    const items = [{ kind: 'field' }, ...WORKERS.map(w => ({ kind: 'worker', worker: w }))];
     items.forEach((it, i) => {
-      const c = i % 3, r = Math.floor(i / 3);
-      shop.push({ ...it, x: sx + c * (bw + sgap), y: sy + r * (bh + sgap), w: bw, h: bh });
+      shop.push({ ...it, x: W * 0.02 + i * (bw + sgap), y: sy, w: bw, h: bh });
     });
 
     return { W, H, s, plotRects, bush, seedZone, mill, bld, counter, oven, custXs, custY, shop };
@@ -192,7 +193,8 @@ export class Panaderia {
   // manda al personaje caminando hasta el objetivo y la acción se hace al llegar.
   _goTo(x, y, task = null) {
     const H = this.canvas.height;
-    this.dest = { x, y: Math.max(H * 0.24, Math.min(H * 0.985, y)) };
+    // no dejar que camine detrás de la barra de la tienda (y > 0.87H)
+    this.dest = { x, y: Math.max(H * 0.24, Math.min(H * 0.865, y)) };
     this.task = task;
   }
 
@@ -213,11 +215,11 @@ export class Panaderia {
         Sound.serveGood();
         this._save();
       } else {
-        if (this.workers[b.w.key]) { this._flash(`Ya tenés ${b.w.name.toLowerCase()} ✓`); return; }
-        if (this.money < b.w.price) { this._flash('Te falta dinero 💰'); return; }
-        this.money -= b.w.price;
-        this.workers[b.w.key] = true;
-        this._float(b.x + b.w / 2, b.y, `¡${b.w.name} contratado!`);
+        if (this.workers[b.worker.key]) { this._flash(`Ya tenés ${b.worker.name.toLowerCase()} ✓`); return; }
+        if (this.money < b.worker.price) { this._flash('Te falta dinero 💰'); return; }
+        this.money -= b.worker.price;
+        this.workers[b.worker.key] = true;
+        this._float(b.x + b.w / 2, b.y, `¡${b.worker.name} contratado!`);
         Sound.serveGood();
         this._save();
       }
@@ -985,10 +987,10 @@ export class Panaderia {
           label1 = '🌾 + Campo'; label2 = `$${price}`; afford = this.money >= price;
         }
       } else {
-        owned = this.workers[b.w.key];
-        label1 = `${b.w.emoji} ${b.w.name}`;
-        label2 = owned ? '✓ contratado' : `$${b.w.price}`;
-        afford = this.money >= b.w.price;
+        owned = this.workers[b.worker.key];
+        label1 = `${b.worker.emoji} ${b.worker.name}`;
+        label2 = owned ? '✓ contratado' : `$${b.worker.price}`;
+        afford = this.money >= b.worker.price;
       }
       ctx.fillStyle = owned ? '#D8EFC8' : afford ? '#7BC86B' : '#C8C0B0';
       ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 10 * s); ctx.fill();
