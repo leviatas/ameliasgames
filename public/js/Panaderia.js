@@ -30,18 +30,25 @@ const IMG = {
 };
 
 const SAVE_KEY   = 'panaderia_state';
-const MAX_PLOTS  = 8;
+const MAX_PLOTS  = 4;
 const GROW_TIME  = 10;    // seg. para que el trigo madure
 const MILL_TIME  = 3.5;   // seg. de molienda por trigo
+const MILL_TIME_FAST = 1.8;   // con la mejora ⭐
 const OVEN_TIME  = 4.5;   // seg. de horneado por pan
+const OVEN_TIME_FAST = 2.3;   // con la mejora ⭐
 const MAX_GROUND_SEEDS = 6;
-const FIELD_PRICES = [60, 100, 170, 280, 450, 700];   // campos 3..8 (arrancás con 2)
+const FIELD_PRICES = [60, 120];   // campos 3 y 4 (arrancás con 2)
 
 const WORKERS = [
   { key: 'granjero', name: 'Granjero', emoji: '🧑‍🌾', price: 180, desc: 'Junta, planta y cosecha' },
   { key: 'molinero', name: 'Molinero', emoji: '🧑‍🏭', price: 220, desc: 'Muele el trigo solo' },
   { key: 'panadero', name: 'Panadero', emoji: '🧑‍🍳', price: 260, desc: 'Hornea el pan solo' },
   { key: 'vendedor', name: 'Vendedor', emoji: '🧑‍💼', price: 300, desc: 'Atiende el mostrador' },
+];
+
+const UPGRADES = [
+  { key: 'molino', name: 'Molino', price: 250, desc: 'Muele el doble de rápido' },
+  { key: 'horno',  name: 'Horno',  price: 300, desc: 'Hornea el doble de rápido' },
 ];
 
 const CUSTOMER_COLORS = [
@@ -69,10 +76,14 @@ export class Panaderia {
     this.workerT = { granjero: 0, molinero: 0, panadero: 0, vendedor: 0 };
     this.saveT = 4;
 
+    // granjero contratado: camina hasta semillas y campos para trabajar
+    this.farmer = { x: 0, y: 0, seeded: false, dest: null, task: null, pauseT: 0, facing: 1 };
+
     // estado persistente
     this.money   = 0;
     this.inv     = { seed: 0, wheat: 0, flour: 0, bread: 0 };
     this.workers = { granjero: false, molinero: false, panadero: false, vendedor: false };
+    this.upgrades = { molino: false, horno: false };
     this.plots   = [];
     let nPlots = 2;
     try {
@@ -81,6 +92,7 @@ export class Panaderia {
         this.money = s.money | 0;
         if (s.inv) for (const k of Object.keys(this.inv)) this.inv[k] = s.inv[k] | 0;
         if (s.workers) for (const k of Object.keys(this.workers)) this.workers[k] = !!s.workers[k];
+        if (s.upgrades) for (const k of Object.keys(this.upgrades)) this.upgrades[k] = !!s.upgrades[k];
         nPlots = Math.max(2, Math.min(MAX_PLOTS, s.plots | 0 || 2));
       }
     } catch (e) {}
@@ -90,10 +102,14 @@ export class Panaderia {
     this.oven = { busy: false, t: 0 };
   }
 
+  _millDur() { return this.upgrades.molino ? MILL_TIME_FAST : MILL_TIME; }
+  _ovenDur() { return this.upgrades.horno ? OVEN_TIME_FAST : OVEN_TIME; }
+
   _save() {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        money: this.money, inv: this.inv, workers: this.workers, plots: this.plots.length,
+        money: this.money, inv: this.inv, workers: this.workers,
+        upgrades: this.upgrades, plots: this.plots.length,
       }));
     } catch (e) {}
   }
@@ -103,12 +119,12 @@ export class Panaderia {
     const W = this.canvas.width, H = this.canvas.height;
     const s = Math.max(0.5, Math.min(1.0, Math.min(W, H) / 720));
 
-    // campos: grilla 4×2 a la izquierda
+    // campos: grilla 2×2 a la izquierda
     const fa = { x: W * 0.03, y: H * 0.27, w: W * 0.40, h: H * 0.40 };
-    const cols = 4, rows = 2;
-    const gap = 8 * s;
+    const cols = 2;
+    const gap = 10 * s;
     const pw = (fa.w - gap * (cols - 1)) / cols;
-    const ph = (fa.h - gap * (rows - 1)) / rows;
+    const ph = (fa.h - gap) / 2;
     const plotRects = [];
     for (let i = 0; i < MAX_PLOTS; i++) {
       const c = i % cols, r = Math.floor(i / cols);
@@ -134,10 +150,14 @@ export class Panaderia {
 
     // botones de la tienda: barra única a lo ancho, pegada abajo (no tapa nada)
     const shop = [];
-    const sgap = 8 * s;
+    const sgap = 6 * s;
     const sy = H * 0.885, bh = H * 0.10;
-    const bw = (W * 0.96 - sgap * 4) / 5;
-    const items = [{ kind: 'field' }, ...WORKERS.map(w => ({ kind: 'worker', worker: w }))];
+    const items = [
+      { kind: 'field' },
+      ...WORKERS.map(w => ({ kind: 'worker', worker: w })),
+      ...UPGRADES.map(u => ({ kind: 'upgrade', upgrade: u })),
+    ];
+    const bw = (W * 0.96 - sgap * (items.length - 1)) / items.length;
     items.forEach((it, i) => {
       shop.push({ ...it, x: W * 0.02 + i * (bw + sgap), y: sy, w: bw, h: bh });
     });
@@ -150,6 +170,14 @@ export class Panaderia {
     const w = h * (img.naturalWidth / img.naturalHeight);
     ctx.drawImage(img, cx - w / 2, bottomY - h, w, h);
     return w;
+  }
+
+  // dibuja una imagen contenida en una caja (sin desbordar), anclada abajo-centro
+  _imgFit(ctx, img, x, y, w, h) {
+    const ar = img.naturalWidth / img.naturalHeight;
+    let dw = w, dh = dw / ar;
+    if (dh > h) { dh = h; dw = dh * ar; }
+    ctx.drawImage(img, x + (w - dw) / 2, y + h - dh, dw, dh);
   }
 
   _inRect(px, py, r) { return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h; }
@@ -239,12 +267,20 @@ export class Panaderia {
         this._float(b.x + b.w / 2, b.y, '¡Nuevo campo!');
         Sound.serveGood();
         this._save();
-      } else {
+      } else if (b.kind === 'worker') {
         if (this.workers[b.worker.key]) { this._flash(`Ya tenés ${b.worker.name.toLowerCase()} ✓`); return; }
         if (this.money < b.worker.price) { this._flash('Te falta dinero 💰'); return; }
         this.money -= b.worker.price;
         this.workers[b.worker.key] = true;
         this._float(b.x + b.w / 2, b.y, `¡${b.worker.name} contratado!`);
+        Sound.serveGood();
+        this._save();
+      } else {
+        if (this.upgrades[b.upgrade.key]) { this._flash(`El ${b.upgrade.key} ya está mejorado ⭐`); return; }
+        if (this.money < b.upgrade.price) { this._flash('Te falta dinero 💰'); return; }
+        this.money -= b.upgrade.price;
+        this.upgrades[b.upgrade.key] = true;
+        this._float(b.x + b.w / 2, b.y, `¡${b.upgrade.name} mejorado! ⭐`);
         Sound.serveGood();
         this._save();
       }
@@ -410,10 +446,10 @@ export class Panaderia {
     }
 
     // molino
-    this.millAngle += dt * (this.mill.busy ? 3.2 : 0.45);
+    this.millAngle += dt * (this.mill.busy ? (this.upgrades.molino ? 5.5 : 3.2) : 0.45);
     if (this.mill.busy) {
       this.mill.t += dt;
-      if (this.mill.t >= MILL_TIME) {
+      if (this.mill.t >= this._millDur()) {
         this.mill.busy = false;
         this.inv.flour++;
         this._float(L.mill.x + L.mill.w / 2, L.mill.y, '+1 harina', '#8A6A20');
@@ -424,7 +460,7 @@ export class Panaderia {
     // horno
     if (this.oven.busy) {
       this.oven.t += dt;
-      if (this.oven.t >= OVEN_TIME) {
+      if (this.oven.t >= this._ovenDur()) {
         this.oven.busy = false;
         this.inv.bread++;
         this._float(L.oven.x + L.oven.w / 2, L.oven.y, '+1 🍞', '#B05020');
@@ -432,13 +468,16 @@ export class Panaderia {
       }
     }
 
-    // clientes
+    // clientes — piden más pan a medida que el negocio crece
+    // (con granjero y molinero contratados los pedidos llegan a ×3 y ×4)
     this.custSpawnT -= dt;
     if (this.custSpawnT <= 0 && this.customers.length < 3) {
       this.custSpawnT = 7 + Math.random() * 5;
+      const maxWant = Math.min(4, 2 + (this.workers.granjero ? 1 : 0) + (this.workers.molinero ? 1 : 0));
+      const want = 1 + Math.floor(Math.random() * maxWant);
+      const pat = 26 + want * 5;
       this.customers.push({
-        want: 1 + Math.floor(Math.random() * Math.min(3, 1 + Math.floor(this.money / 150))),
-        patience: 30, maxPatience: 30,
+        want, patience: pat, maxPatience: pat,
         seed: Math.floor(Math.random() * 1000),
         appear: 0, leaving: false, happy: false, gone: 0,
       });
@@ -460,15 +499,58 @@ export class Panaderia {
     }
 
     // ── trabajadores ──
+    // El granjero camina de verdad: va hasta las semillas para juntarlas y
+    // hasta los campos para plantar y cosechar.
     if (this.workers.granjero) {
-      this.workerT.granjero -= dt;
-      if (this.workerT.granjero <= 0) {
-        this.workerT.granjero = 1.1;
-        const ready = this.plots.findIndex(p => p.state === 'ready');
-        const empty = this.plots.findIndex(p => p.state === 'empty');
-        if (ready >= 0) this._harvest(ready, L);
-        else if (empty >= 0 && this.inv.seed > 0) this._plant(empty);
-        else if (this.groundSeeds.length > 0) this._collectSeed(this.groundSeeds.length - 1, true);
+      const f = this.farmer;
+      if (!f.seeded) {
+        f.x = L.bush.x + L.bush.r * 1.8;
+        f.y = L.bush.y + L.bush.r * 0.95;
+        f.seeded = true;
+      }
+      if (f.pauseT > 0) {
+        f.pauseT -= dt;
+      } else if (!f.dest) {
+        // elegir tarea: cosechar > plantar > juntar semillas del piso
+        const ri = this.plots.findIndex(p => p.state === 'ready');
+        const ei = this.plots.findIndex(p => p.state === 'empty');
+        const gi = this.groundSeeds.findIndex(g => g.t >= 1);
+        if (ri >= 0) {
+          const r = L.plotRects[ri];
+          f.task = { type: 'harvest', idx: ri };
+          f.dest = { x: r.x + r.w / 2, y: r.y + r.h + 10 * L.s };
+        } else if (ei >= 0 && this.inv.seed > 0) {
+          const r = L.plotRects[ei];
+          f.task = { type: 'plant', idx: ei };
+          f.dest = { x: r.x + r.w / 2, y: r.y + r.h + 10 * L.s };
+        } else if (gi >= 0) {
+          const g = this.groundSeeds[gi];
+          f.task = { type: 'seed', seed: g };
+          f.dest = { x: g.tx, y: g.ty + 6 * L.s };
+        }
+      } else {
+        const dx = f.dest.x - f.x, dy = f.dest.y - f.y;
+        const dist = Math.hypot(dx, dy);
+        const spd = 240 * L.s;
+        if (Math.abs(dx) > 2) f.facing = dx < 0 ? -1 : 1;
+        if (dist <= Math.max(5, spd * dt)) {
+          f.x = f.dest.x; f.y = f.dest.y;
+          f.dest = null;
+          const task = f.task;
+          f.task = null;
+          f.pauseT = 0.5;
+          if (task) {
+            if (task.type === 'harvest' && this.plots[task.idx]?.state === 'ready') this._harvest(task.idx, L);
+            else if (task.type === 'plant' && this.plots[task.idx]?.state === 'empty' && this.inv.seed > 0) this._plant(task.idx);
+            else if (task.type === 'seed') {
+              const i = this.groundSeeds.indexOf(task.seed);
+              if (i >= 0) { this._collectSeed(i, true); this._float(f.x, f.y - 40 * L.s, '+1 🌱'); }
+            }
+          }
+        } else {
+          f.x += (dx / dist) * spd * dt;
+          f.y += (dy / dist) * spd * dt;
+        }
       }
     }
     if (this.workers.molinero && !this.mill.busy && this.inv.wheat > 0) {
@@ -518,6 +600,7 @@ export class Panaderia {
     this._drawFields(ctx, L);
     this._drawBush(ctx, L);
     this._drawSeeds(ctx, L);
+    this._drawFarmer(ctx, L);
     this._drawMill(ctx, L);
     this._drawBakery(ctx, L);
     this._drawPlayer(ctx, L);
@@ -629,8 +712,8 @@ export class Panaderia {
         const stage = frac < 0.5 ? 0 : 1;
         if (ready(IMG.trigo[stage])) {
           const grow = 0.72 + 0.28 * Math.min(1, (frac - stage * 0.5) * 2 + 0.35);
-          this._imgH(ctx, IMG.trigo[stage], r.x + r.w / 2, r.y + r.h - 4 * s,
-            Math.min(r.h * (stage === 0 ? 0.52 : 0.86) * grow, r.h));
+          const boxH = (r.h - 16 * s) * (stage === 0 ? 0.58 : 0.9) * grow;
+          this._imgFit(ctx, IMG.trigo[stage], r.x + 6 * s, r.y + r.h - 12 * s - boxH, r.w - 12 * s, boxH);
         } else {
           this._drawWheatRows(ctx, r, frac, s);
         }
@@ -642,7 +725,7 @@ export class Panaderia {
       } else if (p.state === 'ready') {
         if (ready(IMG.trigo[2])) {
           const sway = Math.sin(p.t * 3) * 1.5 * s;
-          this._imgH(ctx, IMG.trigo[2], r.x + r.w / 2 + sway, r.y + r.h - 4 * s, r.h * 0.98);
+          this._imgFit(ctx, IMG.trigo[2], r.x + 4 * s + sway, r.y + 4 * s, r.w - 8 * s, r.h - 10 * s);
         } else {
           this._drawWheatRows(ctx, r, 1, s, true);
         }
@@ -704,8 +787,31 @@ export class Panaderia {
     ctx.textAlign = 'center';
     ctx.fillText('Semillas', b.x, b.y + b.r + 18 * s);
 
-    // granjero contratado, al lado del arbusto
-    if (this.workers.granjero) this._drawWorker(ctx, b.x + b.r * 1.8, b.y + b.r * 0.95, 'granjero', L);
+  }
+
+  // granjero contratado: se dibuja donde esté caminando, mirando hacia su destino
+  _drawFarmer(ctx, L) {
+    if (!this.workers.granjero || !this.farmer.seeded) return;
+    const { s } = L;
+    const f = this.farmer;
+    const moving = !!f.dest;
+    const bob = moving ? Math.abs(Math.sin(this.t * 9)) * 4 * s : Math.sin(this.t * 3) * 2 * s;
+    // sombra
+    ctx.save(); ctx.globalAlpha = 0.20; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(f.x, f.y, 16 * s, 5 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save();
+    ctx.translate(f.x, f.y - bob);
+    if (f.facing < 0) ctx.scale(-1, 1);
+    if (ready(IMG.granjero)) {
+      const h = 82 * s, w = h * (IMG.granjero.naturalWidth / IMG.granjero.naturalHeight);
+      ctx.drawImage(IMG.granjero, -w / 2, -h, w, h);
+    } else {
+      ctx.font = `${30 * s}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🧑‍🌾', 0, -15 * s);
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.restore();
   }
 
   _drawSeeds(ctx, L) {
@@ -801,9 +907,12 @@ export class Panaderia {
       ctx.beginPath(); ctx.arc(hubX, hubY, 6 * s, 0, Math.PI * 2); ctx.fill();
     }
 
+    // estrella de mejora
+    if (this.upgrades.molino) this._drawStar(ctx, cx + m.w * 0.55, m.y + 8 * s, s);
+
     // progreso de molienda
     if (this.mill.busy) {
-      const frac = this.mill.t / MILL_TIME;
+      const frac = this.mill.t / this._millDur();
       this._progressBar(ctx, cx - 34 * s, m.y + m.h + 8 * s, 68 * s, 9 * s, frac, '#E0A050', s);
     }
     ctx.fillStyle = '#5A4020'; ctx.font = `bold ${13 * s}px system-ui, sans-serif`;
@@ -930,8 +1039,10 @@ export class Panaderia {
       ctx.fillStyle = '#8A4A28';
       ctx.fillRect(o.x + o.w * 0.7, o.y - 16 * s, 12 * s, 18 * s);
     }
+    // estrella de mejora
+    if (this.upgrades.horno) this._drawStar(ctx, o.x + o.w + 4 * s, o.y - o.h * 0.22, s);
     if (this.oven.busy) {
-      const frac = this.oven.t / OVEN_TIME;
+      const frac = this.oven.t / this._ovenDur();
       this._progressBar(ctx, dx - 34 * s, o.y + o.h + 8 * s, 68 * s, 9 * s, frac, '#FF8A3A', s);
       // humo de la chimenea
       for (let k = 0; k < 3; k++) {
@@ -1127,11 +1238,16 @@ export class Panaderia {
           const price = FIELD_PRICES[this.plots.length - 2];
           label1 = '🌾 + Campo'; label2 = `$${price}`; afford = this.money >= price;
         }
-      } else {
+      } else if (b.kind === 'worker') {
         owned = this.workers[b.worker.key];
         label1 = `${b.worker.emoji} ${b.worker.name}`;
         label2 = owned ? '✓ contratado' : `$${b.worker.price}`;
         afford = this.money >= b.worker.price;
+      } else {
+        owned = this.upgrades[b.upgrade.key];
+        label1 = `⭐ ${b.upgrade.name}`;
+        label2 = owned ? '✓ mejorado' : `$${b.upgrade.price}`;
+        afford = this.money >= b.upgrade.price;
       }
       ctx.fillStyle = owned ? '#D8EFC8' : afford ? '#7BC86B' : '#C8C0B0';
       ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 10 * s); ctx.fill();
@@ -1186,6 +1302,19 @@ export class Panaderia {
       ctx.fillText(txt, x + iconW + 8 * s, y + h / 2 + 1 * s);
       x += w + 6 * s;
     }
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // estrella dorada pulsante: marca una máquina mejorada
+  _drawStar(ctx, x, y, s) {
+    const pulse = 1 + Math.sin(this.t * 4) * 0.12;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(pulse, pulse);
+    ctx.font = `${20 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('⭐', 0, 0);
+    ctx.restore();
     ctx.textBaseline = 'alphabetic';
   }
 
