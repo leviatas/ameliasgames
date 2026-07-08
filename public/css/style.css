@@ -751,6 +751,8 @@ body {
 #panaderia-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
 #panaderia-ui.hidden { display: none; }
 #panaderia-ui button { pointer-events: all; }
+#panaderia-reset { right: 122px; background: rgba(150,45,35,0.55); }
+#panaderia-reset:hover { background: rgba(150,45,35,0.8); }
 
 /* ── Mob Control UI overlay ── */
 #mob-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }

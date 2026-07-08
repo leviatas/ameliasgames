@@ -1736,6 +1736,13 @@ const heladoExit = document.getElementById('helado-exit');
 if (heladoExit) heladoExit.addEventListener('click', exitHelado);
 const panaderiaExit = document.getElementById('panaderia-exit');
 if (panaderiaExit) panaderiaExit.addEventListener('click', exitPanaderia);
+const panaderiaReset = document.getElementById('panaderia-reset');
+if (panaderiaReset) panaderiaReset.addEventListener('click', () => {
+  if (mode !== 'panaderia' || !panaderia) return;
+  if (!confirm('¿Reiniciar la panadería? Se pierden el dinero, los campos, los trabajadores y las mejoras de este juego (el resto del progreso no se toca).')) return;
+  panaderia.wipeSave();
+  panaderia = new Panaderia(canvas, look);   // arranca de cero, sin releer el guardado
+});
 canvas.addEventListener('pointerdown', e => {
   if (mode !== 'panaderia' || !panaderia) return;
   const p = canvasPoint(e); panaderia.pointer(p.x, p.y);

@@ -126,6 +126,12 @@ export class Panaderia {
     return this.inv.flour >= P.flour && this.inv.egg >= P.egg;
   }
 
+  // Borra SOLO el progreso de la panadería (el resto del juego no se toca).
+  // Tras llamarlo hay que crear una instancia nueva para arrancar de cero.
+  wipeSave() {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  }
+
   _save() {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
