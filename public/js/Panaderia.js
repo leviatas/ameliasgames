@@ -907,9 +907,6 @@ export class Panaderia {
       ctx.beginPath(); ctx.arc(hubX, hubY, 6 * s, 0, Math.PI * 2); ctx.fill();
     }
 
-    // estrella de mejora
-    if (this.upgrades.molino) this._drawStar(ctx, cx + m.w * 0.55, m.y + 8 * s, s);
-
     // progreso de molienda
     if (this.mill.busy) {
       const frac = this.mill.t / this._millDur();
@@ -917,7 +914,13 @@ export class Panaderia {
     }
     ctx.fillStyle = '#5A4020'; ctx.font = `bold ${13 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Molino', cx, m.y + m.h + (this.mill.busy ? 30 : 16) * s);
+    const millLabelY = m.y + m.h + (this.mill.busy ? 30 : 16) * s;
+    ctx.fillText('Molino', cx, millLabelY);
+    // estrella de mejora al lado del nombre
+    if (this.upgrades.molino) {
+      const tw = ctx.measureText('Molino').width;
+      this._drawStar(ctx, cx + tw / 2 + 12 * s, millLabelY - 4 * s, s);
+    }
 
     if (this.workers.molinero) this._drawWorker(ctx, m.x - 18 * s, m.y + m.h, 'molinero', L);
   }
@@ -1039,8 +1042,6 @@ export class Panaderia {
       ctx.fillStyle = '#8A4A28';
       ctx.fillRect(o.x + o.w * 0.7, o.y - 16 * s, 12 * s, 18 * s);
     }
-    // estrella de mejora
-    if (this.upgrades.horno) this._drawStar(ctx, o.x + o.w + 4 * s, o.y - o.h * 0.22, s);
     if (this.oven.busy) {
       const frac = this.oven.t / this._ovenDur();
       this._progressBar(ctx, dx - 34 * s, o.y + o.h + 8 * s, 68 * s, 9 * s, frac, '#FF8A3A', s);
@@ -1057,7 +1058,13 @@ export class Panaderia {
     }
     ctx.fillStyle = '#7A4A18'; ctx.font = `bold ${13 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Horno', dx, o.y + o.h + (this.oven.busy ? 30 : 16) * s);
+    const ovenLabelY = o.y + o.h + (this.oven.busy ? 30 : 16) * s;
+    ctx.fillText('Horno', dx, ovenLabelY);
+    // estrella de mejora al lado del nombre
+    if (this.upgrades.horno) {
+      const tw = ctx.measureText('Horno').width;
+      this._drawStar(ctx, dx + tw / 2 + 12 * s, ovenLabelY - 4 * s, s);
+    }
 
     if (this.workers.panadero) this._drawWorker(ctx, o.x - 20 * s, o.y + o.h, 'panadero', L);
   }
@@ -1305,13 +1312,13 @@ export class Panaderia {
     ctx.textBaseline = 'alphabetic';
   }
 
-  // estrella dorada pulsante: marca una máquina mejorada
+  // estrella dorada pulsante: marca una máquina mejorada (junto a su nombre)
   _drawStar(ctx, x, y, s) {
     const pulse = 1 + Math.sin(this.t * 4) * 0.12;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(pulse, pulse);
-    ctx.font = `${20 * s}px system-ui, sans-serif`;
+    ctx.font = `${15 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('⭐', 0, 0);
     ctx.restore();
