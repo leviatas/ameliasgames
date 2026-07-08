@@ -26,6 +26,7 @@ const IMG = {
   granjero: loadImg('granjero'), molinero: loadImg('molinero'),
   panadero: loadImg('panadero'), vendedor: loadImg('vendedor'),
   clientes: [loadImg('cliente1'), loadImg('cliente2'), loadImg('cliente3'), loadImg('cliente4')],
+  jugadora: loadImg('jugadora'),
 };
 
 const SAVE_KEY   = 'panaderia_state';
@@ -1032,7 +1033,38 @@ export class Panaderia {
       ctx.lineWidth = 2.5 * s;
       ctx.beginPath(); ctx.ellipse(this.dest.x, this.dest.y, 16 * s * pulse + 6 * s, (16 * s * pulse + 6 * s) * 0.4, 0, 0, Math.PI * 2); ctx.stroke();
     }
-    this.player.draw(ctx, { x: 0, y: 0 }, scaleOf);
+    if (ready(IMG.jugadora)) {
+      // protagonista ilustrada, con la animación de caminar/saltar del avatar
+      const p = this.player;
+      const sc = scaleOf(p.y);
+      const hgt = 168 * sc;
+      let ox = 0, oy = 0, rot = 0, scaleY = 1, shadowScale = 1;
+      if (p.isMoving) { oy += p.bobOffset * sc; rot += Math.sin(p.walkPhase) * 0.05; }
+      if (p.gesture === 'jump') {
+        const t = Math.min(p.gestureTime / p.gestureDur, 1);
+        if (t < 0.13) { const f = t / 0.13; oy += 12 * f * sc; scaleY = 1 - 0.18 * f; }
+        else if (t < 0.87) {
+          const f = (t - 0.13) / 0.74;
+          const arc = Math.sin(f * Math.PI);
+          oy -= 80 * arc * sc; scaleY = 1 + 0.14 * arc; rot += Math.sin(f * Math.PI * 2) * 0.08;
+          shadowScale = 1 - 0.5 * arc;
+        } else { const f = (t - 0.87) / 0.13; oy += 12 * (1 - f) * sc; scaleY = 0.82 + 0.18 * f; }
+      }
+      // sombra
+      ctx.save(); ctx.globalAlpha = 0.22 * shadowScale; ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(p.x + ox, p.y, 24 * sc * shadowScale, 7 * sc * shadowScale, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      // sprite (espejado según hacia dónde mira)
+      const w = hgt * (IMG.jugadora.naturalWidth / IMG.jugadora.naturalHeight);
+      ctx.save();
+      ctx.translate(p.x + ox, p.y + oy);
+      ctx.rotate(rot);
+      if (p.facingDir < 0) ctx.scale(-1, 1);
+      ctx.scale(1, scaleY);
+      ctx.drawImage(IMG.jugadora, -w / 2, -hgt, w, hgt);
+      ctx.restore();
+    } else {
+      this.player.draw(ctx, { x: 0, y: 0 }, scaleOf);
+    }
     // burbujita con lo que va a hacer/llevar
     if (this.task) {
       const label = this.task.type === 'oven' ? null : {
@@ -1041,7 +1073,7 @@ export class Panaderia {
         mill: '🌾', customer: '🍞',
       }[this.task.type];
       const sc = scaleOf(this.player.y);
-      const bx = this.player.x, by = this.player.y - 168 * sc;
+      const bx = this.player.x, by = this.player.y - 190 * sc;
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.beginPath(); ctx.arc(bx, by, 15 * s, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#E0A050'; ctx.lineWidth = 2 * s; ctx.stroke();
