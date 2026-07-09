@@ -27,7 +27,25 @@ const IMG = {
   panadero: loadImg('panadero'), vendedor: loadImg('vendedor'),
   clientes: [loadImg('cliente1'), loadImg('cliente2'), loadImg('cliente3'), loadImg('cliente4')],
   jugadora: loadImg('jugadora'),
+  gallinero: loadImg('gallinero'), gallina: loadImg('gallina'), huevo: loadImg('huevo'),
+  cacaotero: loadImg('cacaotero'), chocolate: loadImg('chocolate'),
+  vaca: loadImg('vaca'), leche: loadImg('leche'),
+  torta: loadImg('torta'), galletas: loadImg('galletas'), chocoleche: loadImg('chocoleche'),
 };
+// sprite de cada producto vendible (para burbujas, mostrador y HUD)
+const PROD_IMG = () => ({ pan: IMG.pan, torta: IMG.torta, galleta: IMG.galletas, chocoleche: IMG.chocoleche });
+// sprite de cada ícono del HUD (si no cargó, se usa el emoji)
+const CHIP_IMG = () => ({
+  '🌱': IMG.semilla, '🍞': IMG.pan, '🥚': IMG.huevo, '🎂': IMG.torta,
+  '🍫': IMG.chocolate, '🍪': IMG.galletas, '🥛': IMG.leche, '☕': IMG.chocoleche,
+});
+// dibuja una imagen contenida en un cuadrado centrado en (cx, cy)
+function drawIconImg(ctx, img, cx, cy, size) {
+  const ar = img.naturalWidth / img.naturalHeight;
+  let w = size, h = w / ar;
+  if (h > size) { h = size; w = h * ar; }
+  ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+}
 
 const SAVE_KEY   = 'panaderia_state';
 const MAX_PLOTS  = 4;
@@ -1092,46 +1110,59 @@ export class Panaderia {
     if (!this.coop) return;
     const { s } = L;
     const c = L.coop;
-    // casita
-    ctx.fillStyle = '#C98A5A';
-    ctx.beginPath(); ctx.roundRect(c.x, c.y + c.h * 0.32, c.w, c.h * 0.68, 5 * s); ctx.fill();
-    ctx.strokeStyle = '#8A5A30'; ctx.lineWidth = 2 * s; ctx.stroke();
-    // tablones
-    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1.5 * s;
-    for (let k = 1; k < 4; k++) {
-      const lx = c.x + (c.w * k) / 4;
-      ctx.beginPath(); ctx.moveTo(lx, c.y + c.h * 0.35); ctx.lineTo(lx, c.y + c.h * 0.97); ctx.stroke();
+    if (ready(IMG.gallinero)) {
+      this._imgH(ctx, IMG.gallinero, c.x + c.w / 2, c.y + c.h, c.h * 1.12);
+    } else {
+      // casita
+      ctx.fillStyle = '#C98A5A';
+      ctx.beginPath(); ctx.roundRect(c.x, c.y + c.h * 0.32, c.w, c.h * 0.68, 5 * s); ctx.fill();
+      ctx.strokeStyle = '#8A5A30'; ctx.lineWidth = 2 * s; ctx.stroke();
+      // tablones
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1.5 * s;
+      for (let k = 1; k < 4; k++) {
+        const lx = c.x + (c.w * k) / 4;
+        ctx.beginPath(); ctx.moveTo(lx, c.y + c.h * 0.35); ctx.lineTo(lx, c.y + c.h * 0.97); ctx.stroke();
+      }
+      // techo
+      ctx.fillStyle = '#B0563A';
+      ctx.beginPath();
+      ctx.moveTo(c.x - 6 * s, c.y + c.h * 0.35);
+      ctx.lineTo(c.x + c.w / 2, c.y - c.h * 0.08);
+      ctx.lineTo(c.x + c.w + 6 * s, c.y + c.h * 0.35);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#7A3A24'; ctx.stroke();
+      // puertita oscura
+      ctx.fillStyle = '#4A2A14';
+      ctx.beginPath(); ctx.arc(c.x + c.w / 2, c.y + c.h * 0.78, c.w * 0.2, Math.PI, 0);
+      ctx.lineTo(c.x + c.w / 2 + c.w * 0.2, c.y + c.h); ctx.lineTo(c.x + c.w / 2 - c.w * 0.2, c.y + c.h);
+      ctx.closePath(); ctx.fill();
     }
-    // techo
-    ctx.fillStyle = '#B0563A';
-    ctx.beginPath();
-    ctx.moveTo(c.x - 6 * s, c.y + c.h * 0.35);
-    ctx.lineTo(c.x + c.w / 2, c.y - c.h * 0.08);
-    ctx.lineTo(c.x + c.w + 6 * s, c.y + c.h * 0.35);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#7A3A24'; ctx.stroke();
-    // puertita oscura
-    ctx.fillStyle = '#4A2A14';
-    ctx.beginPath(); ctx.arc(c.x + c.w / 2, c.y + c.h * 0.78, c.w * 0.2, Math.PI, 0);
-    ctx.lineTo(c.x + c.w / 2 + c.w * 0.2, c.y + c.h); ctx.lineTo(c.x + c.w / 2 - c.w * 0.2, c.y + c.h);
-    ctx.closePath(); ctx.fill();
-    // gallina asomada, con un saltito de vez en cuando
+    // gallina al lado, con un saltito de vez en cuando
     const hop = Math.abs(Math.sin(this.t * 2.2)) < 0.12 ? 3 * s : 0;
-    ctx.font = `${24 * s}px system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('🐔', c.x + c.w + 12 * s, c.y + c.h * 0.82 - hop);
-    ctx.textBaseline = 'alphabetic';
+    if (ready(IMG.gallina)) {
+      this._imgH(ctx, IMG.gallina, c.x + c.w + 16 * s, c.y + c.h - hop, 34 * s);
+    } else {
+      ctx.font = `${24 * s}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🐔', c.x + c.w + 12 * s, c.y + c.h * 0.82 - hop);
+      ctx.textBaseline = 'alphabetic';
+    }
     ctx.fillStyle = '#5A4020'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
     ctx.fillText('Gallinero', c.x + c.w / 2, c.y + c.h + 15 * s);
 
     // huevos en el piso
     for (const e of this.eggs) {
       const pop = Math.min(1, e.t);
       const bob = e.t >= 1 ? Math.sin(e.wob) * 1.5 * s : 0;
-      ctx.fillStyle = '#FFF8EC';
-      ctx.strokeStyle = '#C8B890'; ctx.lineWidth = 1.5 * s;
-      ctx.beginPath(); ctx.ellipse(e.x, e.y + bob, 6.5 * s * pop, 8.5 * s * pop, 0, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
+      if (ready(IMG.huevo)) {
+        drawIconImg(ctx, IMG.huevo, e.x, e.y + bob, 17 * s * pop);
+      } else {
+        ctx.fillStyle = '#FFF8EC';
+        ctx.strokeStyle = '#C8B890'; ctx.lineWidth = 1.5 * s;
+        ctx.beginPath(); ctx.ellipse(e.x, e.y + bob, 6.5 * s * pop, 8.5 * s * pop, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      }
       if (e.t >= 1) {
         ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5 * s;
         ctx.beginPath(); ctx.arc(e.x, e.y + bob, 12 * s + Math.sin(this.t * 4 + e.wob) * 2 * s, 0, Math.PI * 2); ctx.stroke();
@@ -1145,21 +1176,25 @@ export class Panaderia {
     const { s } = L;
     const c = L.cacao;
     const shake = this.cacaoShake > 0 ? Math.sin(this.t * 40) * 4 * s : 0;
-    // tronco
-    ctx.fillStyle = '#8A5A30';
-    ctx.fillRect(c.x - 5 * s, c.y + c.r * 0.4, 10 * s, c.r * 0.85);
-    // copa
-    for (const [dx, dy, rr] of [[-0.45, 0.0, 0.6], [0.45, 0.0, 0.6], [0, -0.4, 0.7], [0, 0.1, 0.75]]) {
-      ctx.fillStyle = '#5A8A3C';
-      ctx.beginPath(); ctx.arc(c.x + dx * c.r + shake, c.y + dy * c.r, c.r * rr, 0, Math.PI * 2); ctx.fill();
-    }
-    // vainas de cacao colgando
-    ctx.fillStyle = '#7A4A22';
-    ctx.strokeStyle = '#5A3416'; ctx.lineWidth = 1.5 * s;
-    for (const [dx, dy] of [[-0.45, 0.25], [0.1, -0.35], [0.5, 0.1], [-0.05, 0.35]]) {
-      ctx.beginPath();
-      ctx.ellipse(c.x + dx * c.r + shake, c.y + dy * c.r, 5 * s, 9 * s, 0.3, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
+    if (ready(IMG.cacaotero)) {
+      this._imgH(ctx, IMG.cacaotero, c.x + shake, c.y + c.r * 1.45, c.r * 2.9);
+    } else {
+      // tronco
+      ctx.fillStyle = '#8A5A30';
+      ctx.fillRect(c.x - 5 * s, c.y + c.r * 0.4, 10 * s, c.r * 0.85);
+      // copa
+      for (const [dx, dy, rr] of [[-0.45, 0.0, 0.6], [0.45, 0.0, 0.6], [0, -0.4, 0.7], [0, 0.1, 0.75]]) {
+        ctx.fillStyle = '#5A8A3C';
+        ctx.beginPath(); ctx.arc(c.x + dx * c.r + shake, c.y + dy * c.r, c.r * rr, 0, Math.PI * 2); ctx.fill();
+      }
+      // vainas de cacao colgando
+      ctx.fillStyle = '#7A4A22';
+      ctx.strokeStyle = '#5A3416'; ctx.lineWidth = 1.5 * s;
+      for (const [dx, dy] of [[-0.45, 0.25], [0.1, -0.35], [0.5, 0.1], [-0.05, 0.35]]) {
+        ctx.beginPath();
+        ctx.ellipse(c.x + dx * c.r + shake, c.y + dy * c.r, 5 * s, 9 * s, 0.3, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      }
     }
     ctx.fillStyle = '#4A3A1A'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
@@ -1170,8 +1205,12 @@ export class Panaderia {
     for (const ch of this.chocs) {
       const pop = Math.min(1, ch.t);
       const bob = ch.t >= 1 ? Math.sin(ch.wob) * 1.5 * s : 0;
-      ctx.font = `${18 * s * pop}px system-ui, sans-serif`;
-      ctx.fillText('🍫', ch.x, ch.y + bob);
+      if (ready(IMG.chocolate)) {
+        drawIconImg(ctx, IMG.chocolate, ch.x, ch.y + bob, 20 * s * pop);
+      } else {
+        ctx.font = `${18 * s * pop}px system-ui, sans-serif`;
+        ctx.fillText('🍫', ch.x, ch.y + bob);
+      }
       if (ch.t >= 1) {
         ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5 * s;
         ctx.beginPath(); ctx.arc(ch.x, ch.y + bob, 13 * s + Math.sin(this.t * 4 + ch.wob) * 2 * s, 0, Math.PI * 2); ctx.stroke();
@@ -1186,14 +1225,19 @@ export class Panaderia {
     const { s } = L;
     const v = L.vaca;
     const bob = Math.sin(this.t * 1.8) * 2 * s;
-    // sombra
-    ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(v.x, v.y + v.r * 0.95, v.r * 1.1, v.r * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.font = `${v.r * 1.9}px system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('🐄', v.x, v.y + bob);
-    ctx.textBaseline = 'alphabetic';
+    if (ready(IMG.vaca)) {
+      this._imgH(ctx, IMG.vaca, v.x, v.y + v.r + bob * 0.5, v.r * 2.1);
+    } else {
+      // sombra
+      ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(v.x, v.y + v.r * 0.95, v.r * 1.1, v.r * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ctx.font = `${v.r * 1.9}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🐄', v.x, v.y + bob);
+      ctx.textBaseline = 'alphabetic';
+    }
     ctx.fillStyle = '#4A3A1A'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
     ctx.fillText('Vaca', v.x, v.y + v.r * 1.25 + 12 * s);
 
     // burbuja de "leche lista"
@@ -1203,10 +1247,14 @@ export class Panaderia {
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.strokeStyle = '#8FB8D8'; ctx.lineWidth = 2 * s;
       ctx.beginPath(); ctx.arc(v.x, by, 14 * s * pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.font = `${15 * s * pulse}px system-ui, sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('🥛', v.x, by + 1 * s);
-      ctx.textBaseline = 'alphabetic';
+      if (ready(IMG.leche)) {
+        drawIconImg(ctx, IMG.leche, v.x, by, 19 * s * pulse);
+      } else {
+        ctx.font = `${15 * s * pulse}px system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🥛', v.x, by + 1 * s);
+        ctx.textBaseline = 'alphabetic';
+      }
     }
   }
 
@@ -1425,43 +1473,34 @@ export class Panaderia {
       ctx.textAlign = 'left';
       ctx.fillText(`×${this.inv.bread}`, cb.cx - cb.w * 0.36 + 6 * 28 * s, shelfY - 2 * s);
     }
-    // tortas y galletas en el estante de arriba
+    // tortas, galletas y chocos en el estante de arriba (sprite o emoji)
     const shelf2Y = cb.bottom - cb.h * 0.92;
+    const shelfItem = (img, emoji, x, size) => {
+      if (ready(img)) drawIconImg(ctx, img, x, shelf2Y - 6 * s, size);
+      else {
+        ctx.font = `${size}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(emoji, x, shelf2Y);
+      }
+    };
+    const shelfCount = (n, x) => {
+      ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${13 * s}px system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`×${n}`, x, shelf2Y);
+    };
     if (this.inv.cake > 0) {
-      ctx.font = `${20 * s}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
       const nCakes = Math.min(this.inv.cake, 2);
-      for (let k = 0; k < nCakes; k++) {
-        ctx.fillText('🎂', cb.cx - cb.w * 0.34 + k * 28 * s, shelf2Y);
-      }
-      if (this.inv.cake > 2) {
-        ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${13 * s}px system-ui, sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.fillText(`×${this.inv.cake}`, cb.cx - cb.w * 0.34 + 2 * 28 * s - 10 * s, shelf2Y);
-      }
+      for (let k = 0; k < nCakes; k++) shelfItem(IMG.torta, '🎂', cb.cx - cb.w * 0.34 + k * 28 * s, 24 * s);
+      if (this.inv.cake > 2) shelfCount(this.inv.cake, cb.cx - cb.w * 0.34 + 2 * 28 * s - 10 * s);
     }
     if (this.inv.cookie > 0) {
-      ctx.font = `${18 * s}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
       const nCk = Math.min(this.inv.cookie, 2);
-      for (let k = 0; k < nCk; k++) {
-        ctx.fillText('🍪', cb.cx + cb.w * 0.05 + k * 24 * s, shelf2Y);
-      }
-      if (this.inv.cookie > 2) {
-        ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${13 * s}px system-ui, sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.fillText(`×${this.inv.cookie}`, cb.cx + cb.w * 0.05 + 2 * 24 * s - 8 * s, shelf2Y);
-      }
+      for (let k = 0; k < nCk; k++) shelfItem(IMG.galletas, '🍪', cb.cx + cb.w * 0.05 + k * 24 * s, 22 * s);
+      if (this.inv.cookie > 2) shelfCount(this.inv.cookie, cb.cx + cb.w * 0.05 + 2 * 24 * s - 8 * s);
     }
     if (this.inv.chocomilk > 0) {
-      ctx.font = `${18 * s}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText('☕', cb.cx + cb.w * 0.36, shelf2Y);
-      if (this.inv.chocomilk > 1) {
-        ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${13 * s}px system-ui, sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.fillText(`×${this.inv.chocomilk}`, cb.cx + cb.w * 0.36 + 12 * s, shelf2Y);
-      }
+      shelfItem(IMG.chocoleche, '☕', cb.cx + cb.w * 0.36, 22 * s);
+      if (this.inv.chocomilk > 1) shelfCount(this.inv.chocomilk, cb.cx + cb.w * 0.36 + 12 * s);
     }
     ctx.fillStyle = '#7A4A18'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
@@ -1607,7 +1646,13 @@ export class Panaderia {
       ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${15 * s}px system-ui, sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(`${PRODUCTS[c.prod].emoji}×${c.want}`, bx, by - 5 * s);
+      const pimg = PROD_IMG()[c.prod];
+      if (pimg && ready(pimg)) {
+        drawIconImg(ctx, pimg, bx - 11 * s, by - 6 * s, 20 * s);
+        ctx.fillText(`×${c.want}`, bx + 12 * s, by - 5 * s);
+      } else {
+        ctx.fillText(`${PRODUCTS[c.prod].emoji}×${c.want}`, bx, by - 5 * s);
+      }
       ctx.textBaseline = 'alphabetic';
       const frac = Math.max(0, c.patience / c.maxPatience);
       const col = frac > 0.5 ? '#5AC85A' : frac > 0.22 ? '#F2B705' : '#E0353A';
@@ -1674,13 +1719,18 @@ export class Panaderia {
       ctx.beginPath(); ctx.arc(bx, by, 15 * s, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#E0A050'; ctx.lineWidth = 2 * s; ctx.stroke();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      if (this.task.type === 'oven' && this.task.product === 'pan' && ready(IMG.harina)) {
-        // bolsita de harina rumbo al horno
-        const h = 22 * s, w = h * (IMG.harina.naturalWidth / IMG.harina.naturalHeight);
-        ctx.drawImage(IMG.harina, bx - w / 2, by - h / 2, w, h);
-      } else if (this.task.type === 'customer' && this.task.cust?.prod === 'pan' && ready(IMG.pan)) {
-        const w = 22 * s, h = w * (IMG.pan.naturalHeight / IMG.pan.naturalWidth);
-        ctx.drawImage(IMG.pan, bx - w / 2, by - h / 2, w, h);
+      // sprite de lo que lleva/va a hacer (con el emoji como respaldo)
+      const tk = this.task;
+      const bubbleImg = tk.type === 'seed' ? IMG.semilla
+        : tk.type === 'egg' ? IMG.huevo
+        : tk.type === 'choc' ? IMG.chocolate
+        : tk.type === 'vaca' ? IMG.leche
+        : tk.type === 'plot' ? (this.plots[tk.idx]?.state === 'ready' ? null : IMG.semilla)
+        : tk.type === 'oven' ? (tk.product === 'pan' ? IMG.harina : PROD_IMG()[tk.product])
+        : tk.type === 'customer' ? PROD_IMG()[tk.cust?.prod]
+        : null;
+      if (bubbleImg && ready(bubbleImg)) {
+        drawIconImg(ctx, bubbleImg, bx, by, 21 * s);
       } else if (label) {
         ctx.font = `${16 * s}px system-ui, sans-serif`;
         ctx.fillText(label, bx, by + 1 * s);
@@ -1798,8 +1848,13 @@ export class Panaderia {
           ctx.beginPath(); ctx.ellipse(bx, by - 7 * s, 5 * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill();
         }
       } else {
-        ctx.textAlign = 'left';
-        ctx.fillText(icon, x + 6 * s, y + h / 2 + 1 * s);
+        const cimg = CHIP_IMG()[icon];
+        if (cimg && ready(cimg)) {
+          drawIconImg(ctx, cimg, x + 12 * s, y + h / 2, 20 * s);
+        } else {
+          ctx.textAlign = 'left';
+          ctx.fillText(icon, x + 6 * s, y + h / 2 + 1 * s);
+        }
       }
       ctx.fillStyle = '#6A4A20';
       ctx.textAlign = 'left';
