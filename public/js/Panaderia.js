@@ -121,7 +121,6 @@ export class Panaderia {
     this.chocSpawnT = 8;
     this.cacaoShake = 0;
     this.cacaoCooldown = 0;
-    this.ovenMenuOpen = false;   // menú "¿qué horneamos?" sobre el horno
 
     // vaca: se ordeña cuando está lista (cada tanto) y da leche directa
     this.cowReadyT = 0;
@@ -244,12 +243,14 @@ export class Panaderia {
       shop.push({ ...it, x: W * 0.02 + i * (bw + sgap), y: sy, w: bw, h: bh });
     });
 
-    // menú "¿qué horneamos?": botones apilados sobre el horno (solo productos desbloqueados)
-    const omW = W * 0.16, omH = H * 0.058;
-    const omX = oven.x + oven.w / 2 - omW / 2;
+    // recetas del horno: botones fijos en columna al costado derecho del horno;
+    // tocar una receta manda a la protagonista a cocinarla directamente
+    const omX = oven.x + oven.w + 8 * s;
+    const omW = Math.min(W * 0.098, bld.x + bld.w - omX - 6 * s);
+    const omH = H * 0.048, omGap = 6 * s;
     const avail = Object.keys(PRODUCTS).filter(p => this._unlocked(p));
     const ovenMenu = avail.map((prod, i) => ({
-      prod, x: omX, y: oven.y - omH * 1.2 * (avail.length - i), w: omW, h: omH,
+      prod, x: omX, y: oven.y - H * 0.015 + i * (omH + omGap), w: omW, h: omH,
     }));
 
     return { W, H, s, plotRects, bush, seedZone, mill, coop, cacao, chocZone, vaca, bld, counter, counterBox, oven, ovenMenu, custXs, custY, shop };
@@ -369,18 +370,15 @@ export class Panaderia {
     const L = this._layout();
     const { s } = L;
 
-    // menú del horno abierto: elegir producto o cerrar tocando afuera
-    if (this.ovenMenuOpen) {
-      this.ovenMenuOpen = false;
-      for (const mb of L.ovenMenu) {
-        if (!this._inRect(px, py, mb)) continue;
-        if (!this._canBake(mb.prod)) {
-          this._flash(`Faltan ingredientes (${this._ingText(mb.prod)})`);
-          return;
-        }
-        this._goTo(L.oven.x + L.oven.w / 2, L.oven.y + L.oven.h + 14 * s, { type: 'oven', product: mb.prod });
+    // recetas al costado del horno: tocar una arranca la cocción directa
+    for (const mb of L.ovenMenu) {
+      if (!this._inRect(px, py, mb)) continue;
+      if (this.oven.busy) { this._flash('El horno está ocupado 🔥'); return; }
+      if (!this._canBake(mb.prod)) {
+        this._flash(`Faltan ingredientes (${this._ingText(mb.prod)})`);
         return;
       }
+      this._goTo(L.oven.x + L.oven.w / 2, L.oven.y + L.oven.h + 14 * s, { type: 'oven', product: mb.prod });
       return;
     }
 
@@ -510,15 +508,14 @@ export class Panaderia {
       return;
     }
 
-    // horno → con más de un producto desbloqueado se abre el menú; si no, pan directo
+    // horno → con un solo producto hornea pan directo; si hay varios, señala las recetas
     if (this._inRect(px, py, L.oven)) {
       if (this.oven.busy) return;
       if (L.ovenMenu.length <= 1) {
         if (this.inv.flour <= 0) { this._flash('No tenés harina'); return; }
         this._goTo(L.oven.x + L.oven.w / 2, L.oven.y + L.oven.h + 14 * s, { type: 'oven', product: 'pan' });
       } else {
-        this.ovenMenuOpen = true;
-        Sound.pick();
+        this._flash('Elegí una receta a la derecha ➡️');
       }
       return;
     }
@@ -918,9 +915,9 @@ export class Panaderia {
     this._drawFarmer(ctx, L);
     this._drawMill(ctx, L);
     this._drawBakery(ctx, L);
+    this._drawOvenMenu(ctx, L);
     this._drawPlayer(ctx, L);
     this._drawShop(ctx, L);
-    if (this.ovenMenuOpen) this._drawOvenMenu(ctx, L);
     this._drawHUD(ctx, L);
 
     // textos flotantes
@@ -1258,21 +1255,57 @@ export class Panaderia {
     }
   }
 
-  // menú "¿qué horneamos?" sobre el horno
+  // recetas del horno: columna fija de botones al costado derecho.
+  // Cada botón muestra el producto y sus ingredientes; tocar = cocinar.
   _drawOvenMenu(ctx, L) {
     const { s } = L;
+    ctx.textBaseline = 'middle';
     for (const mb of L.ovenMenu) {
       const P = PRODUCTS[mb.prod];
-      const can = this._canBake(mb.prod);
-      ctx.fillStyle = can ? '#FFF8EC' : '#D8D0C0';
-      ctx.strokeStyle = '#E0A050'; ctx.lineWidth = 2.5 * s;
-      ctx.beginPath(); ctx.roundRect(mb.x, mb.y, mb.w, mb.h, 10 * s); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = can ? '#7A4A18' : '#9A9080';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = `900 ${13.5 * s}px system-ui, sans-serif`;
-      ctx.fillText(`${P.emoji} ${P.name}  ·  ${this._ingText(mb.prod)}`, mb.x + mb.w / 2, mb.y + mb.h / 2);
-      ctx.textBaseline = 'alphabetic';
+      const can = this._canBake(mb.prod) && !this.oven.busy;
+      const cooking = this.oven.busy && this.oven.product === mb.prod;
+      ctx.fillStyle = can ? '#FFF8EC' : '#E4DCCB';
+      ctx.strokeStyle = cooking ? '#FF8A3A' : '#E0A050';
+      ctx.lineWidth = (cooking ? 3.5 : 2) * s;
+      ctx.beginPath(); ctx.roundRect(mb.x, mb.y, mb.w, mb.h, 8 * s); ctx.fill(); ctx.stroke();
+
+      ctx.globalAlpha = can || cooking ? 1 : 0.55;
+      // producto a la izquierda
+      const pimg = PROD_IMG()[mb.prod];
+      const cy = mb.y + mb.h / 2;
+      if (pimg && ready(pimg)) {
+        drawIconImg(ctx, pimg, mb.x + 15 * s, cy, 22 * s);
+      } else {
+        ctx.font = `${16 * s}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(P.emoji, mb.x + 15 * s, cy);
+      }
+      // ingredientes a la derecha (iconito + cantidad si es más de 1)
+      let ix = mb.x + 32 * s;
+      const ings = [
+        [P.flour, IMG.harina, 'H'], [P.egg, IMG.huevo, '🥚'],
+        [P.choc, IMG.chocolate, '🍫'], [P.milk, IMG.leche, '🥛'],
+      ];
+      for (const [n, img, fb] of ings) {
+        if (!n) continue;
+        if (ready(img)) drawIconImg(ctx, img, ix + 7 * s, cy, 15 * s);
+        else {
+          ctx.font = `bold ${11 * s}px system-ui, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText(fb, ix + 7 * s, cy);
+        }
+        if (n > 1) {
+          ctx.fillStyle = '#7A4A18';
+          ctx.font = `900 ${10 * s}px system-ui, sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.fillText(`×${n}`, ix + 14 * s, cy + 1 * s);
+          ix += 10 * s;
+        }
+        ix += 18 * s;
+      }
+      ctx.globalAlpha = 1;
     }
+    ctx.textBaseline = 'alphabetic';
   }
 
   // granjero contratado: se dibuja donde esté caminando, mirando hacia su destino
