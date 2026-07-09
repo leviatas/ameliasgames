@@ -51,16 +51,20 @@ const UPGRADES = [
   { key: 'horno',  name: 'Horno',  price: 300, desc: 'Hornea el doble de rápido' },
 ];
 
-// Productos horneables. El gallinero desbloquea la torta (harina + huevos)
-// y el cacaotero desbloquea las galletas (harina + chocolate).
+// Productos horneables. El gallinero desbloquea la torta (harina + huevos),
+// el cacaotero las galletas (harina + chocolate) y la vaca + cacaotero el
+// choco con leche (chocolate + leche ordeñada).
 const COOP_PRICE  = 200;
 const CACAO_PRICE = 300;
+const VACA_PRICE  = 250;
+const COW_MILK_COOLDOWN = 8;   // seg. hasta que la vaca vuelve a dar leche
 const MAX_GROUND_EGGS  = 3;
 const MAX_GROUND_CHOCS = 3;
 const PRODUCTS = {
-  pan:     { name: 'Pan',      emoji: '🍞', inv: 'bread',  flour: 1, egg: 0, choc: 0, priceBase: 12, priceVar: 5,  coins: 5,  timeMul: 1 },
-  galleta: { name: 'Galletas', emoji: '🍪', inv: 'cookie', flour: 1, egg: 0, choc: 1, priceBase: 25, priceVar: 6,  coins: 8,  timeMul: 1.5 },
-  torta:   { name: 'Torta',    emoji: '🎂', inv: 'cake',   flour: 2, egg: 1, choc: 0, priceBase: 45, priceVar: 10, coins: 12, timeMul: 2.2 },
+  pan:        { name: 'Pan',           emoji: '🍞', inv: 'bread',     flour: 1, egg: 0, choc: 0, milk: 0, priceBase: 12, priceVar: 5,  coins: 5,  timeMul: 1 },
+  galleta:    { name: 'Galletas',      emoji: '🍪', inv: 'cookie',    flour: 1, egg: 0, choc: 1, milk: 0, priceBase: 25, priceVar: 6,  coins: 8,  timeMul: 1.5 },
+  chocoleche: { name: 'Choco c/leche', emoji: '☕', inv: 'chocomilk', flour: 0, egg: 0, choc: 1, milk: 1, priceBase: 30, priceVar: 8,  coins: 9,  timeMul: 0.8 },
+  torta:      { name: 'Torta',         emoji: '🎂', inv: 'cake',      flour: 2, egg: 1, choc: 0, milk: 0, priceBase: 45, priceVar: 10, coins: 12, timeMul: 2.2 },
 };
 
 const CUSTOMER_COLORS = [
@@ -101,13 +105,17 @@ export class Panaderia {
     this.cacaoCooldown = 0;
     this.ovenMenuOpen = false;   // menú "¿qué horneamos?" sobre el horno
 
+    // vaca: se ordeña cuando está lista (cada tanto) y da leche directa
+    this.cowReadyT = 0;
+
     // estado persistente
     this.money   = 0;
-    this.inv     = { seed: 0, wheat: 0, flour: 0, bread: 0, egg: 0, cake: 0, choc: 0, cookie: 0 };
+    this.inv     = { seed: 0, wheat: 0, flour: 0, bread: 0, egg: 0, cake: 0, choc: 0, cookie: 0, milk: 0, chocomilk: 0 };
     this.workers = { granjero: false, molinero: false, panadero: false, vendedor: false };
     this.upgrades = { molino: false, horno: false };
     this.coop    = false;
     this.cacao   = false;
+    this.vaca    = false;
     this.plots   = [];
     let nPlots = 2;
     try {
@@ -119,6 +127,7 @@ export class Panaderia {
         if (s.upgrades) for (const k of Object.keys(this.upgrades)) this.upgrades[k] = !!s.upgrades[k];
         this.coop = !!s.coop;
         this.cacao = !!s.cacao;
+        this.vaca = !!s.vaca;
         nPlots = Math.max(2, Math.min(MAX_PLOTS, s.plots | 0 || 2));
       }
     } catch (e) {}
@@ -134,11 +143,13 @@ export class Panaderia {
   }
   _canBake(prod) {
     const P = PRODUCTS[prod];
-    return this.inv.flour >= P.flour && this.inv.egg >= P.egg && this.inv.choc >= P.choc;
+    return this.inv.flour >= P.flour && this.inv.egg >= P.egg &&
+           this.inv.choc >= P.choc && this.inv.milk >= P.milk;
   }
   _unlocked(prod) {
     if (prod === 'torta') return this.coop;
     if (prod === 'galleta') return this.cacao;
+    if (prod === 'chocoleche') return this.cacao && this.vaca;
     return true;
   }
 
@@ -152,7 +163,7 @@ export class Panaderia {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         money: this.money, inv: this.inv, workers: this.workers,
-        upgrades: this.upgrades, coop: this.coop, cacao: this.cacao, plots: this.plots.length,
+        upgrades: this.upgrades, coop: this.coop, cacao: this.cacao, vaca: this.vaca, plots: this.plots.length,
       }));
     } catch (e) {}
   }
@@ -181,8 +192,10 @@ export class Panaderia {
     // gallinero (se compra en la tienda), entre la zona de semillas y el molino
     const coop = { x: W * 0.435, y: H * 0.685, w: W * 0.08, h: H * 0.14 };
     // cacaotero (se compra en la tienda), arriba del gallinero
-    const cacao = { x: W * 0.468, y: H * 0.475, r: Math.min(W, H) * 0.062 };
-    const chocZone = { x: W * 0.435, y: H * 0.575, w: W * 0.075, h: H * 0.075 };
+    const cacao = { x: W * 0.468, y: H * 0.50, r: Math.min(W, H) * 0.060 };
+    const chocZone = { x: W * 0.435, y: H * 0.585, w: W * 0.075, h: H * 0.065 };
+    // vaca (se compra en la tienda), arriba del cacaotero
+    const vaca = { x: W * 0.472, y: H * 0.315, r: Math.min(W, H) * 0.052 };
 
     // edificio de la panadería (derecha): mostrador arriba, horno abajo
     const bld = { x: W * 0.655, y: H * 0.10, w: W * 0.335, h: H * 0.585 };
@@ -204,6 +217,7 @@ export class Panaderia {
       { kind: 'field' },
       { kind: 'coop' },
       { kind: 'cacao' },
+      { kind: 'vaca' },
       ...WORKERS.map(w => ({ kind: 'worker', worker: w })),
       ...UPGRADES.map(u => ({ kind: 'upgrade', upgrade: u })),
     ];
@@ -220,7 +234,7 @@ export class Panaderia {
       prod, x: omX, y: oven.y - omH * 1.2 * (avail.length - i), w: omW, h: omH,
     }));
 
-    return { W, H, s, plotRects, bush, seedZone, mill, coop, cacao, chocZone, bld, counter, counterBox, oven, ovenMenu, custXs, custY, shop };
+    return { W, H, s, plotRects, bush, seedZone, mill, coop, cacao, chocZone, vaca, bld, counter, counterBox, oven, ovenMenu, custXs, custY, shop };
   }
 
   // dibuja una imagen anclada abajo-centro con una altura dada (mantiene aspecto)
@@ -265,7 +279,12 @@ export class Panaderia {
   }
   _ingText(prod) {
     const P = PRODUCTS[prod];
-    return `${P.flour} harina${P.egg ? ` + ${P.egg}🥚` : ''}${P.choc ? ` + ${P.choc}🍫` : ''}`;
+    const parts = [];
+    if (P.flour) parts.push(`${P.flour} harina`);
+    if (P.egg)   parts.push(`${P.egg}🥚`);
+    if (P.choc)  parts.push(`${P.choc}🍫`);
+    if (P.milk)  parts.push(`${P.milk}🥛`);
+    return parts.join(' + ');
   }
   _dropChocs(L, n) {
     for (let i = 0; i < n && this.chocs.length < MAX_GROUND_CHOCS; i++) {
@@ -300,6 +319,7 @@ export class Panaderia {
     this.inv.flour -= P.flour;
     this.inv.egg   -= P.egg;
     this.inv.choc  -= P.choc;
+    this.inv.milk  -= P.milk;
     this.oven.busy = true; this.oven.t = 0; this.oven.product = prod;
     this._float(L.oven.x + L.oven.w / 2, L.oven.y, `horneando ${P.name.toLowerCase()}…`, '#B05020');
     Sound.pick();
@@ -374,6 +394,15 @@ export class Panaderia {
         this._float(b.x + b.w / 2, b.y, '¡Cacaotero! Ahora hay galletas 🍪');
         Sound.serveGood();
         this._save();
+      } else if (b.kind === 'vaca') {
+        if (this.vaca) { this._flash('Ya tenés vaca 🐄'); return; }
+        if (this.money < VACA_PRICE) { this._flash('Te falta dinero 💰'); return; }
+        this.money -= VACA_PRICE;
+        this.vaca = true;
+        this.cowReadyT = 0;   // llega lista para ordeñar
+        this._float(b.x + b.w / 2, b.y, this.cacao ? '¡Vaca! Ahora hay choco c/leche ☕' : '¡Vaca! Da leche 🥛');
+        Sound.serveGood();
+        this._save();
       } else if (b.kind === 'worker') {
         if (this.workers[b.worker.key]) { this._flash(`Ya tenés ${b.worker.name.toLowerCase()} ✓`); return; }
         if (this.money < b.worker.price) { this._flash('Te falta dinero 💰'); return; }
@@ -428,6 +457,13 @@ export class Panaderia {
     // cacaotero → ir a sacudirlo
     if (this.cacao && Math.hypot(px - L.cacao.x, py - L.cacao.y) < L.cacao.r * 1.3) {
       this._goTo(L.cacao.x + L.cacao.r * 1.0, L.cacao.y + L.cacao.r * 1.15, { type: 'cacao' });
+      return;
+    }
+
+    // vaca → ir a ordeñarla cuando está lista
+    if (this.vaca && Math.hypot(px - L.vaca.x, py - L.vaca.y) < L.vaca.r * 1.4) {
+      if (this.cowReadyT > 0) { this._flash('La vaca todavía no tiene leche 🐄'); return; }
+      this._goTo(L.vaca.x + L.vaca.r * 1.2, L.vaca.y + L.vaca.r * 0.9, { type: 'vaca' });
       return;
     }
 
@@ -535,6 +571,14 @@ export class Panaderia {
         Sound.undo();
         break;
       }
+      case 'vaca': {
+        if (this.cowReadyT > 0) return;          // se le adelantó el granjero
+        this.cowReadyT = COW_MILK_COOLDOWN;
+        this.inv.milk++;
+        this._float(L.vaca.x, L.vaca.y - L.vaca.r, '+1 🥛');
+        Sound.pick();
+        break;
+      }
       case 'plot': {
         const p = this.plots[task.idx];
         if (!p) return;
@@ -619,6 +663,9 @@ export class Panaderia {
       for (const e of this.eggs) { e.t = Math.min(1, e.t + dt * 3); e.wob += dt * 3; }
     }
 
+    // la vaca recarga leche con el tiempo
+    if (this.vaca && this.cowReadyT > 0) this.cowReadyT -= dt;
+
     // el cacaotero suelta chocolates cada tanto
     if (this.cacao) {
       this.chocSpawnT -= dt;
@@ -673,11 +720,12 @@ export class Panaderia {
       const pool = ['pan', 'pan'];
       if (this.coop) pool.push('torta');
       if (this.cacao) pool.push('galleta');
+      if (this._unlocked('chocoleche')) pool.push('chocoleche');
       const prod = pool[Math.floor(Math.random() * pool.length)];
       let want;
       if (prod === 'torta') {
         want = 1 + (this.workers.granjero && this.workers.molinero && Math.random() < 0.4 ? 1 : 0);
-      } else if (prod === 'galleta') {
+      } else if (prod === 'galleta' || prod === 'chocoleche') {
         want = 1 + Math.floor(Math.random() * (this.workers.granjero && this.workers.molinero ? 3 : 2));
       } else {
         const maxWant = Math.min(4, 2 + (this.workers.granjero ? 1 : 0) + (this.workers.molinero ? 1 : 0));
@@ -745,6 +793,9 @@ export class Panaderia {
           const c = this.chocs[ch];
           f.task = { type: 'choc', choc: c };
           f.dest = { x: c.x, y: c.y + 6 * L.s };
+        } else if (this.vaca && this.cowReadyT <= 0) {
+          f.task = { type: 'vaca' };
+          f.dest = { x: L.vaca.x + L.vaca.r * 1.2, y: L.vaca.y + L.vaca.r * 0.9 };
         }
       } else {
         const dx = f.dest.x - f.x, dy = f.dest.y - f.y;
@@ -772,6 +823,13 @@ export class Panaderia {
               const i = this.chocs.indexOf(task.choc);
               if (i >= 0) { this.chocs.splice(i, 1); this.inv.choc++; this._float(f.x, f.y - 40 * L.s, '+1 🍫'); }
             }
+            else if (task.type === 'vaca') {
+              if (this.cowReadyT <= 0) {
+                this.cowReadyT = COW_MILK_COOLDOWN;
+                this.inv.milk++;
+                this._float(f.x, f.y - 40 * L.s, '+1 🥛');
+              }
+            }
           }
         } else {
           f.x += (dx / dist) * spd * dt;
@@ -788,7 +846,7 @@ export class Panaderia {
       if (this.workerT.panadero <= 0) {
         this.workerT.panadero = 0.9;
         // prioriza el producto que espera algún cliente y todavía no está en stock
-        const wanted = ['torta', 'galleta'].find(pr =>
+        const wanted = ['torta', 'galleta', 'chocoleche'].find(pr =>
           this.customers.some(c => !c.leaving && c.prod === pr && this.inv[PRODUCTS[pr].inv] < c.want) && this._canBake(pr));
         if (wanted) this._loadOven(L, wanted);
         else if (this._canBake('pan')) this._loadOven(L, 'pan');
@@ -821,6 +879,7 @@ export class Panaderia {
     if (this.plots.some(p => p.state === 'ready')) return '¡Trigo listo! Tocalo para cosechar 🌾';
     if (this.coop && this.eggs.some(e => e.t >= 1) && this.inv.egg === 0) return 'Juntá los huevos del gallinero 🥚';
     if (this.cacao && this.chocs.some(c => c.t >= 1) && this.inv.choc === 0) return 'Juntá los chocolates del cacaotero 🍫';
+    if (this.vaca && this.cowReadyT <= 0 && this.inv.milk === 0) return 'La vaca está lista, ¡ordeñala! 🥛';
     if (this.inv.wheat > 0 && !this.mill.busy) return 'Llevá el trigo al molino ⚙️';
     if (this.inv.flour > 0 && !this.oven.busy) return 'Horneá la harina en el horno 🔥';
     if (this.customers.some(c => !c.leaving && this.inv[PRODUCTS[c.prod].inv] >= c.want)) return '¡Tocá al cliente para entregar su pedido! 🧺';
@@ -837,6 +896,7 @@ export class Panaderia {
     this._drawSeeds(ctx, L);
     this._drawCoop(ctx, L);
     this._drawCacao(ctx, L);
+    this._drawVaca(ctx, L);
     this._drawFarmer(ctx, L);
     this._drawMill(ctx, L);
     this._drawBakery(ctx, L);
@@ -1120,6 +1180,36 @@ export class Panaderia {
     ctx.textBaseline = 'alphabetic';
   }
 
+  // vaca comprada: se ordeña cuando muestra la burbuja de leche
+  _drawVaca(ctx, L) {
+    if (!this.vaca) return;
+    const { s } = L;
+    const v = L.vaca;
+    const bob = Math.sin(this.t * 1.8) * 2 * s;
+    // sombra
+    ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(v.x, v.y + v.r * 0.95, v.r * 1.1, v.r * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.font = `${v.r * 1.9}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🐄', v.x, v.y + bob);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#4A3A1A'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
+    ctx.fillText('Vaca', v.x, v.y + v.r * 1.25 + 12 * s);
+
+    // burbuja de "leche lista"
+    if (this.cowReadyT <= 0) {
+      const pulse = 1 + Math.sin(this.t * 5) * 0.1;
+      const by = v.y - v.r * 1.5 + Math.sin(this.t * 3) * 2 * s;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.strokeStyle = '#8FB8D8'; ctx.lineWidth = 2 * s;
+      ctx.beginPath(); ctx.arc(v.x, by, 14 * s * pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.font = `${15 * s * pulse}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🥛', v.x, by + 1 * s);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+
   // menú "¿qué horneamos?" sobre el horno
   _drawOvenMenu(ctx, L) {
     const { s } = L;
@@ -1355,12 +1445,22 @@ export class Panaderia {
       ctx.textAlign = 'center';
       const nCk = Math.min(this.inv.cookie, 2);
       for (let k = 0; k < nCk; k++) {
-        ctx.fillText('🍪', cb.cx + cb.w * 0.14 + k * 24 * s, shelf2Y);
+        ctx.fillText('🍪', cb.cx + cb.w * 0.05 + k * 24 * s, shelf2Y);
       }
       if (this.inv.cookie > 2) {
         ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${13 * s}px system-ui, sans-serif`;
         ctx.textAlign = 'left';
-        ctx.fillText(`×${this.inv.cookie}`, cb.cx + cb.w * 0.14 + 2 * 24 * s - 8 * s, shelf2Y);
+        ctx.fillText(`×${this.inv.cookie}`, cb.cx + cb.w * 0.05 + 2 * 24 * s - 8 * s, shelf2Y);
+      }
+    }
+    if (this.inv.chocomilk > 0) {
+      ctx.font = `${18 * s}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('☕', cb.cx + cb.w * 0.36, shelf2Y);
+      if (this.inv.chocomilk > 1) {
+        ctx.fillStyle = '#7A4A18'; ctx.font = `900 ${13 * s}px system-ui, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`×${this.inv.chocomilk}`, cb.cx + cb.w * 0.36 + 12 * s, shelf2Y);
       }
     }
     ctx.fillStyle = '#7A4A18'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
@@ -1562,7 +1662,7 @@ export class Panaderia {
     // burbujita con lo que va a hacer/llevar
     if (this.task) {
       const label = {
-        bush: '🌳', seed: '🌱', egg: '🥚', choc: '🍫', cacao: '🌳',
+        bush: '🌳', seed: '🌱', egg: '🥚', choc: '🍫', cacao: '🌳', vaca: '🥛',
         plot: this.plots[this.task.idx]?.state === 'ready' ? '🌾' : '🌱',
         mill: '🌾',
         oven: this.task.product !== 'pan' ? PRODUCTS[this.task.product]?.emoji : null,
@@ -1633,6 +1733,11 @@ export class Panaderia {
         label1 = '🍫 Cacaotero';
         label2 = owned ? '✓ ¡hay galletas!' : `$${CACAO_PRICE}`;
         afford = this.money >= CACAO_PRICE;
+      } else if (b.kind === 'vaca') {
+        owned = this.vaca;
+        label1 = '🐄 Vaca';
+        label2 = owned ? '✓ da leche' : `$${VACA_PRICE}`;
+        afford = this.money >= VACA_PRICE;
       } else if (b.kind === 'worker') {
         owned = this.workers[b.worker.key];
         label1 = `${b.worker.emoji} ${b.worker.name}`;
@@ -1665,6 +1770,8 @@ export class Panaderia {
       ['🍞', this.inv.bread],
       ...(this.coop ? [['🥚', this.inv.egg], ['🎂', this.inv.cake]] : []),
       ...(this.cacao ? [['🍫', this.inv.choc], ['🍪', this.inv.cookie]] : []),
+      ...(this.vaca ? [['🥛', this.inv.milk]] : []),
+      ...(this._unlocked('chocoleche') ? [['☕', this.inv.chocomilk]] : []),
       ['💰', `$${this.money}`],
     ];
     let x = 10 * s;
