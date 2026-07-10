@@ -156,6 +156,10 @@ export class Panaderia {
 
     this.mill = { busy: false, t: 0 };
     this.oven = { busy: false, t: 0 };
+
+    // cámara de zoom (pinza en mobile): screen = world * z + (x, y)
+    this.cam = { z: 1, x: 0, y: 0 };
+    this._pinch = null;
   }
 
   _millDur() { return this.upgrades.molino ? MILL_TIME_FAST : MILL_TIME; }
@@ -375,9 +379,122 @@ export class Panaderia {
     this.task = task;
   }
 
+  // ── Zoom con pinza (mobile) ────────────────────────────────────────────────
+  // game.js manda los dos dedos en coordenadas del canvas. El mundo se escala
+  // alrededor del centro del gesto y arrastrar los dedos panea; la tienda, el
+  // HUD y los avisos quedan fijos en pantalla.
+  pinchStart(a, b) {
+    this._pinch = {
+      d: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
+      mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2,
+      z0: this.cam.z,
+    };
+    this.dest = null; this.task = null;   // cancela el toque accidental del primer dedo
+    this.player.isMoving = false;
+  }
+
+  pinchMove(a, b) {
+    const p = this._pinch;
+    if (!p) return;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const nz = Math.max(1, Math.min(2.5, p.z0 * (Math.hypot(b.x - a.x, b.y - a.y) / p.d)));
+    // el punto del mundo bajo el centro del gesto sigue al gesto (zoom + paneo)
+    const wx = (p.mx - this.cam.x) / this.cam.z;
+    const wy = (p.my - this.cam.y) / this.cam.z;
+    this.cam.z = nz;
+    this.cam.x = mx - wx * nz;
+    this.cam.y = my - wy * nz;
+    p.mx = mx; p.my = my;
+    this._clampCam();
+  }
+
+  pinchEnd() { this._pinch = null; }
+
+  _clampCam() {
+    const W = this.canvas.width, H = this.canvas.height, c = this.cam;
+    // casi sin zoom → volver a la vista completa
+    if (c.z <= 1.02) { c.z = 1; c.x = 0; c.y = 0; return; }
+    // que nunca se vea más allá de los bordes del mapa
+    c.x = Math.max(W * (1 - c.z), Math.min(0, c.x));
+    c.y = Math.max(H * (1 - c.z), Math.min(0, c.y));
+  }
+
+  // Tienda (UI instantánea, sin caminar). Devuelve true si el toque cayó en
+  // un botón; se llama con coordenadas de pantalla porque la barra no se
+  // escala con el zoom.
+  _shopPointer(px, py, L) {
+    // los textos flotantes viven en el mundo: convertir el botón a esas coordenadas
+    const fl = (b, txt) => this._float(
+      (b.x + b.w / 2 - this.cam.x) / this.cam.z, (b.y - this.cam.y) / this.cam.z, txt);
+    for (const b of L.shop) {
+      if (!this._inRect(px, py, b)) continue;
+      if (b.kind === 'field') {
+        if (this.plots.length >= MAX_PLOTS) { this._flash('¡Ya tenés todos los campos!'); return true; }
+        const price = FIELD_PRICES[this.plots.length - 2];
+        if (this.money < price) { this._flash('Te falta dinero 💰'); return true; }
+        this.money -= price;
+        this.plots.push({ state: 'empty', t: 0 });
+        fl(b, '¡Nuevo campo!');
+        Sound.serveGood();
+        this._save();
+      } else if (b.kind === 'coop') {
+        if (this.coop) { this._flash('Ya tenés gallinero 🐔'); return true; }
+        if (this.money < COOP_PRICE) { this._flash('Te falta dinero 💰'); return true; }
+        this.money -= COOP_PRICE;
+        this.coop = true;
+        fl(b, '¡Gallinero! Ahora hay tortas 🎂');
+        Sound.serveGood();
+        this._save();
+      } else if (b.kind === 'cacao') {
+        if (this.cacao) { this._flash('Ya tenés cacaotero 🍫'); return true; }
+        if (this.money < CACAO_PRICE) { this._flash('Te falta dinero 💰'); return true; }
+        this.money -= CACAO_PRICE;
+        this.cacao = true;
+        fl(b, '¡Cacaotero! Ahora hay galletas 🍪');
+        Sound.serveGood();
+        this._save();
+      } else if (b.kind === 'vaca') {
+        if (this.vaca) { this._flash('Ya tenés vaca 🐄'); return true; }
+        if (this.money < VACA_PRICE) { this._flash('Te falta dinero 💰'); return true; }
+        this.money -= VACA_PRICE;
+        this.vaca = true;
+        this.cowReadyT = 0;   // llega lista para ordeñar
+        fl(b, this.cacao ? '¡Vaca! Panqueques y choco c/leche 🥞☕' : '¡Vaca! Ahora hay panqueques 🥞');
+        Sound.serveGood();
+        this._save();
+      } else if (b.kind === 'worker') {
+        if (this.workers[b.worker.key]) { this._flash(`Ya tenés ${b.worker.name.toLowerCase()} ✓`); return true; }
+        if (this.money < b.worker.price) { this._flash('Te falta dinero 💰'); return true; }
+        this.money -= b.worker.price;
+        this.workers[b.worker.key] = true;
+        fl(b, `¡${b.worker.name} contratado!`);
+        Sound.serveGood();
+        this._save();
+      } else {
+        if (this.upgrades[b.upgrade.key]) { this._flash(`El ${b.upgrade.key} ya está mejorado ⭐`); return true; }
+        if (this.money < b.upgrade.price) { this._flash('Te falta dinero 💰'); return true; }
+        this.money -= b.upgrade.price;
+        this.upgrades[b.upgrade.key] = true;
+        fl(b, `¡${b.upgrade.name} mejorado! ⭐`);
+        Sound.serveGood();
+        this._save();
+      }
+      return true;
+    }
+    return false;
+  }
+
   pointer(px, py) {
+    if (this._pinch) return;   // mientras se hace zoom no hay taps
     const L = this._layout();
     const { s } = L;
+
+    // la tienda es UI fija: se toca en coordenadas de pantalla, antes del zoom
+    if (this._shopPointer(px, py, L)) return;
+
+    // el resto del mapa se toca en coordenadas del mundo (deshace el zoom)
+    px = (px - this.cam.x) / this.cam.z;
+    py = (py - this.cam.y) / this.cam.z;
 
     // recetas al costado del horno: tocar una arranca la cocción directa
     for (const mb of L.ovenMenu) {
@@ -388,63 +505,6 @@ export class Panaderia {
         return;
       }
       this._goTo(L.oven.x + L.oven.w / 2, L.oven.y + L.oven.h + 14 * s, { type: 'oven', product: mb.prod });
-      return;
-    }
-
-    // tienda (UI instantánea, sin caminar)
-    for (const b of L.shop) {
-      if (!this._inRect(px, py, b)) continue;
-      if (b.kind === 'field') {
-        if (this.plots.length >= MAX_PLOTS) { this._flash('¡Ya tenés todos los campos!'); return; }
-        const price = FIELD_PRICES[this.plots.length - 2];
-        if (this.money < price) { this._flash('Te falta dinero 💰'); return; }
-        this.money -= price;
-        this.plots.push({ state: 'empty', t: 0 });
-        this._float(b.x + b.w / 2, b.y, '¡Nuevo campo!');
-        Sound.serveGood();
-        this._save();
-      } else if (b.kind === 'coop') {
-        if (this.coop) { this._flash('Ya tenés gallinero 🐔'); return; }
-        if (this.money < COOP_PRICE) { this._flash('Te falta dinero 💰'); return; }
-        this.money -= COOP_PRICE;
-        this.coop = true;
-        this._float(b.x + b.w / 2, b.y, '¡Gallinero! Ahora hay tortas 🎂');
-        Sound.serveGood();
-        this._save();
-      } else if (b.kind === 'cacao') {
-        if (this.cacao) { this._flash('Ya tenés cacaotero 🍫'); return; }
-        if (this.money < CACAO_PRICE) { this._flash('Te falta dinero 💰'); return; }
-        this.money -= CACAO_PRICE;
-        this.cacao = true;
-        this._float(b.x + b.w / 2, b.y, '¡Cacaotero! Ahora hay galletas 🍪');
-        Sound.serveGood();
-        this._save();
-      } else if (b.kind === 'vaca') {
-        if (this.vaca) { this._flash('Ya tenés vaca 🐄'); return; }
-        if (this.money < VACA_PRICE) { this._flash('Te falta dinero 💰'); return; }
-        this.money -= VACA_PRICE;
-        this.vaca = true;
-        this.cowReadyT = 0;   // llega lista para ordeñar
-        this._float(b.x + b.w / 2, b.y, this.cacao ? '¡Vaca! Panqueques y choco c/leche 🥞☕' : '¡Vaca! Ahora hay panqueques 🥞');
-        Sound.serveGood();
-        this._save();
-      } else if (b.kind === 'worker') {
-        if (this.workers[b.worker.key]) { this._flash(`Ya tenés ${b.worker.name.toLowerCase()} ✓`); return; }
-        if (this.money < b.worker.price) { this._flash('Te falta dinero 💰'); return; }
-        this.money -= b.worker.price;
-        this.workers[b.worker.key] = true;
-        this._float(b.x + b.w / 2, b.y, `¡${b.worker.name} contratado!`);
-        Sound.serveGood();
-        this._save();
-      } else {
-        if (this.upgrades[b.upgrade.key]) { this._flash(`El ${b.upgrade.key} ya está mejorado ⭐`); return; }
-        if (this.money < b.upgrade.price) { this._flash('Te falta dinero 💰'); return; }
-        this.money -= b.upgrade.price;
-        this.upgrades[b.upgrade.key] = true;
-        this._float(b.x + b.w / 2, b.y, `¡${b.upgrade.name} mejorado! ⭐`);
-        Sound.serveGood();
-        this._save();
-      }
       return;
     }
 
@@ -915,6 +975,11 @@ export class Panaderia {
   render(ctx) {
     const L = this._layout(), { W, H, s } = L;
 
+    // el mundo se dibuja con la cámara del zoom; la UI va fija encima
+    ctx.save();
+    ctx.translate(this.cam.x, this.cam.y);
+    ctx.scale(this.cam.z, this.cam.z);
+
     this._drawBackground(ctx, L);
     this._drawFields(ctx, L);
     this._drawBush(ctx, L);
@@ -927,10 +992,8 @@ export class Panaderia {
     this._drawBakery(ctx, L);
     this._drawOvenMenu(ctx, L);
     this._drawPlayer(ctx, L);
-    this._drawShop(ctx, L);
-    this._drawHUD(ctx, L);
 
-    // textos flotantes
+    // textos flotantes (viven en coordenadas del mundo)
     for (const f of this.floats) {
       ctx.globalAlpha = Math.max(0, 1 - f.life / f.max);
       ctx.fillStyle = f.color;
@@ -939,6 +1002,11 @@ export class Panaderia {
       ctx.fillText(f.txt, f.x, f.y);
     }
     ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // UI fija en pantalla (no se escala con el zoom)
+    this._drawShop(ctx, L);
+    this._drawHUD(ctx, L);
 
     // mensaje de error / aviso
     if (this.msgT > 0) {

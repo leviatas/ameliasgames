@@ -936,6 +936,7 @@ function startGame() {
   }
 
   touchControls.onZoom(scale => {
+    if (mode === 'panaderia') return;   // la panadería tiene su propio zoom con pinza
     cam.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, cam.zoom * scale));
   });
 
@@ -1746,6 +1747,21 @@ if (panaderiaReset) panaderiaReset.addEventListener('click', () => {
 canvas.addEventListener('pointerdown', e => {
   if (mode !== 'panaderia' || !panaderia) return;
   const p = canvasPoint(e); panaderia.pointer(p.x, p.y);
+});
+// pinza con dos dedos → zoom del mapa de la panadería (mobile)
+canvas.addEventListener('touchstart', e => {
+  if (mode !== 'panaderia' || !panaderia || e.touches.length !== 2) return;
+  e.preventDefault();
+  panaderia.pinchStart(canvasPoint(e.touches[0]), canvasPoint(e.touches[1]));
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  if (mode !== 'panaderia' || !panaderia || e.touches.length !== 2) return;
+  e.preventDefault();
+  panaderia.pinchMove(canvasPoint(e.touches[0]), canvasPoint(e.touches[1]));
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  if (mode !== 'panaderia' || !panaderia) return;
+  if (e.touches.length < 2) panaderia.pinchEnd();
 });
 window.addEventListener('keydown', e => {
   if (mode === 'panaderia' && panaderia && e.code === 'Escape') { exitPanaderia(); e.preventDefault(); }
