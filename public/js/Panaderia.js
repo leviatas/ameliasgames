@@ -86,6 +86,7 @@ const MILL_TIME_FAST = 1.8;   // con la mejora ⭐
 const OVEN_TIME  = 4.5;   // seg. de horneado por pan
 const OVEN_TIME_FAST = 2.3;   // con la mejora ⭐
 const MAX_GROUND_SEEDS = 6;
+const FARMER_STOCK_CAP = 20;   // el granjero deja de juntar semillas / sembrar con 20 en stock
 
 const COW_MILK_COOLDOWN = 8;   // seg. hasta que la vaca vuelve a dar leche
 const HONEY_COOLDOWN    = 9;   // seg. hasta que la colmena vuelve a dar miel
@@ -1088,6 +1089,7 @@ export class Panaderia {
         f.pauseT -= dt;
       } else if (!f.dest) {
         // elegir tarea: cosechar > plantar > juntar semillas > huevos > chocolates > frutillas
+        // (siembra y semillas con tope: al llegar a 20 en stock deja de acumular)
         const ri = this.plots.findIndex(p => p.state === 'ready');
         const ei = this.plots.findIndex(p => p.state === 'empty');
         const gi = this.groundSeeds.findIndex(g => g.t >= 1);
@@ -1098,11 +1100,11 @@ export class Panaderia {
           const r = L.plotRects[ri];
           f.task = { type: 'harvest', idx: ri };
           f.dest = { x: r.x + r.w / 2, y: r.y + r.h + 10 * L.s };
-        } else if (ei >= 0 && this.inv.seed > 0) {
+        } else if (ei >= 0 && this.inv.seed > 0 && this.inv.wheat < FARMER_STOCK_CAP) {
           const r = L.plotRects[ei];
           f.task = { type: 'plant', idx: ei };
           f.dest = { x: r.x + r.w / 2, y: r.y + r.h + 10 * L.s };
-        } else if (gi >= 0) {
+        } else if (gi >= 0 && this.inv.seed < FARMER_STOCK_CAP) {
           const g = this.groundSeeds[gi];
           f.task = { type: 'seed', seed: g };
           f.dest = { x: g.tx, y: g.ty + 6 * L.s };
