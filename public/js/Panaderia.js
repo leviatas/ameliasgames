@@ -86,7 +86,10 @@ const MILL_TIME_FAST = 1.8;   // con la mejora ⭐
 const OVEN_TIME  = 4.5;   // seg. de horneado por pan
 const OVEN_TIME_FAST = 2.3;   // con la mejora ⭐
 const MAX_GROUND_SEEDS = 6;
-const FARMER_STOCK_CAP = 20;   // el granjero deja de juntar semillas / sembrar con 20 en stock
+// Tope de stock: los trabajadores (granjero, molinero) dejan de juntar o
+// producir un recurso cuando ya hay 20 en el inventario; al consumir/vender
+// se libera el tope y retoman solos. El jugador no tiene límite.
+const STOCK_CAP = 20;
 
 const COW_MILK_COOLDOWN = 8;   // seg. hasta que la vaca vuelve a dar leche
 const HONEY_COOLDOWN    = 9;   // seg. hasta que la colmena vuelve a dar miel
@@ -1089,22 +1092,23 @@ export class Panaderia {
         f.pauseT -= dt;
       } else if (!f.dest) {
         // elegir tarea: cosechar > plantar > juntar semillas > huevos > chocolates > frutillas
-        // (siembra y semillas con tope: al llegar a 20 en stock deja de acumular)
+        // Cada recurso respeta STOCK_CAP; la cosecha del trigo maduro sigue
+        // siempre (lo que se frena con el tope es la siembra).
         const ri = this.plots.findIndex(p => p.state === 'ready');
         const ei = this.plots.findIndex(p => p.state === 'empty');
-        const gi = this.groundSeeds.findIndex(g => g.t >= 1);
-        const eg = this.eggs.findIndex(e => e.t >= 1);
-        const ch = this.chocs.findIndex(c => c.t >= 1);
-        const fr = this.straws.findIndex(f => f.t >= 1);
+        const gi = this.inv.seed < STOCK_CAP ? this.groundSeeds.findIndex(g => g.t >= 1) : -1;
+        const eg = this.inv.egg < STOCK_CAP ? this.eggs.findIndex(e => e.t >= 1) : -1;
+        const ch = this.inv.choc < STOCK_CAP ? this.chocs.findIndex(c => c.t >= 1) : -1;
+        const fr = this.inv.straw < STOCK_CAP ? this.straws.findIndex(f => f.t >= 1) : -1;
         if (ri >= 0) {
           const r = L.plotRects[ri];
           f.task = { type: 'harvest', idx: ri };
           f.dest = { x: r.x + r.w / 2, y: r.y + r.h + 10 * L.s };
-        } else if (ei >= 0 && this.inv.seed > 0 && this.inv.wheat < FARMER_STOCK_CAP) {
+        } else if (ei >= 0 && this.inv.seed > 0 && this.inv.wheat < STOCK_CAP) {
           const r = L.plotRects[ei];
           f.task = { type: 'plant', idx: ei };
           f.dest = { x: r.x + r.w / 2, y: r.y + r.h + 10 * L.s };
-        } else if (gi >= 0 && this.inv.seed < FARMER_STOCK_CAP) {
+        } else if (gi >= 0) {
           const g = this.groundSeeds[gi];
           f.task = { type: 'seed', seed: g };
           f.dest = { x: g.tx, y: g.ty + 6 * L.s };
@@ -1120,10 +1124,10 @@ export class Panaderia {
           const f2 = this.straws[fr];
           f.task = { type: 'straw', straw: f2 };
           f.dest = { x: f2.x, y: f2.y + 6 * L.s };
-        } else if (this.vaca && this.cowReadyT <= 0) {
+        } else if (this.vaca && this.cowReadyT <= 0 && this.inv.milk < STOCK_CAP) {
           f.task = { type: 'vaca' };
           f.dest = { x: L.vaca.x + L.vaca.r * 1.2, y: L.vaca.y + L.vaca.r * 0.9 };
-        } else if (this.colmena && this.honeyReadyT <= 0) {
+        } else if (this.colmena && this.honeyReadyT <= 0 && this.inv.honey < STOCK_CAP) {
           f.task = { type: 'colmena' };
           f.dest = { x: L.colmena.x + L.colmena.r * 1.2, y: L.colmena.y + L.colmena.r * 1.1 };
         }
@@ -1178,7 +1182,7 @@ export class Panaderia {
         }
       }
     }
-    if (this.workers.molinero && !this.mill.busy && this.inv.wheat > 0) {
+    if (this.workers.molinero && !this.mill.busy && this.inv.wheat > 0 && this.inv.flour < STOCK_CAP) {
       this.workerT.molinero -= dt;
       if (this.workerT.molinero <= 0) { this.workerT.molinero = 0.9; this._loadMill(L); }
     }
