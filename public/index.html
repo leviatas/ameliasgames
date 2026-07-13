@@ -600,7 +600,8 @@
   <!-- Bakery farm mini-game controls -->
   <div id="panaderia-ui" class="hidden">
     <button id="panaderia-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
-    <button id="panaderia-reset" class="game-menu-btn" title="Borrar solo el progreso de la panadería">🔄 Reiniciar</button>
+    <button id="panaderia-reset" class="game-menu-btn" title="Borrar solo el progreso de este nivel">🔄 Reiniciar</button>
+    <button id="panaderia-level" class="game-menu-btn hidden" title="Cambiar de nivel">🧁 Pastelería</button>
   </div>
 
   <!-- Clothing store controls -->
@@ -624,7 +625,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.56.0</div>
+  <div id="app-version">v2.57.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">
@@ -726,6 +727,7 @@
         'mimundo_state_v2', 'fridge_foods',
         'hole_best', 'cocina_best', 'match3_best',
         'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
+        'pasteleria_state', 'panaderia_money', 'panaderia_meta',
       ];
       keys.forEach(k => localStorage.removeItem(k));
       location.reload();
