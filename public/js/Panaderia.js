@@ -1184,12 +1184,15 @@ export class Panaderia {
       this.workerT.panadero -= dt;
       if (this.workerT.panadero <= 0) {
         this.workerT.panadero = 0.9;
-        // prioriza el producto que espera algún cliente y todavía no está en stock
+        // hornea lo que pide la fila, en orden de llegada. Si a un pedido le
+        // faltan ingredientes, espera a que lleguen (no los malgasta horneando
+        // el básico); solo hace básico de más cuando nadie espera nada
         const st = this.cfg.starter;
-        const wanted = Object.keys(this.cfg.products).filter(pr => pr !== st).find(pr =>
-          this.customers.some(c => !c.leaving && c.prod === pr && this.inv[this.cfg.products[pr].inv] < c.want) && this._canBake(pr));
-        if (wanted) this._loadOven(L, wanted);
-        else if (this._canBake(st)) this._loadOven(L, st);
+        const pending = this.customers.filter(c =>
+          !c.leaving && this.inv[this.cfg.products[c.prod].inv] < c.want);
+        const order = pending.find(c => this._canBake(c.prod));
+        if (order) this._loadOven(L, order.prod);
+        else if (!pending.length && this._canBake(st)) this._loadOven(L, st);
       }
     }
     if (this.workers.vendedor) {
