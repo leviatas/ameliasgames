@@ -81,6 +81,9 @@ const VACA_PRICE  = 250;
 const COW_MILK_COOLDOWN = 8;   // seg. hasta que la vaca vuelve a dar leche
 const MAX_GROUND_EGGS  = 3;
 const MAX_GROUND_CHOCS = 3;
+// Tope de stock: los trabajadores (granjero, molinero) no juntan ni producen un
+// recurso si ya hay al menos esta cantidad en el inventario.
+const STOCK_CAP = 20;
 const PRODUCTS = {
   pan:        { name: 'Pan',           emoji: '🍞', inv: 'bread',     flour: 1, egg: 0, choc: 0, milk: 0, priceBase: 12, priceVar: 5,  coins: 5,  timeMul: 1 },
   galleta:    { name: 'Galletas',      emoji: '🍪', inv: 'cookie',    flour: 1, egg: 0, choc: 1, milk: 0, priceBase: 25, priceVar: 6,  coins: 8,  timeMul: 1.5 },
@@ -853,11 +856,12 @@ export class Panaderia {
         f.pauseT -= dt;
       } else if (!f.dest) {
         // elegir tarea: cosechar > plantar > juntar semillas > huevos > chocolates
-        const ri = this.plots.findIndex(p => p.state === 'ready');
+        // No juntamos/producimos un recurso si ya hay STOCK_CAP (20) o más.
+        const ri = this.inv.wheat < STOCK_CAP ? this.plots.findIndex(p => p.state === 'ready') : -1;
         const ei = this.plots.findIndex(p => p.state === 'empty');
-        const gi = this.groundSeeds.findIndex(g => g.t >= 1);
-        const eg = this.eggs.findIndex(e => e.t >= 1);
-        const ch = this.chocs.findIndex(c => c.t >= 1);
+        const gi = this.inv.seed < STOCK_CAP ? this.groundSeeds.findIndex(g => g.t >= 1) : -1;
+        const eg = this.inv.egg < STOCK_CAP ? this.eggs.findIndex(e => e.t >= 1) : -1;
+        const ch = this.inv.choc < STOCK_CAP ? this.chocs.findIndex(c => c.t >= 1) : -1;
         if (ri >= 0) {
           const r = L.plotRects[ri];
           f.task = { type: 'harvest', idx: ri };
@@ -878,7 +882,7 @@ export class Panaderia {
           const c = this.chocs[ch];
           f.task = { type: 'choc', choc: c };
           f.dest = { x: c.x, y: c.y + 6 * L.s };
-        } else if (this.vaca && this.cowReadyT <= 0) {
+        } else if (this.vaca && this.cowReadyT <= 0 && this.inv.milk < STOCK_CAP) {
           f.task = { type: 'vaca' };
           f.dest = { x: L.vaca.x + L.vaca.r * 1.2, y: L.vaca.y + L.vaca.r * 0.9 };
         }
@@ -922,7 +926,7 @@ export class Panaderia {
         }
       }
     }
-    if (this.workers.molinero && !this.mill.busy && this.inv.wheat > 0) {
+    if (this.workers.molinero && !this.mill.busy && this.inv.wheat > 0 && this.inv.flour < STOCK_CAP) {
       this.workerT.molinero -= dt;
       if (this.workerT.molinero <= 0) { this.workerT.molinero = 0.9; this._loadMill(L); }
     }
