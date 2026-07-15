@@ -431,29 +431,46 @@ function exitHelado() {
 }
 
 // ── Bakery farm mini-game ────────────────────────────────────────────────────
-// La panadería tiene dos niveles: 'panaderia' y 'pasteleria' (se desbloquea al
-// comprar todo lo del 1). El nivel actual y el desbloqueo viven en panaderia_meta.
+// La panadería tiene niveles encadenados (panadería → pastelería → pizzería):
+// cada uno se desbloquea al comprar todo lo del anterior. El nivel actual y la
+// lista de desbloqueados viven en panaderia_meta.
+const PANADERIA_LABELS = { panaderia: '🍞 Panadería', pasteleria: '🧁 Pastelería', pizzeria: '🍕 Pizzería' };
 function getPanaderiaMeta() {
-  try { return JSON.parse(localStorage.getItem('panaderia_meta')) || {}; } catch (e) { return {}; }
+  try {
+    const m = JSON.parse(localStorage.getItem('panaderia_meta')) || {};
+    // migración: el flag viejo l2 pasa a la lista de niveles desbloqueados
+    if (!Array.isArray(m.unlocked)) m.unlocked = m.l2 ? ['pasteleria'] : [];
+    return m;
+  } catch (e) { return { unlocked: [] }; }
 }
 function setPanaderiaMeta(m) {
   try { localStorage.setItem('panaderia_meta', JSON.stringify(m)); } catch (e) {}
 }
-function panaderiaLevelBtn() { return document.getElementById('panaderia-level'); }
-function updatePanaderiaLevelBtn(level) {
-  const btn = panaderiaLevelBtn();
-  if (!btn) return;
+// ciclo de niveles disponibles, en orden (la panadería siempre está)
+function panaderiaCycle() {
   const meta = getPanaderiaMeta();
-  btn.classList.toggle('hidden', !meta.l2);
-  btn.textContent = level === 'pasteleria' ? '🍞 Panadería' : '🧁 Pastelería';
+  return ['panaderia', ...['pasteleria', 'pizzeria'].filter(l => meta.unlocked.includes(l))];
+}
+function nextPanaderiaLevel(cur) {
+  const cyc = panaderiaCycle();
+  return cyc[(cyc.indexOf(cur) + 1) % cyc.length];
+}
+function updatePanaderiaLevelBtn(level) {
+  const btn = document.getElementById('panaderia-level');
+  if (!btn) return;
+  const cyc = panaderiaCycle();
+  btn.classList.toggle('hidden', cyc.length < 2);
+  btn.textContent = PANADERIA_LABELS[nextPanaderiaLevel(level)] || '';
 }
 function newPanaderia(level) {
   return new Panaderia(canvas, look, {
     level,
-    // al completar la panadería queda desbloqueada la pastelería
-    onLevelUnlocked: (lvl) => {
-      if (lvl !== 'panaderia') return;
-      setPanaderiaMeta({ ...getPanaderiaMeta(), l2: true });
+    // al completar un nivel queda desbloqueado el siguiente de la cadena
+    onLevelUnlocked: (lvl, next) => {
+      if (!next) return;
+      const meta = getPanaderiaMeta();
+      if (!meta.unlocked.includes(next)) meta.unlocked.push(next);
+      setPanaderiaMeta(meta);
       updatePanaderiaLevelBtn(level);
     },
     onSwitchLevel: (target) => switchPanaderiaLevel(target),
@@ -462,7 +479,9 @@ function newPanaderia(level) {
 function switchPanaderiaLevel(target) {
   if (!panaderia) return;
   panaderia.destroy();
-  setPanaderiaMeta({ ...getPanaderiaMeta(), level: target });
+  const meta = getPanaderiaMeta();
+  meta.level = target;
+  setPanaderiaMeta(meta);
   panaderia = newPanaderia(target);
   updatePanaderiaLevelBtn(target);
 }
@@ -473,7 +492,7 @@ function launchPanaderia() {
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('panaderia-ui').classList.remove('hidden');
   const meta = getPanaderiaMeta();
-  const level = meta.level === 'pasteleria' && meta.l2 ? 'pasteleria' : 'panaderia';
+  const level = meta.level === 'panaderia' || meta.unlocked.includes(meta.level) ? meta.level : 'panaderia';
   panaderia = newPanaderia(level);
   updatePanaderiaLevelBtn(level);
   mode   = 'panaderia';
@@ -1779,17 +1798,17 @@ const panaderiaReset = document.getElementById('panaderia-reset');
 if (panaderiaReset) panaderiaReset.addEventListener('click', () => {
   if (mode !== 'panaderia' || !panaderia) return;
   const level = panaderia.cfg.key;
-  const nombre = level === 'pasteleria' ? 'la pastelería' : 'la panadería';
+  const nombre = { panaderia: 'la panadería', pasteleria: 'la pastelería', pizzeria: 'la pizzería' }[level] || 'la panadería';
   if (!confirm(`¿Reiniciar ${nombre}? Se pierden los campos, los trabajadores y las mejoras de este nivel (el dinero, el otro nivel y el resto del progreso no se tocan).`)) return;
   panaderia.wipeSave();
   panaderia = newPanaderia(level);   // arranca de cero, sin releer el guardado
 });
-// botón para alternar entre panadería y pastelería (aparece al desbloquear el nivel 2)
+// botón para rotar entre los niveles desbloqueados (aparece al ganar el primero)
 const panaderiaLevel = document.getElementById('panaderia-level');
 if (panaderiaLevel) panaderiaLevel.addEventListener('click', () => {
   if (mode !== 'panaderia' || !panaderia) return;
-  if (!getPanaderiaMeta().l2) return;
-  switchPanaderiaLevel(panaderia.cfg.key === 'pasteleria' ? 'panaderia' : 'pasteleria');
+  if (panaderiaCycle().length < 2) return;
+  switchPanaderiaLevel(nextPanaderiaLevel(panaderia.cfg.key));
 });
 canvas.addEventListener('pointerdown', e => {
   if (mode !== 'panaderia' || !panaderia) return;

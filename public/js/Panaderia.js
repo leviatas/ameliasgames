@@ -10,10 +10,11 @@
 //      cada tarea (granjero, molinero, panadero, vendedor).
 // El progreso (dinero, campos, trabajadores e inventario) se guarda solo.
 //
-// Niveles: la misma clase corre la Panadería (nivel 1) y la Pastelería
-// (nivel 2, se desbloquea al comprar todo lo del 1). Cada nivel es una entrada
-// de LEVELS con su tienda, fuentes, productos y paleta. El dinero se comparte
-// entre niveles; el resto del progreso vive en el saveKey de cada nivel.
+// Niveles: la misma clase corre la Panadería, la Pastelería y la Pizzería
+// (cada uno se desbloquea al comprar todo lo del anterior; `next` los encadena).
+// Cada nivel es una entrada de LEVELS con su tienda, fuentes, productos y
+// paleta. El dinero se comparte entre niveles; el resto del progreso vive en
+// el saveKey de cada nivel.
 
 import { Sound }     from './Sound.js';
 import { addCoins }  from './Wallet.js';
@@ -48,10 +49,22 @@ const IMG2 = {
   medialunas: loadImg2('medialunas'), tarta: loadImg2('tarta'),
   alfajores: loadImg2('alfajores'), licuado: loadImg2('licuado'),
 };
+// sprites propios de la pizzería (nivel 3), mismo esquema de respaldo
+const ASSET3 = (name) => `/assets/pizzeria/${name}.png`;
+function loadImg3(name) { const im = new Image(); im.src = ASSET3(name); return im; }
+const IMG3 = {
+  quesera: loadImg3('quesera'), queso: loadImg3('queso'),
+  tomatera: loadImg3('tomatera'), tomate: loadImg3('tomate'),
+  maizal: loadImg3('maizal'), choclo: loadImg3('choclo'),
+  albahaca: loadImg3('albahaca'),
+  tostado: loadImg3('tostado'), pizza: loadImg3('pizza'),
+  empanadas: loadImg3('empanadas'), caprese: loadImg3('caprese'),
+};
 // sprite de cada producto vendible por nivel (para burbujas, mostrador y HUD)
 const PROD_IMG = {
   panaderia: () => ({ pan: IMG.pan, torta: IMG.torta, galleta: IMG.galletas, chocoleche: IMG.chocoleche, panqueque: IMG.panqueques }),
   pasteleria: () => ({ medialuna: IMG2.medialunas, tarta: IMG2.tarta, alfajor: IMG2.alfajores, licuado: IMG2.licuado }),
+  pizzeria: () => ({ tostado: IMG3.tostado, pizza: IMG3.pizza, empanada: IMG3.empanadas, caprese: IMG3.caprese }),
 };
 // sprite de cada ícono del HUD (si no cargó, se usa el emoji)
 const CHIP_IMG = () => ({
@@ -60,15 +73,21 @@ const CHIP_IMG = () => ({
   '🥞': IMG.panqueques,
   '🍯': IMG2.miel, '🍓': IMG2.frutilla, '🥐': IMG2.medialunas,
   '🍰': IMG2.tarta, '🍬': IMG2.alfajores, '🥤': IMG2.licuado,
+  '🧀': IMG3.queso, '🍅': IMG3.tomate, '🌽': IMG3.choclo,
+  '🥪': IMG3.tostado, '🍕': IMG3.pizza, '🥟': IMG3.empanadas, '🥗': IMG3.caprese,
 });
 // cómo se muestra cada ingrediente de las recetas (sprite con emoji de respaldo)
 const ING = {
-  flour: { emoji: 'H',  word: 'harina', img: () => IMG.harina },
-  egg:   { emoji: '🥚', img: () => IMG.huevo },
-  choc:  { emoji: '🍫', img: () => IMG.chocolate },
-  milk:  { emoji: '🥛', img: () => IMG.leche },
-  honey: { emoji: '🍯', img: () => IMG2.miel },
-  straw: { emoji: '🍓', img: () => IMG2.frutilla },
+  flour:  { emoji: 'H',  word: 'harina', img: () => IMG.harina },
+  egg:    { emoji: '🥚', img: () => IMG.huevo },
+  choc:   { emoji: '🍫', img: () => IMG.chocolate },
+  milk:   { emoji: '🥛', img: () => IMG.leche },
+  honey:  { emoji: '🍯', img: () => IMG2.miel },
+  straw:  { emoji: '🍓', img: () => IMG2.frutilla },
+  cheese: { emoji: '🧀', img: () => IMG3.queso },
+  tomato: { emoji: '🍅', img: () => IMG3.tomate },
+  corn:   { emoji: '🌽', img: () => IMG3.choclo },
+  basil:  { emoji: '🌿', img: () => IMG3.albahaca },
 };
 // dibuja una imagen contenida en un cuadrado centrado en (cx, cy)
 function drawIconImg(ctx, img, cx, cy, size) {
@@ -78,13 +97,15 @@ function drawIconImg(ctx, img, cx, cy, size) {
   ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
 }
 
-const MONEY_KEY  = 'panaderia_money';   // dinero compartido entre los dos niveles
+const MONEY_KEY  = 'panaderia_money';   // dinero compartido entre niveles
 const MAX_PLOTS  = 4;
 const GROW_TIME  = 10;    // seg. para que el trigo madure
 const MILL_TIME  = 3.5;   // seg. de molienda por trigo
 const MILL_TIME_FAST = 1.8;   // con la mejora ⭐
 const OVEN_TIME  = 4.5;   // seg. de horneado por pan
 const OVEN_TIME_FAST = 2.3;   // con la mejora ⭐
+const QUESO_TIME = 5;     // seg. de la quesera por leche (pizzería)
+const QUESO_TIME_FAST = 2.6;  // con la mejora ⭐
 const MAX_GROUND_SEEDS = 6;
 // Tope de stock: los trabajadores (granjero, molinero) dejan de juntar o
 // producir un recurso cuando ya hay 20 en el inventario; al consumir/vender
@@ -93,9 +114,7 @@ const STOCK_CAP = 20;
 
 const COW_MILK_COOLDOWN = 8;   // seg. hasta que la vaca vuelve a dar leche
 const HONEY_COOLDOWN    = 9;   // seg. hasta que la colmena vuelve a dar miel
-const MAX_GROUND_EGGS   = 3;
-const MAX_GROUND_CHOCS  = 3;
-const MAX_GROUND_STRAWS = 3;
+const MAX_GROUND_ITEMS  = 3;   // items de una fuente esperando en el piso
 
 // Productos horneables por nivel. `ing` es la receta (se descuenta tal cual en
 // _loadOven, sea cual sea el ingrediente) y `req` las fuentes que la desbloquean.
@@ -112,23 +131,45 @@ const PRODUCTS2 = {
   licuado:   { name: 'Licuado',    emoji: '🥤', inv: 'licuado',   ing: { milk: 1, straw: 1 },           req: ['vaca', 'frutillar'],  priceBase: 45, priceVar: 10, coins: 12, timeMul: 0.8 },
   tarta:     { name: 'Tarta',      emoji: '🍰', inv: 'tart',      ing: { flour: 2, egg: 1, straw: 1 },  req: ['coop', 'frutillar'],  priceBase: 90, priceVar: 20, coins: 22, timeMul: 2.2 },
 };
+const PRODUCTS3 = {
+  tostado:  { name: 'Tostado',   emoji: '🥪', inv: 'toast',    ing: { flour: 1, cheese: 1 },            req: [],                       priceBase: 50,  priceVar: 14, coins: 16, timeMul: 1 },
+  pizza:    { name: 'Pizza',     emoji: '🍕', inv: 'pizza',    ing: { flour: 2, tomato: 1, cheese: 1 }, req: ['tomatera'],             priceBase: 180, priceVar: 40, coins: 45, timeMul: 2.2 },
+  empanada: { name: 'Empanadas', emoji: '🥟', inv: 'empanada', ing: { flour: 1, corn: 1, cheese: 1 },   req: ['maizal'],               priceBase: 110, priceVar: 25, coins: 28, timeMul: 1.5 },
+  caprese:  { name: 'Caprese',   emoji: '🥗', inv: 'caprese',  ing: { tomato: 1, cheese: 1, basil: 1 }, req: ['tomatera', 'albahaca'], priceBase: 90,  priceVar: 20, coins: 24, timeMul: 0.8 },
+};
 
 // ── Niveles ──────────────────────────────────────────────────────────────────
 // `sources` son las fuentes de ingredientes: las free vienen de regalo con el
 // nivel, el resto se compra en la tienda. `starter` es el producto básico que
 // se hornea tocando el horno directo (y el que el panadero hace por defecto).
+//
+// Cada fuente declara su mecánica (`mech`):
+//   'spawn' → suelta items solos en su `zone` (gallinero, maizal)
+//   'shake' → además se sacude para que caigan ya (cacaotero, frutillar, tomatera)
+//   'ready' → recarga con `cooldown` y se cosecha directo (vaca, colmena, albahaca)
+// `spot`/`zone` nombran rects del _layout(); `first`/`spawn:[base,var]` son los
+// tiempos de aparición; `standY` ajusta dónde se para el personaje al cosechar.
 const LEVELS = {
   panaderia: {
     key: 'panaderia',
     saveKey: 'panaderia_state',
     title: '🍞 PANADERÍA',
+    name: 'Panadería',
+    icon: '🍞',
+    next: 'pasteleria',   // nivel que se desbloquea al comprar todo
     starter: 'pan',
     fieldPrices: [60, 120],   // campos 3 y 4 (arrancás con 2)
     sources: {
-      coop:  { name: 'Gallinero', emoji: '🐔', ing: 'egg',  price: 200, done: '✓ ¡hay tortas!',    already: 'Ya tenés gallinero 🐔', buy: '¡Gallinero! Ahora hay tortas 🎂' },
-      cacao: { name: 'Cacaotero', emoji: '🍫', ing: 'choc', price: 300, done: '✓ ¡hay galletas!',  already: 'Ya tenés cacaotero 🍫', buy: '¡Cacaotero! Ahora hay galletas 🍪' },
-      vaca:  { name: 'Vaca',      emoji: '🐄', ing: 'milk', price: 250, done: '✓ ¡hay panqueques!', already: 'Ya tenés vaca 🐄',
-               buy: (g) => g.cacao ? '¡Vaca! Panqueques y choco c/leche 🥞☕' : '¡Vaca! Ahora hay panqueques 🥞' },
+      coop:  { name: 'Gallinero', emoji: '🐔', ing: 'egg',  price: 200, mech: 'spawn', spot: 'coop', zone: 'coopZone', first: 6, spawn: [7, 4],
+               done: '✓ ¡hay tortas!', already: 'Ya tenés gallinero 🐔', buy: '¡Gallinero! Ahora hay tortas 🎂',
+               hintDrop: 'Juntá los huevos del gallinero 🥚' },
+      cacao: { name: 'Cacaotero', emoji: '🍫', ing: 'choc', price: 300, mech: 'shake', spot: 'cacao', zone: 'chocZone', first: 8, spawn: [8, 5],
+               done: '✓ ¡hay galletas!', already: 'Ya tenés cacaotero 🍫', buy: '¡Cacaotero! Ahora hay galletas 🍪',
+               hintDrop: 'Juntá los chocolates del cacaotero 🍫' },
+      vaca:  { name: 'Vaca', emoji: '🐄', ing: 'milk', price: 250, mech: 'ready', spot: 'vaca', cooldown: COW_MILK_COOLDOWN, standY: 0.9,
+               done: '✓ ¡hay panqueques!', already: 'Ya tenés vaca 🐄',
+               buy: (g) => g.cacao ? '¡Vaca! Panqueques y choco c/leche 🥞☕' : '¡Vaca! Ahora hay panqueques 🥞',
+               notReady: 'La vaca todavía no tiene leche 🐄', hintReady: 'La vaca está lista, ¡ordeñala! 🥛' },
     },
     workers: [
       { key: 'granjero', name: 'Granjero', emoji: '🧑‍🌾', price: 180, desc: 'Junta, planta y cosecha' },
@@ -147,14 +188,26 @@ const LEVELS = {
     key: 'pasteleria',
     saveKey: 'pasteleria_state',
     title: '🧁 PASTELERÍA',
+    name: 'Pastelería',
+    icon: '🧁',
+    next: 'pizzeria',
     starter: 'medialuna',
     fieldPrices: [120, 240],
     sources: {
-      colmena:   { name: 'Colmena',   emoji: '🐝', ing: 'honey', price: 0, free: true },
-      frutillar: { name: 'Frutillar', emoji: '🍓', ing: 'straw', price: 350, done: '✓ ¡hay frutillas!', already: 'Ya tenés frutillar 🍓', buy: '¡Frutillar! Frutillas para tartas y licuados 🍓' },
-      coop:  { name: 'Gallinero', emoji: '🐔', ing: 'egg',  price: 400, done: '✓ ¡hay tartas!',    already: 'Ya tenés gallinero 🐔', buy: '¡Gallinero! Huevos para las tartas 🥚' },
-      cacao: { name: 'Cacaotero', emoji: '🍫', ing: 'choc', price: 550, done: '✓ ¡hay alfajores!', already: 'Ya tenés cacaotero 🍫', buy: '¡Cacaotero! Ahora hay alfajores 🍬' },
-      vaca:  { name: 'Vaca',      emoji: '🐄', ing: 'milk', price: 500, done: '✓ ¡hay licuados!',  already: 'Ya tenés vaca 🐄',      buy: '¡Vaca! Leche para los licuados 🥛' },
+      colmena:   { name: 'Colmena', emoji: '🐝', ing: 'honey', price: 0, free: true, mech: 'ready', spot: 'colmena', cooldown: HONEY_COOLDOWN, standY: 1.1,
+                   notReady: 'Las abejas siguen trabajando 🐝', hintReady: '¡La colmena tiene miel lista! 🍯' },
+      frutillar: { name: 'Frutillar', emoji: '🍓', ing: 'straw', price: 350, mech: 'shake', spot: 'frutillar', zone: 'strawZone', first: 8, spawn: [8, 5],
+                   done: '✓ ¡hay frutillas!', already: 'Ya tenés frutillar 🍓', buy: '¡Frutillar! Frutillas para tartas y licuados 🍓',
+                   hintDrop: 'Juntá las frutillas 🍓' },
+      coop:  { name: 'Gallinero', emoji: '🐔', ing: 'egg',  price: 400, mech: 'spawn', spot: 'coop', zone: 'coopZone', first: 6, spawn: [7, 4],
+               done: '✓ ¡hay tartas!', already: 'Ya tenés gallinero 🐔', buy: '¡Gallinero! Huevos para las tartas 🥚',
+               hintDrop: 'Juntá los huevos del gallinero 🥚' },
+      cacao: { name: 'Cacaotero', emoji: '🍫', ing: 'choc', price: 550, mech: 'shake', spot: 'cacao', zone: 'chocZone', first: 8, spawn: [8, 5],
+               done: '✓ ¡hay alfajores!', already: 'Ya tenés cacaotero 🍫', buy: '¡Cacaotero! Ahora hay alfajores 🍬',
+               hintDrop: 'Juntá los chocolates del cacaotero 🍫' },
+      vaca:  { name: 'Vaca', emoji: '🐄', ing: 'milk', price: 500, mech: 'ready', spot: 'vaca', cooldown: COW_MILK_COOLDOWN, standY: 0.9,
+               done: '✓ ¡hay licuados!', already: 'Ya tenés vaca 🐄', buy: '¡Vaca! Leche para los licuados 🥛',
+               notReady: 'La vaca todavía no tiene leche 🐄', hintReady: 'La vaca está lista, ¡ordeñala! 🥛' },
     },
     workers: [
       { key: 'granjero', name: 'Granjero',  emoji: '🧑‍🌾', price: 350, desc: 'Junta, planta y cosecha' },
@@ -168,6 +221,43 @@ const LEVELS = {
     ],
     products: PRODUCTS2,
     palette: { sky0: '#F8CCE4', sky1: '#FDEAF4', grass0: '#A8E0C0', grass1: '#86C9A6', path: '#D8B8E0', sign: '#E080B0', signText: '#B05080' },
+  },
+  pizzeria: {
+    key: 'pizzeria',
+    saveKey: 'pizzeria_state',
+    title: '🍕 PIZZERÍA',
+    name: 'Pizzería',
+    icon: '🍕',
+    next: null,   // el último nivel (por ahora)
+    starter: 'tostado',
+    fieldPrices: [240, 480],
+    quesera: true,   // máquina fija del nivel: leche → queso
+    sources: {
+      vaca: { name: 'Vaca', emoji: '🐄', ing: 'milk', price: 0, free: true, mech: 'ready', spot: 'vaca', cooldown: COW_MILK_COOLDOWN, standY: 0.9,
+              notReady: 'La vaca todavía no tiene leche 🐄', hintReady: 'La vaca está lista, ¡ordeñala! 🥛' },
+      tomatera: { name: 'Tomatera', emoji: '🍅', ing: 'tomato', price: 700, mech: 'shake', spot: 'cacao', zone: 'chocZone', first: 8, spawn: [8, 5],
+                  done: '✓ ¡hay pizza!', already: 'Ya tenés tomatera 🍅', buy: '¡Tomatera! Ahora hay pizza 🍕',
+                  hintDrop: 'Juntá los tomates 🍅' },
+      maizal: { name: 'Maizal', emoji: '🌽', ing: 'corn', price: 800, mech: 'spawn', spot: 'frutillar', zone: 'strawZone', first: 6, spawn: [7, 4],
+                done: '✓ ¡hay empanadas!', already: 'Ya tenés maizal 🌽', buy: '¡Maizal! Ahora hay empanadas 🥟',
+                hintDrop: 'Juntá los choclos 🌽' },
+      albahaca: { name: 'Albahaca', emoji: '🌿', ing: 'basil', price: 650, mech: 'ready', spot: 'colmena', cooldown: 10, standY: 1.1,
+                  done: '✓ ¡hay caprese!', already: 'Ya tenés albahaca 🌿', buy: '¡Albahaca! Ahora hay caprese 🥗',
+                  notReady: 'La albahaca está creciendo 🌿', hintReady: '¡Cortá la albahaca fresca! 🌿' },
+    },
+    workers: [
+      { key: 'granjero', name: 'Granjero', emoji: '🧑‍🌾', price: 700,  desc: 'Junta, planta y cosecha' },
+      { key: 'molinero', name: 'Molinero', emoji: '🧑‍🏭', price: 850,  desc: 'Muele y hace queso' },
+      { key: 'panadero', name: 'Pizzero',  emoji: '🧑‍🍳', price: 1000, desc: 'Cocina solo' },
+      { key: 'vendedor', name: 'Vendedor', emoji: '🧑‍💼', price: 1150, desc: 'Atiende el mostrador' },
+    ],
+    upgrades: [
+      { key: 'molino',  name: 'Molino',  price: 1000, desc: 'Muele el doble de rápido' },
+      { key: 'horno',   name: 'Horno',   price: 1200, desc: 'Hornea el doble de rápido' },
+      { key: 'quesera', name: 'Quesera', price: 900,  desc: 'Hace queso el doble de rápido' },
+    ],
+    products: PRODUCTS3,
+    palette: { sky0: '#F8E8C0', sky1: '#FDF6E4', grass0: '#B5C46B', grass1: '#94A84E', path: '#D89A6A', sign: '#C0392B', signText: '#9A2C20' },
   },
 };
 
@@ -202,37 +292,35 @@ export class Panaderia {
     // granjero contratado: camina hasta semillas y campos para trabajar
     this.farmer = { x: 0, y: 0, seeded: false, dest: null, task: null, pauseT: 0, facing: 1 };
 
-    // gallinero: pone huevos en el piso que se juntan como las semillas
-    this.eggs = [];
-    this.eggSpawnT = 6;
-    // cacaotero: suelta chocolates; también se puede sacudir como el arbusto
-    this.chocs = [];
-    this.chocSpawnT = 8;
-    this.cacaoShake = 0;
-    this.cacaoCooldown = 0;
-
-    // vaca: se ordeña cuando está lista (cada tanto) y da leche directa
-    this.cowReadyT = 0;
-
-    // colmena (pastelería): junta miel que se cosecha directa, como la leche
-    this.honeyReadyT = 0;
-    // frutillar (pastelería): suelta frutillas; también se sacude como el arbusto
-    this.straws = [];
-    this.strawSpawnT = 8;
-    this.frutShake = 0;
-    this.frutCooldown = 0;
+    // fuentes de ingredientes: estado transiente genérico por mecánica.
+    // drops[ing] = items en el piso; readyT[key] = cooldown de cosecha directa;
+    // spawnT/shakeT/shakeCd[key] = timers de aparición y de sacudida.
+    this.drops = {};
+    this.readyT = {};
+    this.spawnT = {};
+    this.shakeT = {};
+    this.shakeCd = {};
+    for (const [k, src] of Object.entries(this.cfg.sources)) {
+      if (src.zone) { this.drops[src.ing] = []; this.spawnT[k] = src.first; }
+      if (src.mech === 'ready') this.readyT[k] = 0;
+      if (src.mech === 'shake') { this.shakeT[k] = 0; this.shakeCd[k] = 0; }
+    }
 
     // estado persistente
     this.money   = 0;
     this.inv     = { seed: 0, wheat: 0, flour: 0, bread: 0, egg: 0, cake: 0, choc: 0, cookie: 0, milk: 0, chocomilk: 0, pancake: 0,
-                     honey: 0, straw: 0, croissant: 0, tart: 0, alfajor: 0, licuado: 0 };
+                     honey: 0, straw: 0, croissant: 0, tart: 0, alfajor: 0, licuado: 0,
+                     cheese: 0, tomato: 0, corn: 0, basil: 0, toast: 0, pizza: 0, empanada: 0, caprese: 0 };
     this.workers = { granjero: false, molinero: false, panadero: false, vendedor: false };
-    this.upgrades = { molino: false, horno: false };
+    this.upgrades = { molino: false, horno: false, quesera: false };
     this.coop    = false;
     this.cacao   = false;
     this.vaca    = false;
     this.colmena   = false;
     this.frutillar = false;
+    this.tomatera  = false;
+    this.maizal    = false;
+    this.albahaca  = false;
     this.won = false;        // ya completó todas las compras del nivel
     this.celebrate = null;   // overlay de festejo activo (confetti + botones)
     this.plots   = [];
@@ -249,6 +337,9 @@ export class Panaderia {
         this.vaca = !!s.vaca;
         this.colmena = !!s.colmena;
         this.frutillar = !!s.frutillar;
+        this.tomatera = !!s.tomatera;
+        this.maizal = !!s.maizal;
+        this.albahaca = !!s.albahaca;
         this.won = !!s.won;
         nPlots = Math.max(2, Math.min(MAX_PLOTS, s.plots | 0 || 2));
       }
@@ -270,6 +361,7 @@ export class Panaderia {
 
     this.mill = { busy: false, t: 0 };
     this.oven = { busy: false, t: 0 };
+    this.quesera = { busy: false, t: 0 };   // leche→queso, solo si cfg.quesera
 
     // cámara de zoom (pinza en mobile): screen = world * z + (x, y)
     this.cam = { z: 1, x: 0, y: 0 };
@@ -281,6 +373,7 @@ export class Panaderia {
   }
 
   _millDur() { return this.upgrades.molino ? MILL_TIME_FAST : MILL_TIME; }
+  _queseraDur() { return this.upgrades.quesera ? QUESO_TIME_FAST : QUESO_TIME; }
   _ovenDur(prod = this.cfg.starter) {
     return (this.upgrades.horno ? OVEN_TIME_FAST : OVEN_TIME) * this.cfg.products[prod].timeMul;
   }
@@ -306,7 +399,7 @@ export class Panaderia {
     if (this.won || !this._isComplete()) return;
     this.won = true;
     this._save();
-    this.opts.onLevelUnlocked?.(this.cfg.key);
+    this.opts.onLevelUnlocked?.(this.cfg.key, this.cfg.next);
     const W = this.canvas.width, H = this.canvas.height;
     this.celebrate = {
       t: 0,
@@ -332,7 +425,9 @@ export class Panaderia {
       localStorage.setItem(this.cfg.saveKey, JSON.stringify({
         money: this.money, inv: this.inv, workers: this.workers,
         upgrades: this.upgrades, coop: this.coop, cacao: this.cacao, vaca: this.vaca,
-        colmena: this.colmena, frutillar: this.frutillar, won: this.won, plots: this.plots.length,
+        colmena: this.colmena, frutillar: this.frutillar,
+        tomatera: this.tomatera, maizal: this.maizal, albahaca: this.albahaca,
+        won: this.won, plots: this.plots.length,
       }));
       localStorage.setItem(MONEY_KEY, String(this.money));
     } catch (e) {}
@@ -364,6 +459,10 @@ export class Panaderia {
     const mill = { x: W * 0.525, y: H * 0.47, w: W * 0.105, h: H * 0.34 };
     // gallinero (se compra en la tienda), entre la zona de semillas y el molino
     const coop = { x: W * 0.435, y: H * 0.685, w: W * 0.08, h: H * 0.14 };
+    // franja al pie del gallinero donde caen los huevos
+    const coopZone = { x: coop.x - 14 * s, y: coop.y + coop.h + 4 * s, w: coop.w + 28 * s, h: 14 * s };
+    // quesera (pizzería): ocupa el lugar del gallinero, que ese nivel no usa
+    const quesera = coop;
     // cacaotero (se compra en la tienda), arriba del gallinero
     const cacao = { x: W * 0.468, y: H * 0.50, r: Math.min(W, H) * 0.060 };
     const chocZone = { x: W * 0.435, y: H * 0.585, w: W * 0.075, h: H * 0.065 };
@@ -418,7 +517,7 @@ export class Panaderia {
       prod, x: omX, y: omTop + i * (omH + omGap), w: omW, h: omH,
     }));
 
-    return { W, H, s, plotRects, bush, seedZone, mill, coop, cacao, chocZone, vaca, colmena, frutillar, strawZone, bld, counter, counterBox, oven, ovenMenu, custXs, custY, shop };
+    return { W, H, s, plotRects, bush, seedZone, mill, coop, coopZone, quesera, cacao, chocZone, vaca, colmena, frutillar, strawZone, bld, counter, counterBox, oven, ovenMenu, custXs, custY, shop };
   }
 
   // dibuja una imagen anclada abajo-centro con una altura dada (mantiene aspecto)
@@ -467,20 +566,13 @@ export class Panaderia {
       .map(([k, n]) => ING[k].word ? `${n} ${ING[k].word}` : `${n}${ING[k].emoji}`)
       .join(' + ');
   }
-  _dropChocs(L, n) {
-    for (let i = 0; i < n && this.chocs.length < MAX_GROUND_CHOCS; i++) {
-      const z = L.chocZone;
-      this.chocs.push({
-        x: z.x + Math.random() * z.w,
-        y: z.y + Math.random() * z.h,
-        t: 0, wob: Math.random() * 6.28,
-      });
-    }
-  }
-  _dropStraws(L, n) {
-    for (let i = 0; i < n && this.straws.length < MAX_GROUND_STRAWS; i++) {
-      const z = L.strawZone;
-      this.straws.push({
+  // suelta n items del ingrediente de la fuente `key` en su zona del piso
+  _dropItems(L, key, n) {
+    const src = this.cfg.sources[key];
+    const arr = this.drops[src.ing];
+    const z = L[src.zone];
+    for (let i = 0; i < n && arr.length < MAX_GROUND_ITEMS; i++) {
+      arr.push({
         x: z.x + Math.random() * z.w,
         y: z.y + Math.random() * z.h,
         t: 0, wob: Math.random() * 6.28,
@@ -503,6 +595,12 @@ export class Panaderia {
     this.inv.wheat--;
     this.mill.busy = true; this.mill.t = 0;
     this._float(L.mill.x + L.mill.w / 2, L.mill.y, '🌾 moliendo…', '#8A6A20');
+    Sound.pick();
+  }
+  _loadQuesera(L) {
+    this.inv.milk--;
+    this.quesera.busy = true; this.quesera.t = 0;
+    this._float(L.quesera.x + L.quesera.w / 2, L.quesera.y, '🥛 haciendo queso…', '#B08828');
     Sound.pick();
   }
   _loadOven(L, prod = this.cfg.starter) {
@@ -600,8 +698,7 @@ export class Panaderia {
         if (this.money < src.price) { this._flash('Te falta dinero 💰'); return true; }
         this.money -= src.price;
         this[src.key] = true;
-        if (src.key === 'vaca') this.cowReadyT = 0;        // llega lista para ordeñar
-        if (src.key === 'colmena') this.honeyReadyT = 0;   // llega con miel lista
+        if (src.mech === 'ready') this.readyT[src.key] = 0;   // llega lista para cosechar
         fl(b, typeof src.buy === 'function' ? src.buy(this) : src.buy);
         Sound.serveGood();
         this._save();
@@ -636,7 +733,7 @@ export class Panaderia {
       for (const b of this._celebrateRects()) {
         if (!this._inRect(px, py, b)) continue;
         if (b.action === 'switch') {
-          this.opts.onSwitchLevel?.('pasteleria');
+          this.opts.onSwitchLevel?.(this.cfg.next);
         } else {
           this.celebrate = null;
           Sound.pick();
@@ -679,60 +776,36 @@ export class Panaderia {
       }
     }
 
-    // huevos del gallinero → ir a juntarlos
-    for (let i = this.eggs.length - 1; i >= 0; i--) {
-      const e = this.eggs[i];
-      if (e.t < 1) continue;
-      if (Math.hypot(px - e.x, py - e.y) < 24 * s) {
-        this._goTo(e.x, e.y + 6 * s, { type: 'egg', egg: e });
-        return;
+    // items de las fuentes en el piso (huevos, chocolates, frutillas…) → ir a juntarlos
+    for (const src of Object.values(this.cfg.sources)) {
+      if (!src.zone) continue;
+      const arr = this.drops[src.ing];
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const it = arr[i];
+        if (it.t < 1) continue;
+        if (Math.hypot(px - it.x, py - it.y) < 24 * s) {
+          this._goTo(it.x, it.y + 6 * s, { type: 'drop', ing: src.ing, item: it });
+          return;
+        }
       }
     }
 
-    // chocolates del cacaotero → ir a juntarlos
-    for (let i = this.chocs.length - 1; i >= 0; i--) {
-      const c = this.chocs[i];
-      if (c.t < 1) continue;
-      if (Math.hypot(px - c.x, py - c.y) < 24 * s) {
-        this._goTo(c.x, c.y + 6 * s, { type: 'choc', choc: c });
-        return;
+    // fuentes: sacudir (cacaotero, frutillar…) o cosechar directo (vaca, colmena…)
+    for (const [k, src] of Object.entries(this.cfg.sources)) {
+      if (!this[k]) continue;
+      const spot = L[src.spot];
+      if (src.mech === 'shake') {
+        if (Math.hypot(px - spot.x, py - spot.y) < spot.r * 1.3) {
+          this._goTo(spot.x + spot.r * 1.0, spot.y + spot.r * 1.15, { type: 'shake', key: k });
+          return;
+        }
+      } else if (src.mech === 'ready') {
+        if (Math.hypot(px - spot.x, py - spot.y) < spot.r * 1.4) {
+          if (this.readyT[k] > 0) { this._flash(src.notReady); return; }
+          this._goTo(spot.x + spot.r * 1.2, spot.y + spot.r * src.standY, { type: 'harvestSrc', key: k });
+          return;
+        }
       }
-    }
-
-    // frutillas del frutillar → ir a juntarlas
-    for (let i = this.straws.length - 1; i >= 0; i--) {
-      const f = this.straws[i];
-      if (f.t < 1) continue;
-      if (Math.hypot(px - f.x, py - f.y) < 24 * s) {
-        this._goTo(f.x, f.y + 6 * s, { type: 'straw', straw: f });
-        return;
-      }
-    }
-
-    // cacaotero → ir a sacudirlo
-    if (this.cacao && Math.hypot(px - L.cacao.x, py - L.cacao.y) < L.cacao.r * 1.3) {
-      this._goTo(L.cacao.x + L.cacao.r * 1.0, L.cacao.y + L.cacao.r * 1.15, { type: 'cacao' });
-      return;
-    }
-
-    // frutillar → ir a sacudirlo
-    if (this.frutillar && Math.hypot(px - L.frutillar.x, py - L.frutillar.y) < L.frutillar.r * 1.3) {
-      this._goTo(L.frutillar.x + L.frutillar.r * 1.0, L.frutillar.y + L.frutillar.r * 1.15, { type: 'frutillar' });
-      return;
-    }
-
-    // colmena → ir a cosechar la miel cuando está lista
-    if (this.colmena && Math.hypot(px - L.colmena.x, py - L.colmena.y) < L.colmena.r * 1.4) {
-      if (this.honeyReadyT > 0) { this._flash('Las abejas siguen trabajando 🐝'); return; }
-      this._goTo(L.colmena.x + L.colmena.r * 1.2, L.colmena.y + L.colmena.r * 1.1, { type: 'colmena' });
-      return;
-    }
-
-    // vaca → ir a ordeñarla cuando está lista
-    if (this.vaca && Math.hypot(px - L.vaca.x, py - L.vaca.y) < L.vaca.r * 1.4) {
-      if (this.cowReadyT > 0) { this._flash('La vaca todavía no tiene leche 🐄'); return; }
-      this._goTo(L.vaca.x + L.vaca.r * 1.2, L.vaca.y + L.vaca.r * 0.9, { type: 'vaca' });
-      return;
     }
 
     // arbusto → ir a sacudirlo
@@ -757,6 +830,14 @@ export class Panaderia {
       if (this.mill.busy) return;
       if (this.inv.wheat <= 0) { this._flash('No tenés trigo 🌾'); return; }
       this._goTo(L.mill.x + L.mill.w / 2, L.mill.y + L.mill.h + 14 * s, { type: 'mill' });
+      return;
+    }
+
+    // quesera (pizzería) → llevar la leche
+    if (this.cfg.quesera && this._inRect(px, py, L.quesera)) {
+      if (this.quesera.busy) return;
+      if (this.inv.milk <= 0) { this._flash('No tenés leche 🥛'); return; }
+      this._goTo(L.quesera.x + L.quesera.w / 2, L.quesera.y + L.quesera.h + 14 * s, { type: 'quesera' });
       return;
     }
 
@@ -813,62 +894,31 @@ export class Panaderia {
         this._float(g.tx, g.ty, '+1 🌱');
         break;
       }
-      case 'egg': {
-        const i = this.eggs.indexOf(task.egg);
+      case 'drop': {
+        const arr = this.drops[task.ing];
+        const i = arr.indexOf(task.item);
         if (i < 0) return;                       // ya lo juntó el granjero
-        this.eggs.splice(i, 1);
-        this.inv.egg++;
-        this._float(task.egg.x, task.egg.y, '+1 🥚');
+        arr.splice(i, 1);
+        this.inv[task.ing]++;
+        this._float(task.item.x, task.item.y, `+1 ${ING[task.ing].emoji}`);
         Sound.pick();
         break;
       }
-      case 'choc': {
-        const i = this.chocs.indexOf(task.choc);
-        if (i < 0) return;                       // ya lo juntó el granjero
-        this.chocs.splice(i, 1);
-        this.inv.choc++;
-        this._float(task.choc.x, task.choc.y, '+1 🍫');
-        Sound.pick();
-        break;
-      }
-      case 'cacao': {
-        if (this.cacaoCooldown > 0) return;
-        this.cacaoCooldown = 0.35;
-        this.cacaoShake = 0.4;
-        this._dropChocs(L, 1 + (Math.random() < 0.3 ? 1 : 0));
+      case 'shake': {
+        if (this.shakeCd[task.key] > 0) return;
+        this.shakeCd[task.key] = 0.35;
+        this.shakeT[task.key] = 0.4;
+        this._dropItems(L, task.key, 1 + (Math.random() < 0.3 ? 1 : 0));
         Sound.undo();
         break;
       }
-      case 'straw': {
-        const i = this.straws.indexOf(task.straw);
-        if (i < 0) return;                       // ya la juntó el granjero
-        this.straws.splice(i, 1);
-        this.inv.straw++;
-        this._float(task.straw.x, task.straw.y, '+1 🍓');
-        Sound.pick();
-        break;
-      }
-      case 'frutillar': {
-        if (this.frutCooldown > 0) return;
-        this.frutCooldown = 0.35;
-        this.frutShake = 0.4;
-        this._dropStraws(L, 1 + (Math.random() < 0.3 ? 1 : 0));
-        Sound.undo();
-        break;
-      }
-      case 'colmena': {
-        if (this.honeyReadyT > 0) return;        // se le adelantó el granjero
-        this.honeyReadyT = HONEY_COOLDOWN;
-        this.inv.honey++;
-        this._float(L.colmena.x, L.colmena.y - L.colmena.r, '+1 🍯');
-        Sound.pick();
-        break;
-      }
-      case 'vaca': {
-        if (this.cowReadyT > 0) return;          // se le adelantó el granjero
-        this.cowReadyT = COW_MILK_COOLDOWN;
-        this.inv.milk++;
-        this._float(L.vaca.x, L.vaca.y - L.vaca.r, '+1 🥛');
+      case 'harvestSrc': {
+        if (this.readyT[task.key] > 0) return;   // se le adelantó el granjero
+        const src = this.cfg.sources[task.key];
+        const spot = L[src.spot];
+        this.readyT[task.key] = src.cooldown;
+        this.inv[src.ing]++;
+        this._float(spot.x, spot.y - spot.r, `+1 ${ING[src.ing].emoji}`);
         Sound.pick();
         break;
       }
@@ -881,6 +931,10 @@ export class Panaderia {
       }
       case 'mill': {
         if (!this.mill.busy && this.inv.wheat > 0) this._loadMill(L);
+        break;
+      }
+      case 'quesera': {
+        if (!this.quesera.busy && this.inv.milk > 0) this._loadQuesera(L);
         break;
       }
       case 'oven': {
@@ -922,10 +976,10 @@ export class Panaderia {
     if (this.msgT > 0) this.msgT -= dt;
     if (this.bushShake > 0) this.bushShake -= dt;
     if (this.bushCooldown > 0) this.bushCooldown -= dt;
-    if (this.cacaoShake > 0) this.cacaoShake -= dt;
-    if (this.cacaoCooldown > 0) this.cacaoCooldown -= dt;
-    if (this.frutShake > 0) this.frutShake -= dt;
-    if (this.frutCooldown > 0) this.frutCooldown -= dt;
+    for (const k of Object.keys(this.shakeT)) {
+      if (this.shakeT[k] > 0) this.shakeT[k] -= dt;
+      if (this.shakeCd[k] > 0) this.shakeCd[k] -= dt;
+    }
 
     // ── personaje: caminar hasta el destino y hacer la acción al llegar ──
     if (this.dest) {
@@ -956,45 +1010,20 @@ export class Panaderia {
     }
     for (const g of this.groundSeeds) { g.t = Math.min(1, g.t + dt * 2.2); g.wob += dt * 3; }
 
-    // el gallinero pone huevos cada tanto
-    if (this.coop) {
-      this.eggSpawnT -= dt;
-      if (this.eggSpawnT <= 0 && this.eggs.length < MAX_GROUND_EGGS) {
-        this.eggSpawnT = 7 + Math.random() * 4;
-        const cp = L.coop;
-        this.eggs.push({
-          x: cp.x - 14 * L.s + Math.random() * (cp.w + 28 * L.s),
-          y: cp.y + cp.h + 4 * L.s + Math.random() * 14 * L.s,
-          t: 0, wob: Math.random() * 6.28,
-        });
+    // fuentes: las que sueltan items (gallinero, cacaotero…) hacen aparecer su
+    // ingrediente cada tanto y los items del piso "maduran"; las de cosecha
+    // directa (vaca, colmena…) recargan su cooldown
+    for (const [k, src] of Object.entries(this.cfg.sources)) {
+      if (!this[k]) continue;
+      if (src.zone) {
+        this.spawnT[k] -= dt;
+        if (this.spawnT[k] <= 0 && this.drops[src.ing].length < MAX_GROUND_ITEMS) {
+          this.spawnT[k] = src.spawn[0] + Math.random() * src.spawn[1];
+          this._dropItems(L, k, 1);
+        }
+        for (const it of this.drops[src.ing]) { it.t = Math.min(1, it.t + dt * 3); it.wob += dt * 3; }
       }
-      for (const e of this.eggs) { e.t = Math.min(1, e.t + dt * 3); e.wob += dt * 3; }
-    }
-
-    // la vaca recarga leche con el tiempo
-    if (this.vaca && this.cowReadyT > 0) this.cowReadyT -= dt;
-
-    // el cacaotero suelta chocolates cada tanto
-    if (this.cacao) {
-      this.chocSpawnT -= dt;
-      if (this.chocSpawnT <= 0 && this.chocs.length < MAX_GROUND_CHOCS) {
-        this.chocSpawnT = 8 + Math.random() * 5;
-        this._dropChocs(L, 1);
-      }
-      for (const c of this.chocs) { c.t = Math.min(1, c.t + dt * 3); c.wob += dt * 3; }
-    }
-
-    // la colmena junta miel con el tiempo (como la leche de la vaca)
-    if (this.colmena && this.honeyReadyT > 0) this.honeyReadyT -= dt;
-
-    // el frutillar suelta frutillas cada tanto (como el cacaotero)
-    if (this.frutillar) {
-      this.strawSpawnT -= dt;
-      if (this.strawSpawnT <= 0 && this.straws.length < MAX_GROUND_STRAWS) {
-        this.strawSpawnT = 8 + Math.random() * 5;
-        this._dropStraws(L, 1);
-      }
-      for (const f of this.straws) { f.t = Math.min(1, f.t + dt * 3); f.wob += dt * 3; }
+      if (src.mech === 'ready' && this.readyT[k] > 0) this.readyT[k] -= dt;
     }
 
     // crecimiento del trigo
@@ -1015,6 +1044,17 @@ export class Panaderia {
         this.mill.busy = false;
         this.inv.flour++;
         this._float(L.mill.x + L.mill.w / 2, L.mill.y, '+1 harina', '#8A6A20');
+        Sound.add();
+      }
+    }
+
+    // quesera (pizzería)
+    if (this.cfg.quesera && this.quesera.busy) {
+      this.quesera.t += dt;
+      if (this.quesera.t >= this._queseraDur()) {
+        this.quesera.busy = false;
+        this.inv.cheese++;
+        this._float(L.quesera.x + L.quesera.w / 2, L.quesera.y, '+1 🧀', '#B08828');
         Sound.add();
       }
     }
@@ -1091,15 +1131,12 @@ export class Panaderia {
       if (f.pauseT > 0) {
         f.pauseT -= dt;
       } else if (!f.dest) {
-        // elegir tarea: cosechar > plantar > juntar semillas > huevos > chocolates > frutillas
-        // Cada recurso respeta STOCK_CAP; la cosecha del trigo maduro sigue
-        // siempre (lo que se frena con el tope es la siembra).
+        // elegir tarea: cosechar > plantar > juntar semillas > items del piso >
+        // fuentes de cosecha directa. Cada recurso respeta STOCK_CAP; la
+        // cosecha del trigo maduro sigue siempre (el tope frena la siembra).
         const ri = this.plots.findIndex(p => p.state === 'ready');
         const ei = this.plots.findIndex(p => p.state === 'empty');
         const gi = this.inv.seed < STOCK_CAP ? this.groundSeeds.findIndex(g => g.t >= 1) : -1;
-        const eg = this.inv.egg < STOCK_CAP ? this.eggs.findIndex(e => e.t >= 1) : -1;
-        const ch = this.inv.choc < STOCK_CAP ? this.chocs.findIndex(c => c.t >= 1) : -1;
-        const fr = this.inv.straw < STOCK_CAP ? this.straws.findIndex(f => f.t >= 1) : -1;
         if (ri >= 0) {
           const r = L.plotRects[ri];
           f.task = { type: 'harvest', idx: ri };
@@ -1112,24 +1149,25 @@ export class Panaderia {
           const g = this.groundSeeds[gi];
           f.task = { type: 'seed', seed: g };
           f.dest = { x: g.tx, y: g.ty + 6 * L.s };
-        } else if (eg >= 0) {
-          const e = this.eggs[eg];
-          f.task = { type: 'egg', egg: e };
-          f.dest = { x: e.x, y: e.y + 6 * L.s };
-        } else if (ch >= 0) {
-          const c = this.chocs[ch];
-          f.task = { type: 'choc', choc: c };
-          f.dest = { x: c.x, y: c.y + 6 * L.s };
-        } else if (fr >= 0) {
-          const f2 = this.straws[fr];
-          f.task = { type: 'straw', straw: f2 };
-          f.dest = { x: f2.x, y: f2.y + 6 * L.s };
-        } else if (this.vaca && this.cowReadyT <= 0 && this.inv.milk < STOCK_CAP) {
-          f.task = { type: 'vaca' };
-          f.dest = { x: L.vaca.x + L.vaca.r * 1.2, y: L.vaca.y + L.vaca.r * 0.9 };
-        } else if (this.colmena && this.honeyReadyT <= 0 && this.inv.honey < STOCK_CAP) {
-          f.task = { type: 'colmena' };
-          f.dest = { x: L.colmena.x + L.colmena.r * 1.2, y: L.colmena.y + L.colmena.r * 1.1 };
+        } else {
+          const srcs = Object.entries(this.cfg.sources);
+          // primero los items del piso, después las fuentes de cosecha directa
+          for (const [k, src] of srcs) {
+            if (!this[k] || !src.zone || this.inv[src.ing] >= STOCK_CAP) continue;
+            const it = this.drops[src.ing].find(d => d.t >= 1);
+            if (it) {
+              f.task = { type: 'drop', ing: src.ing, item: it };
+              f.dest = { x: it.x, y: it.y + 6 * L.s };
+              break;
+            }
+          }
+          if (!f.task) for (const [k, src] of srcs) {
+            if (!this[k] || src.mech !== 'ready' || this.readyT[k] > 0 || this.inv[src.ing] >= STOCK_CAP) continue;
+            const spot = L[src.spot];
+            f.task = { type: 'harvestSrc', key: k };
+            f.dest = { x: spot.x + spot.r * 1.2, y: spot.y + spot.r * src.standY };
+            break;
+          }
         }
       } else {
         const dx = f.dest.x - f.x, dy = f.dest.y - f.y;
@@ -1149,30 +1187,17 @@ export class Panaderia {
               const i = this.groundSeeds.indexOf(task.seed);
               if (i >= 0) { this._collectSeed(i, true); this._float(f.x, f.y - 40 * L.s, '+1 🌱'); }
             }
-            else if (task.type === 'egg') {
-              const i = this.eggs.indexOf(task.egg);
-              if (i >= 0) { this.eggs.splice(i, 1); this.inv.egg++; this._float(f.x, f.y - 40 * L.s, '+1 🥚'); }
+            else if (task.type === 'drop') {
+              const arr = this.drops[task.ing];
+              const i = arr.indexOf(task.item);
+              if (i >= 0) { arr.splice(i, 1); this.inv[task.ing]++; this._float(f.x, f.y - 40 * L.s, `+1 ${ING[task.ing].emoji}`); }
             }
-            else if (task.type === 'choc') {
-              const i = this.chocs.indexOf(task.choc);
-              if (i >= 0) { this.chocs.splice(i, 1); this.inv.choc++; this._float(f.x, f.y - 40 * L.s, '+1 🍫'); }
-            }
-            else if (task.type === 'straw') {
-              const i = this.straws.indexOf(task.straw);
-              if (i >= 0) { this.straws.splice(i, 1); this.inv.straw++; this._float(f.x, f.y - 40 * L.s, '+1 🍓'); }
-            }
-            else if (task.type === 'vaca') {
-              if (this.cowReadyT <= 0) {
-                this.cowReadyT = COW_MILK_COOLDOWN;
-                this.inv.milk++;
-                this._float(f.x, f.y - 40 * L.s, '+1 🥛');
-              }
-            }
-            else if (task.type === 'colmena') {
-              if (this.honeyReadyT <= 0) {
-                this.honeyReadyT = HONEY_COOLDOWN;
-                this.inv.honey++;
-                this._float(f.x, f.y - 40 * L.s, '+1 🍯');
+            else if (task.type === 'harvestSrc') {
+              if (this.readyT[task.key] <= 0) {
+                const src = this.cfg.sources[task.key];
+                this.readyT[task.key] = src.cooldown;
+                this.inv[src.ing]++;
+                this._float(f.x, f.y - 40 * L.s, `+1 ${ING[src.ing].emoji}`);
               }
             }
           }
@@ -1182,9 +1207,14 @@ export class Panaderia {
         }
       }
     }
-    if (this.workers.molinero && !this.mill.busy && this.inv.wheat > 0 && this.inv.flour < STOCK_CAP) {
+    if (this.workers.molinero) {
       this.workerT.molinero -= dt;
-      if (this.workerT.molinero <= 0) { this.workerT.molinero = 0.9; this._loadMill(L); }
+      if (this.workerT.molinero <= 0) {
+        this.workerT.molinero = 0.9;
+        // atiende el molino y, en la pizzería, también la quesera
+        if (!this.mill.busy && this.inv.wheat > 0 && this.inv.flour < STOCK_CAP) this._loadMill(L);
+        else if (this.cfg.quesera && !this.quesera.busy && this.inv.milk > 0 && this.inv.cheese < STOCK_CAP) this._loadQuesera(L);
+      }
     }
     if (this.workers.panadero && !this.oven.busy) {
       this.workerT.panadero -= dt;
@@ -1226,12 +1256,13 @@ export class Panaderia {
     if (this.groundSeeds.length > 0 && this.inv.seed === 0) return 'Tocá las semillas para juntarlas 🌱';
     if (this.inv.seed > 0 && this.plots.some(p => p.state === 'empty')) return 'Tocá un campo marrón para plantar 🌱';
     if (this.plots.some(p => p.state === 'ready')) return '¡Trigo listo! Tocalo para cosechar 🌾';
-    if (this.coop && this.eggs.some(e => e.t >= 1) && this.inv.egg === 0) return 'Juntá los huevos del gallinero 🥚';
-    if (this.cacao && this.chocs.some(c => c.t >= 1) && this.inv.choc === 0) return 'Juntá los chocolates del cacaotero 🍫';
-    if (this.vaca && this.cowReadyT <= 0 && this.inv.milk === 0) return 'La vaca está lista, ¡ordeñala! 🥛';
-    if (this.colmena && this.honeyReadyT <= 0 && this.inv.honey === 0) return '¡La colmena tiene miel lista! 🍯';
-    if (this.frutillar && this.straws.some(f => f.t >= 1) && this.inv.straw === 0) return 'Juntá las frutillas 🍓';
+    for (const [k, src] of Object.entries(this.cfg.sources)) {
+      if (!this[k] || this.inv[src.ing] !== 0) continue;
+      if (src.zone && this.drops[src.ing].some(d => d.t >= 1)) return src.hintDrop;
+      if (src.mech === 'ready' && this.readyT[k] <= 0) return src.hintReady;
+    }
     if (this.inv.wheat > 0 && !this.mill.busy) return 'Llevá el trigo al molino ⚙️';
+    if (this.cfg.quesera && this.inv.milk > 0 && !this.quesera.busy && this.inv.cheese === 0) return 'Llevá la leche a la quesera 🧀';
     if (this.inv.flour > 0 && !this.oven.busy) return 'Horneá la harina en el horno 🔥';
     if (this.customers.some(c => !c.leaving && this.inv[this.cfg.products[c.prod].inv] >= c.want)) return '¡Tocá al cliente para entregar su pedido! 🧺';
     return '';
@@ -1251,10 +1282,15 @@ export class Panaderia {
     this._drawBush(ctx, L);
     this._drawSeeds(ctx, L);
     this._drawCoop(ctx, L);
+    this._drawQuesera(ctx, L);
     this._drawCacao(ctx, L);
     this._drawVaca(ctx, L);
     this._drawColmena(ctx, L);
     this._drawFrutillar(ctx, L);
+    this._drawTomatera(ctx, L);
+    this._drawMaizal(ctx, L);
+    this._drawAlbahaca(ctx, L);
+    this._drawDrops(ctx, L);
     this._drawFarmer(ctx, L);
     this._drawMill(ctx, L);
     this._drawBakery(ctx, L);
@@ -1304,9 +1340,11 @@ export class Panaderia {
   // botones del overlay de festejo (en coordenadas de pantalla)
   _celebrateRects() {
     const W = this.canvas.width, H = this.canvas.height;
-    const canSwitch = this.cfg.key === 'panaderia' && this.opts.onSwitchLevel;
+    const next = this.cfg.next ? LEVELS[this.cfg.next] : null;
+    const canSwitch = next && this.opts.onSwitchLevel;
     const btns = canSwitch
-      ? [{ action: 'switch', label: '🧁 ¡Ir a la Pastelería!' }, { action: 'stay', label: '🍞 Seguir acá' }]
+      ? [{ action: 'switch', label: `${next.icon} ¡Ir a la ${next.name}!` },
+         { action: 'stay', label: `${this.cfg.icon} Seguir acá` }]
       : [{ action: 'stay', label: '🎈 ¡Seguir jugando!' }];
     const bw = Math.min(W * 0.56, 480), bh = H * 0.115, gap = H * 0.04;
     let y = H * 0.52;
@@ -1329,14 +1367,16 @@ export class Panaderia {
     }
 
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const isL1 = this.cfg.key === 'panaderia';
+    const next = this.cfg.next ? LEVELS[this.cfg.next] : null;
     ctx.fillStyle = '#FFD84A';
     ctx.font = `900 ${Math.min(H * 0.075, W * 0.052)}px system-ui, sans-serif`;
-    ctx.fillText(isL1 ? '🎉 ¡Completaste la Panadería!' : '🏆 ¡Completaste TODO!', W / 2, H * 0.26);
+    ctx.fillText(next ? `🎉 ¡Completaste la ${this.cfg.name}!` : '🏆 ¡Completaste TODO!', W / 2, H * 0.26);
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${Math.min(H * 0.042, W * 0.03)}px system-ui, sans-serif`;
-    ctx.fillText(isL1 ? '¡Compraste todo! Se desbloqueó la Pastelería 🧁' : '¡Sos genial! Tu pastelería tiene todo ⭐', W / 2, H * 0.37);
-    if (isL1) {
+    ctx.fillText(next
+      ? `¡Compraste todo! Se desbloqueó la ${next.name} ${next.icon}`
+      : `¡Sos genial! Tu ${this.cfg.name.toLowerCase()} tiene todo ⭐`, W / 2, H * 0.37);
+    if (next) {
       ctx.fillText('¿Querés pasar al siguiente nivel?', W / 2, H * 0.44);
     }
 
@@ -1547,23 +1587,46 @@ export class Panaderia {
     ctx.fillStyle = '#5A4020'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('Gallinero', c.x + c.w / 2, c.y + c.h + 15 * s);
+  }
 
-    // huevos en el piso
-    for (const e of this.eggs) {
-      const pop = Math.min(1, e.t);
-      const bob = e.t >= 1 ? Math.sin(e.wob) * 1.5 * s : 0;
-      if (ready(IMG.huevo)) {
-        drawIconImg(ctx, IMG.huevo, e.x, e.y + bob, 17 * s * pop);
-      } else {
-        ctx.fillStyle = '#FFF8EC';
-        ctx.strokeStyle = '#C8B890'; ctx.lineWidth = 1.5 * s;
-        ctx.beginPath(); ctx.ellipse(e.x, e.y + bob, 6.5 * s * pop, 8.5 * s * pop, 0, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
+  // quesera (pizzería): convierte la leche en queso, como el molino con el trigo
+  _drawQuesera(ctx, L) {
+    if (!this.cfg.quesera) return;
+    const { s } = L;
+    const q = L.quesera;
+    const cx = q.x + q.w / 2;
+    if (ready(IMG3.quesera)) {
+      this._imgH(ctx, IMG3.quesera, cx, q.y + q.h, q.h * 1.12);
+    } else {
+      // casita con una horma de queso gigante en la puerta
+      ctx.fillStyle = '#E8D5B0';
+      ctx.beginPath(); ctx.roundRect(q.x, q.y + q.h * 0.3, q.w, q.h * 0.7, 6 * s); ctx.fill();
+      ctx.strokeStyle = '#B09060'; ctx.lineWidth = 2 * s; ctx.stroke();
+      ctx.fillStyle = '#C08040';
+      ctx.beginPath();
+      ctx.moveTo(q.x - 6 * s, q.y + q.h * 0.32);
+      ctx.lineTo(cx, q.y);
+      ctx.lineTo(q.x + q.w + 6 * s, q.y + q.h * 0.32);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#F6C945';
+      ctx.beginPath(); ctx.arc(cx, q.y + q.h * 0.72, q.w * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#C89820'; ctx.lineWidth = 2 * s; ctx.stroke();
+      ctx.fillStyle = '#E0A828';
+      for (const [dx, dy, rr] of [[-0.1, -0.08, 0.05], [0.12, 0.02, 0.07], [-0.04, 0.12, 0.045]]) {
+        ctx.beginPath(); ctx.arc(cx + q.w * dx, q.y + q.h * 0.72 + q.w * dy, q.w * rr, 0, Math.PI * 2); ctx.fill();
       }
-      if (e.t >= 1) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5 * s;
-        ctx.beginPath(); ctx.arc(e.x, e.y + bob, 12 * s + Math.sin(this.t * 4 + e.wob) * 2 * s, 0, Math.PI * 2); ctx.stroke();
-      }
+    }
+    if (this.quesera.busy) {
+      const frac = this.quesera.t / this._queseraDur();
+      this._progressBar(ctx, cx - 30 * s, q.y + q.h + 8 * s, 60 * s, 9 * s, frac, '#F6C945', s);
+    }
+    ctx.fillStyle = '#5A4020'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    const ly = q.y + q.h + (this.quesera.busy ? 30 : 15) * s;
+    ctx.fillText('Quesera', cx, ly);
+    if (this.upgrades.quesera) {
+      const tw = ctx.measureText('Quesera').width;
+      this._drawStar(ctx, cx + tw / 2 + 12 * s, ly - 4 * s, s);
     }
   }
 
@@ -1572,7 +1635,7 @@ export class Panaderia {
     if (!this.cacao) return;
     const { s } = L;
     const c = L.cacao;
-    const shake = this.cacaoShake > 0 ? Math.sin(this.t * 40) * 4 * s : 0;
+    const shake = this.shakeT.cacao > 0 ? Math.sin(this.t * 40) * 4 * s : 0;
     if (ready(IMG.cacaotero)) {
       this._imgH(ctx, IMG.cacaotero, c.x + shake, c.y + c.r * 1.45, c.r * 2.9);
     } else {
@@ -1596,24 +1659,6 @@ export class Panaderia {
     ctx.fillStyle = '#4A3A1A'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('Cacao', c.x, c.y + c.r * 1.45 + 12 * s);
-
-    // chocolates en el piso
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const ch of this.chocs) {
-      const pop = Math.min(1, ch.t);
-      const bob = ch.t >= 1 ? Math.sin(ch.wob) * 1.5 * s : 0;
-      if (ready(IMG.chocolate)) {
-        drawIconImg(ctx, IMG.chocolate, ch.x, ch.y + bob, 20 * s * pop);
-      } else {
-        ctx.font = `${18 * s * pop}px system-ui, sans-serif`;
-        ctx.fillText('🍫', ch.x, ch.y + bob);
-      }
-      if (ch.t >= 1) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5 * s;
-        ctx.beginPath(); ctx.arc(ch.x, ch.y + bob, 13 * s + Math.sin(this.t * 4 + ch.wob) * 2 * s, 0, Math.PI * 2); ctx.stroke();
-      }
-    }
-    ctx.textBaseline = 'alphabetic';
   }
 
   // vaca comprada: se ordeña cuando muestra la burbuja de leche
@@ -1638,7 +1683,7 @@ export class Panaderia {
     ctx.fillText('Vaca', v.x, v.y + v.r * 1.25 + 12 * s);
 
     // burbuja de "leche lista"
-    if (this.cowReadyT <= 0) {
+    if (this.readyT.vaca <= 0) {
       const pulse = 1 + Math.sin(this.t * 5) * 0.1;
       const by = v.y - v.r * 1.5 + Math.sin(this.t * 3) * 2 * s;
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
@@ -1683,7 +1728,7 @@ export class Panaderia {
     ctx.fillText('Colmena', c.x, c.y + c.r * 1.15 + 14 * s);
 
     // burbuja de "miel lista" (como la leche de la vaca)
-    if (this.honeyReadyT <= 0) {
+    if (this.readyT.colmena <= 0) {
       const pulse = 1 + Math.sin(this.t * 5) * 0.1;
       const by = c.y - c.r * 1.6 + Math.sin(this.t * 3) * 2 * s;
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
@@ -1705,7 +1750,7 @@ export class Panaderia {
     if (!this.frutillar) return;
     const { s } = L;
     const c = L.frutillar;
-    const shake = this.frutShake > 0 ? Math.sin(this.t * 40) * 4 * s : 0;
+    const shake = this.shakeT.frutillar > 0 ? Math.sin(this.t * 40) * 4 * s : 0;
     if (ready(IMG2.frutillar)) {
       this._imgH(ctx, IMG2.frutillar, c.x + shake, c.y + c.r * 1.15, c.r * 2.3);
     } else {
@@ -1724,21 +1769,129 @@ export class Panaderia {
     ctx.fillStyle = '#8A2A3A'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('Frutillas', c.x, c.y + c.r * 1.15 + 14 * s);
+  }
 
-    // frutillas en el piso
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const f of this.straws) {
-      const pop = Math.min(1, f.t);
-      const bob = f.t >= 1 ? Math.sin(f.wob) * 1.5 * s : 0;
-      if (ready(IMG2.frutilla)) {
-        drawIconImg(ctx, IMG2.frutilla, f.x, f.y + bob, 18 * s * pop);
-      } else {
-        ctx.font = `${16 * s * pop}px system-ui, sans-serif`;
-        ctx.fillText('🍓', f.x, f.y + bob);
+  // tomatera (pizzería): mata de tomates que se sacude como el cacaotero
+  _drawTomatera(ctx, L) {
+    if (!this.tomatera) return;
+    const { s } = L;
+    const c = L.cacao;   // ocupa el lugar del cacaotero
+    const shake = this.shakeT.tomatera > 0 ? Math.sin(this.t * 40) * 4 * s : 0;
+    if (ready(IMG3.tomatera)) {
+      this._imgH(ctx, IMG3.tomatera, c.x + shake, c.y + c.r * 1.45, c.r * 2.9);
+    } else {
+      // tutor de madera y mata verde con tomates asomando
+      ctx.fillStyle = '#8A5A30';
+      ctx.fillRect(c.x - 3 * s, c.y - c.r * 0.9, 6 * s, c.r * 2.2);
+      ctx.fillStyle = '#4E9048';
+      for (const [dx, dy, rr] of [[-0.4, 0.1, 0.55], [0.4, 0.1, 0.55], [0, -0.35, 0.6], [0, 0.25, 0.7]]) {
+        ctx.beginPath(); ctx.arc(c.x + dx * c.r + shake, c.y + dy * c.r, c.r * rr, 0, Math.PI * 2); ctx.fill();
       }
-      if (f.t >= 1) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5 * s;
-        ctx.beginPath(); ctx.arc(f.x, f.y + bob, 12 * s + Math.sin(this.t * 4 + f.wob) * 2 * s, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = `${14 * s}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (const [dx, dy] of [[-0.45, -0.1], [0.15, -0.45], [0.5, 0.15], [-0.05, 0.3]]) {
+        ctx.fillText('🍅', c.x + dx * c.r + shake, c.y + dy * c.r);
+      }
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.fillStyle = '#8A3020'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Tomates', c.x, c.y + c.r * 1.45 + 12 * s);
+  }
+
+  // maizal (pizzería): plantas de maíz que sueltan choclos solos
+  _drawMaizal(ctx, L) {
+    if (!this.maizal) return;
+    const { s } = L;
+    const c = L.frutillar;   // ocupa el lugar del frutillar
+    if (ready(IMG3.maizal)) {
+      this._imgH(ctx, IMG3.maizal, c.x, c.y + c.r * 1.15, c.r * 2.3);
+    } else {
+      // tallos con hojas y choclos asomando
+      const sway = Math.sin(this.t * 1.5) * 2 * s;
+      ctx.strokeStyle = '#5A8A3C'; ctx.lineWidth = 3 * s;
+      for (const dx of [-0.6, 0, 0.6]) {
+        const x = c.x + dx * c.r;
+        ctx.beginPath();
+        ctx.moveTo(x, c.y + c.r);
+        ctx.quadraticCurveTo(x + sway, c.y, x + sway, c.y - c.r * 0.9);
+        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, c.y + c.r * 0.3); ctx.quadraticCurveTo(x - c.r * 0.4, c.y, x - c.r * 0.5, c.y - c.r * 0.2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, c.y + c.r * 0.1); ctx.quadraticCurveTo(x + c.r * 0.4, c.y - c.r * 0.2, x + c.r * 0.5, c.y - c.r * 0.4); ctx.stroke();
+      }
+      ctx.font = `${14 * s}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (const [dx, dy] of [[-0.6, -0.2], [0, -0.5], [0.6, -0.1]]) {
+        ctx.fillText('🌽', c.x + dx * c.r + sway, c.y + dy * c.r);
+      }
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.fillStyle = '#6A5A10'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Maizal', c.x, c.y + c.r * 1.15 + 14 * s);
+  }
+
+  // albahaca (pizzería): maceta que se corta cuando la mata está crecida
+  _drawAlbahaca(ctx, L) {
+    if (!this.albahaca) return;
+    const { s } = L;
+    const c = L.colmena;   // ocupa el lugar de la colmena
+    if (ready(IMG3.albahaca)) {
+      this._imgH(ctx, IMG3.albahaca, c.x, c.y + c.r * 1.15, c.r * 2.3);
+    } else {
+      // maceta de terracota con la mata (crece mientras recarga)
+      ctx.fillStyle = '#C06840';
+      ctx.beginPath();
+      ctx.moveTo(c.x - c.r * 0.7, c.y + c.r * 0.1);
+      ctx.lineTo(c.x + c.r * 0.7, c.y + c.r * 0.1);
+      ctx.lineTo(c.x + c.r * 0.5, c.y + c.r);
+      ctx.lineTo(c.x - c.r * 0.5, c.y + c.r);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#8A4020'; ctx.lineWidth = 2 * s; ctx.stroke();
+      const cd = this.cfg.sources.albahaca?.cooldown || 10;
+      const grow = this.readyT.albahaca <= 0 ? 1 : Math.max(0.45, 1 - this.readyT.albahaca / cd);
+      ctx.fillStyle = '#3E8038';
+      for (const [dx, dy, rr] of [[-0.4, -0.15, 0.4], [0.4, -0.15, 0.4], [0, -0.5, 0.5], [0, -0.1, 0.55]]) {
+        ctx.beginPath(); ctx.arc(c.x + dx * c.r * grow, c.y + dy * c.r * grow, c.r * rr * grow, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#2E6028'; ctx.font = `bold ${12 * s}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Albahaca', c.x, c.y + c.r * 1.15 + 14 * s);
+
+    // burbuja de "lista para cortar"
+    if (this.readyT.albahaca <= 0) {
+      const pulse = 1 + Math.sin(this.t * 5) * 0.1;
+      const by = c.y - c.r * 1.6 + Math.sin(this.t * 3) * 2 * s;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.strokeStyle = '#70A860'; ctx.lineWidth = 2 * s;
+      ctx.beginPath(); ctx.arc(c.x, by, 14 * s * pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.font = `${15 * s * pulse}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🌿', c.x, by + 1 * s);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+
+  // items de ingredientes esperando en el piso (huevos, chocolates, frutillas…)
+  _drawDrops(ctx, L) {
+    const { s } = L;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const [ing, arr] of Object.entries(this.drops)) {
+      const img = ING[ing].img();
+      for (const it of arr) {
+        const pop = Math.min(1, it.t);
+        const bob = it.t >= 1 ? Math.sin(it.wob) * 1.5 * s : 0;
+        if (ready(img)) {
+          drawIconImg(ctx, img, it.x, it.y + bob, 18 * s * pop);
+        } else {
+          ctx.font = `${16 * s * pop}px system-ui, sans-serif`;
+          ctx.fillText(ING[ing].emoji, it.x, it.y + bob);
+        }
+        if (it.t >= 1) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5 * s;
+          ctx.beginPath(); ctx.arc(it.x, it.y + bob, 12 * s + Math.sin(this.t * 4 + it.wob) * 2 * s, 0, Math.PI * 2); ctx.stroke();
+        }
       }
     }
     ctx.textBaseline = 'alphabetic';
@@ -2238,10 +2391,11 @@ export class Panaderia {
     if (this.task) {
       const prods = this.cfg.products;
       const label = {
-        bush: '🌳', seed: '🌱', egg: '🥚', choc: '🍫', cacao: '🌳', vaca: '🥛',
-        straw: '🍓', frutillar: '🌳', colmena: '🍯',
+        bush: '🌳', seed: '🌱', shake: '🌳',
+        drop: ING[this.task.ing]?.emoji,
+        harvestSrc: ING[this.cfg.sources[this.task.key]?.ing]?.emoji,
         plot: this.plots[this.task.idx]?.state === 'ready' ? '🌾' : '🌱',
-        mill: '🌾',
+        mill: '🌾', quesera: '🥛',
         oven: this.task.product !== this.cfg.starter ? prods[this.task.product]?.emoji : null,
         customer: prods[this.task.cust?.prod]?.emoji || prods[this.cfg.starter].emoji,
       }[this.task.type];
@@ -2254,11 +2408,9 @@ export class Panaderia {
       // sprite de lo que lleva/va a hacer (con el emoji como respaldo)
       const tk = this.task;
       const bubbleImg = tk.type === 'seed' ? IMG.semilla
-        : tk.type === 'egg' ? IMG.huevo
-        : tk.type === 'choc' ? IMG.chocolate
-        : tk.type === 'vaca' ? IMG.leche
-        : tk.type === 'straw' ? IMG2.frutilla
-        : tk.type === 'colmena' ? IMG2.miel
+        : tk.type === 'quesera' ? IMG.leche
+        : tk.type === 'drop' ? ING[tk.ing]?.img()
+        : tk.type === 'harvestSrc' ? ING[this.cfg.sources[tk.key]?.ing]?.img()
         : tk.type === 'plot' ? (this.plots[tk.idx]?.state === 'ready' ? null : IMG.semilla)
         : tk.type === 'oven' ? (tk.product === this.cfg.starter ? IMG.harina : this._prodImg(tk.product))
         : tk.type === 'customer' ? this._prodImg(tk.cust?.prod)
@@ -2352,6 +2504,7 @@ export class Panaderia {
       ['🌱', this.inv.seed],
       ['🌾', this.inv.wheat],
       ['sack', this.inv.flour],
+      ...(this.cfg.quesera ? [['🧀', this.inv.cheese]] : []),
       [prods[st].emoji, this.inv[prods[st].inv]],
       // el ingrediente de cada fuente que ya se tiene
       ...Object.entries(this.cfg.sources)
