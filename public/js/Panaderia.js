@@ -55,7 +55,8 @@ function loadImg3(name) { const im = new Image(); im.src = ASSET3(name); return 
 const IMG3 = {
   quesera: loadImg3('quesera'), queso: loadImg3('queso'),
   tomatera: loadImg3('tomatera'), tomate: loadImg3('tomate'),
-  maizal: loadImg3('maizal'), choclo: loadImg3('choclo'),
+  maizal: [loadImg3('maizal_1'), loadImg3('maizal_2'), loadImg3('maizal_3')],
+  choclo: loadImg3('choclo'),
   albahaca: loadImg3('albahaca'),
   tostado: loadImg3('tostado'), pizza: loadImg3('pizza'),
   empanadas: loadImg3('empanadas'), caprese: loadImg3('caprese'),
@@ -298,10 +299,11 @@ export class Panaderia {
     this.drops = {};
     this.readyT = {};
     this.spawnT = {};
+    this.spawnT0 = {};   // duración total del timer, para animar el crecimiento
     this.shakeT = {};
     this.shakeCd = {};
     for (const [k, src] of Object.entries(this.cfg.sources)) {
-      if (src.zone) { this.drops[src.ing] = []; this.spawnT[k] = src.first; }
+      if (src.zone) { this.drops[src.ing] = []; this.spawnT[k] = src.first; this.spawnT0[k] = src.first; }
       if (src.mech === 'ready') this.readyT[k] = 0;
       if (src.mech === 'shake') { this.shakeT[k] = 0; this.shakeCd[k] = 0; }
     }
@@ -1019,6 +1021,7 @@ export class Panaderia {
         this.spawnT[k] -= dt;
         if (this.spawnT[k] <= 0 && this.drops[src.ing].length < MAX_GROUND_ITEMS) {
           this.spawnT[k] = src.spawn[0] + Math.random() * src.spawn[1];
+          this.spawnT0[k] = this.spawnT[k];
           this._dropItems(L, k, 1);
         }
         for (const it of this.drops[src.ing]) { it.t = Math.min(1, it.t + dt * 3); it.wob += dt * 3; }
@@ -1804,8 +1807,13 @@ export class Panaderia {
     if (!this.maizal) return;
     const { s } = L;
     const c = L.frutillar;   // ocupa el lugar del frutillar
-    if (ready(IMG3.maizal)) {
-      this._imgH(ctx, IMG3.maizal, c.x, c.y + c.r * 1.15, c.r * 2.3);
+    // el maíz crece con el timer de spawn: brote → planta → maduro (suelta choclo)
+    const total = this.spawnT0.maizal || 1;
+    const p = Math.max(0, Math.min(1, 1 - this.spawnT.maizal / total));
+    const stage = p < 0.4 ? 0 : p < 0.8 ? 1 : 2;
+    const img = IMG3.maizal[stage];
+    if (ready(img)) {
+      this._imgH(ctx, img, c.x, c.y + c.r * 1.15, c.r * (1.2 + stage * 0.55));
     } else {
       // tallos con hojas y choclos asomando
       const sway = Math.sin(this.t * 1.5) * 2 * s;
