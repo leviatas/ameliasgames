@@ -431,9 +431,9 @@ function exitHelado() {
 }
 
 // ── Bakery farm mini-game ────────────────────────────────────────────────────
-// La panadería tiene niveles encadenados (panadería → pastelería → pizzería):
-// cada uno se desbloquea al comprar todo lo del anterior. El nivel actual y la
-// lista de desbloqueados viven en panaderia_meta.
+// La panadería tiene niveles encadenados (panadería → pastelería → pizzería).
+// Todos son accesibles desde el botón de nivel; completar uno sigue festejando
+// e invitando al siguiente. El nivel actual vive en panaderia_meta.
 const PANADERIA_LABELS = { panaderia: '🍞 Panadería', pasteleria: '🧁 Pastelería', pizzeria: '🍕 Pizzería' };
 function getPanaderiaMeta() {
   try {
@@ -446,10 +446,9 @@ function getPanaderiaMeta() {
 function setPanaderiaMeta(m) {
   try { localStorage.setItem('panaderia_meta', JSON.stringify(m)); } catch (e) {}
 }
-// ciclo de niveles disponibles, en orden (la panadería siempre está)
+// ciclo de niveles, en orden: todos accesibles siempre
 function panaderiaCycle() {
-  const meta = getPanaderiaMeta();
-  return ['panaderia', ...['pasteleria', 'pizzeria'].filter(l => meta.unlocked.includes(l))];
+  return ['panaderia', 'pasteleria', 'pizzeria'];
 }
 function nextPanaderiaLevel(cur) {
   const cyc = panaderiaCycle();
@@ -458,8 +457,7 @@ function nextPanaderiaLevel(cur) {
 function updatePanaderiaLevelBtn(level) {
   const btn = document.getElementById('panaderia-level');
   if (!btn) return;
-  const cyc = panaderiaCycle();
-  btn.classList.toggle('hidden', cyc.length < 2);
+  btn.classList.remove('hidden');
   btn.textContent = PANADERIA_LABELS[nextPanaderiaLevel(level)] || '';
 }
 function newPanaderia(level) {
@@ -492,7 +490,7 @@ function launchPanaderia() {
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('panaderia-ui').classList.remove('hidden');
   const meta = getPanaderiaMeta();
-  const level = meta.level === 'panaderia' || meta.unlocked.includes(meta.level) ? meta.level : 'panaderia';
+  const level = PANADERIA_LABELS[meta.level] ? meta.level : 'panaderia';
   panaderia = newPanaderia(level);
   updatePanaderiaLevelBtn(level);
   mode   = 'panaderia';
