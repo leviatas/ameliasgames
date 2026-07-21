@@ -13,6 +13,7 @@ import { Cinema }                from './Cinema.js';
 import { Helado }                from './Helado.js';
 import { Panaderia }             from './Panaderia.js';
 import { Tienda, CATALOG as TIENDA_CATALOG } from './Tienda.js';
+import { Vestidor } from './Vestidor.js';
 import { Mob }                               from './Mob.js';
 import { PongChibi }      from './PongChibi.js';
 import { Globos2P }       from './Globos2P.js';
@@ -53,6 +54,7 @@ let theater  = null;
 let helado   = null;
 let panaderia = null;
 let tienda   = null;
+let vestidor = null;
 let mob      = null;
 let pong     = null;
 let globos   = null;
@@ -89,7 +91,7 @@ const NET_RENDER_DELAY_MS = 90;
 let netLocalOverrides = new Map(); // key → { value, expiresAt }
 const NET_LOCAL_OVERRIDE_TTL_MS = 200;
 let holeFrom = 'hub';        // 'hub' | 'world'
-let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas' | 'tres'
+let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'vestidor' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas' | 'tres'
 let savedPos = null;         // exterior pos when inside a house
 
 let lastTime    = 0;
@@ -317,6 +319,7 @@ function showHub(menuId = 'hub-screen') {
   helado = null;
   if (panaderia) { panaderia.destroy(); panaderia = null; }
   tienda = null;
+  if (vestidor) { vestidor.destroy(); vestidor = null; }
   if (mob)    { mob.destroy(); mob = null; }
   if (galaga) { galaga.destroy(); galaga = null; }
   hideHoleSubmenu();
@@ -353,6 +356,7 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('helado-ui').classList.add('hidden');
   document.getElementById('panaderia-ui').classList.add('hidden');
   document.getElementById('tienda-ui').classList.add('hidden');
+  document.getElementById('vestidor-ui').classList.add('hidden');
   document.getElementById('mob-ui').classList.add('hidden');
   document.getElementById('galaga-ui').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -522,6 +526,24 @@ function exitTienda() {
   document.getElementById('tienda-ui').classList.add('hidden');
   tienda = null;
   showHub();
+}
+
+// ── Vestidor de Moda (juego de vestir, estilo Avatar World) ──────────────────
+function launchVestidor() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('vestidor-ui').classList.remove('hidden');
+  vestidor = new Vestidor(canvas);
+  mode = 'vestidor';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitVestidor() {
+  document.getElementById('vestidor-ui').classList.add('hidden');
+  if (vestidor) { vestidor.destroy(); vestidor = null; }
+  showHub('uno-submenu');
 }
 
 // ── Mob Control mini-game ─────────────────────────────────────────────────────
@@ -1065,6 +1087,7 @@ function gameLoop(now) {
   if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
   if (mode === 'panaderia' && panaderia) { panaderia.update(delta); panaderia.render(ctx); return; }
   if (mode === 'tienda' && tienda) { tienda.update(delta); tienda.render(ctx); return; }
+  if (mode === 'vestidor' && vestidor) { vestidor.update(delta); vestidor.render(ctx); return; }
   if (mode === 'mob'    && mob)    { mob.update(delta);    mob.render(ctx);    return; }
   if (mode === 'pong'   && pong)   { _run2PFrame(pong, delta);   return; }
   if (mode === 'globos' && globos) { _run2PFrame(globos, delta); return; }
@@ -1856,6 +1879,17 @@ window.addEventListener('keydown', e => {
   if (mode === 'mob' && mob && e.code === 'Escape') { exitMob(); e.preventDefault(); }
 });
 
+// ── Vestidor controls ─────────────────────────────────────────────────────────
+const vestidorExit = document.getElementById('vestidor-exit');
+if (vestidorExit) vestidorExit.addEventListener('click', exitVestidor);
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'vestidor' || !vestidor) return;
+  const p = canvasPoint(e); vestidor.pointer(p.x, p.y);
+});
+window.addEventListener('keydown', e => {
+  if (mode === 'vestidor' && vestidor && e.code === 'Escape') { exitVestidor(); e.preventDefault(); }
+});
+
 // ── Customization panel — now redirects to wardrobe (purchased looks) ────────
 ['cust-btn', 'customize-btn'].forEach(id => {
   const el = document.getElementById(id);
@@ -2155,7 +2189,7 @@ window.addEventListener('keydown', e => {
 // ── 1-Player submenu buttons ──────────────────────────────────────────────────
 const unoBack = document.getElementById('uno-back');
 if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
-[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga], ['uno-panaderia', launchPanaderia]].forEach(([id, launch]) => {
+[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga], ['uno-panaderia', launchPanaderia], ['uno-vestidor', launchVestidor]].forEach(([id, launch]) => {
   const btn = document.getElementById(id);
   if (!btn) return;
   const go = () => { hideUnoSubmenu(); launch(); };

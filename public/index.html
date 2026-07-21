@@ -270,6 +270,11 @@
         <div class="hub-name">Panadería</div>
         <div class="hub-desc">Cosechá trigo, horneá y vendé pan</div>
       </button>
+      <button class="hub-card vestidor" id="uno-vestidor">
+        <div class="hub-emoji">👗</div>
+        <div class="hub-name">Vestidor de Moda</div>
+        <div class="hub-desc">Vestí a la nena: pelo, ropa y accesorios</div>
+      </button>
     </div>
   </div>
 
@@ -609,6 +614,11 @@
     <button id="tienda-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
+  <!-- Vestidor de Moda controls -->
+  <div id="vestidor-ui" class="hidden">
+    <button id="vestidor-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
   <!-- Mob Control controls -->
   <div id="mob-ui" class="hidden">
     <button id="mob-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
@@ -625,7 +635,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.61.0</div>
+  <div id="app-version">v2.62.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">
@@ -728,6 +738,7 @@
         'hole_best', 'cocina_best', 'match3_best',
         'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
         'pasteleria_state', 'pizzeria_state', 'panaderia_money', 'panaderia_meta',
+        'vestidor_look',
       ];
       keys.forEach(k => localStorage.removeItem(k));
       location.reload();
