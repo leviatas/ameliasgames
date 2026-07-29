@@ -12,7 +12,6 @@ import { Galaga }                from './Galaga.js';
 import { Cinema }                from './Cinema.js';
 import { Helado }                from './Helado.js';
 import { Panaderia }             from './Panaderia.js';
-import { Tienda, CATALOG as TIENDA_CATALOG } from './Tienda.js';
 import { Vestidor } from './Vestidor.js';
 import { onDollReady } from './Muneca.js';
 import { Mob }                               from './Mob.js';
@@ -31,7 +30,7 @@ import { ThreePlayers }   from './ThreePlayers.js';
 import { FourPlayers }    from './FourPlayers.js';
 import { NetSession }     from './Net.js';
 import { getFridge, eatFood }    from './Pantry.js';
-import { getCoins, getWardrobe, getEquippedId, setEquippedId } from './Wallet.js';
+import { getCoins } from './Wallet.js';
 
 // ── Canvas ─────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('game-canvas');
@@ -54,7 +53,6 @@ let galaga   = null;
 let theater  = null;
 let helado   = null;
 let panaderia = null;
-let tienda   = null;
 let vestidor = null;
 let mob      = null;
 let pong     = null;
@@ -92,7 +90,7 @@ const NET_RENDER_DELAY_MS = 90;
 let netLocalOverrides = new Map(); // key → { value, expiresAt }
 const NET_LOCAL_OVERRIDE_TTL_MS = 200;
 let holeFrom = 'hub';        // 'hub' | 'world'
-let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'tienda' | 'vestidor' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas' | 'tres'
+let mode     = 'exterior';   // 'exterior' | 'interior' | 'runner' | 'cocina' | 'match3' | 'hole' | 'hole2' | 'cinema' | 'helado' | 'vestidor' | 'mob' | 'galaga' | 'pong' | 'globos' | 'sumo' | 'cocinas' | 'tres'
 let savedPos = null;         // exterior pos when inside a house
 
 let lastTime    = 0;
@@ -319,7 +317,6 @@ function showHub(menuId = 'hub-screen') {
   theater = null;
   helado = null;
   if (panaderia) { panaderia.destroy(); panaderia = null; }
-  tienda = null;
   if (vestidor) { vestidor.destroy(); vestidor = null; }
   if (mob)    { mob.destroy(); mob = null; }
   if (galaga) { galaga.destroy(); galaga = null; }
@@ -347,7 +344,6 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('cuatro-ui').classList.add('hidden');
   hideGestureMenu();
   hideFridgeMenu();
-  hideWardrobeMenu();
   document.getElementById('cust-panel').classList.add('hidden');
   document.getElementById('runner-ui').classList.add('hidden');
   document.getElementById('cocina-ui').classList.add('hidden');
@@ -356,7 +352,6 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('cinema-ui').classList.add('hidden');
   document.getElementById('helado-ui').classList.add('hidden');
   document.getElementById('panaderia-ui').classList.add('hidden');
-  document.getElementById('tienda-ui').classList.add('hidden');
   document.getElementById('vestidor-ui').classList.add('hidden');
   document.getElementById('mob-ui').classList.add('hidden');
   document.getElementById('galaga-ui').classList.add('hidden');
@@ -432,7 +427,7 @@ function launchHelado() {
 function exitHelado() {
   document.getElementById('helado-ui').classList.add('hidden');
   helado = null;
-  showHub();
+  showHub('uno-submenu');
 }
 
 // ── Bakery farm mini-game ────────────────────────────────────────────────────
@@ -508,29 +503,12 @@ function exitPanaderia() {
   showHub('uno-submenu');
 }
 
-// ── Clothing store ───────────────────────────────────────────────────────────
-function launchTienda() {
-  if (isTouch) forceLandscape();
-  document.getElementById('hub-screen').classList.add('hidden');
-  document.getElementById('select-screen').classList.add('hidden');
-  document.getElementById('hud').classList.add('hidden');
-  document.getElementById('tienda-ui').classList.remove('hidden');
-  tienda = new Tienda(canvas,
-    () => look,
-    (newLook) => { look = Object.assign({}, newLook); if (character) Object.assign(character.cfg, look); drawSelectionPreviews(); updateHUDPortrait(); saveState(); }
-  );
-  mode = 'tienda';
-  lastTime = performance.now();
-  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
-}
-function exitTienda() {
-  document.getElementById('tienda-ui').classList.add('hidden');
-  tienda = null;
-  showHub();
-}
-
 // ── Vestidor de Moda (juego de vestir, estilo Avatar World) ──────────────────
-function launchVestidor() {
+// onExit: a dónde volver al salir. Sin argumento vuelve al menú de 1 Player;
+// desde la boutique o el placard del mundo se vuelve al mundo.
+let vestidorReturn = null;
+function launchVestidor(onExit = null) {
+  vestidorReturn = onExit;
   if (isTouch) forceLandscape();
   document.getElementById('hub-screen').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
@@ -544,7 +522,18 @@ function launchVestidor() {
 function exitVestidor() {
   document.getElementById('vestidor-ui').classList.add('hidden');
   if (vestidor) { vestidor.destroy(); vestidor = null; }
-  showHub('uno-submenu');
+  drawSelectionPreviews(); updateHUDPortrait();
+  const back = vestidorReturn; vestidorReturn = null;
+  if (back) back(); else showHub('uno-submenu');
+}
+// vuelve al mundo (exterior o interior) dejando el bucle andando
+function _backToWorld(m) {
+  return () => {
+    mode = m;
+    document.getElementById('hud').classList.remove('hidden');
+    lastTime = performance.now();
+    if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+  };
 }
 
 // ── Mob Control mini-game ─────────────────────────────────────────────────────
@@ -579,6 +568,7 @@ function _openHole() {
 }
 function showHoleSubmenu() {
   document.getElementById('hub-screen').classList.add('hidden');
+  hideUnoSubmenu();
   document.getElementById('hole-submenu').classList.remove('hidden');
 }
 function hideHoleSubmenu() {
@@ -956,7 +946,7 @@ function exitCocina() {
     mode = 'interior';
     document.getElementById('hud').classList.remove('hidden');
   } else {
-    showHub();
+    showHub('uno-submenu');
   }
 }
 
@@ -978,7 +968,7 @@ function exitRunner() {
     mode = 'interior';
     document.getElementById('hud').classList.remove('hidden');
   } else {
-    showHub();
+    showHub('uno-submenu');
   }
 }
 
@@ -1087,7 +1077,6 @@ function gameLoop(now) {
   if (mode === 'cinema' && theater) { theater.update(delta); theater.render(ctx); return; }
   if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
   if (mode === 'panaderia' && panaderia) { panaderia.update(delta); panaderia.render(ctx); return; }
-  if (mode === 'tienda' && tienda) { tienda.update(delta); tienda.render(ctx); return; }
   if (mode === 'vestidor' && vestidor) { vestidor.update(delta); vestidor.render(ctx); return; }
   if (mode === 'mob'    && mob)    { mob.update(delta);    mob.render(ctx);    return; }
   if (mode === 'pong'   && pong)   { _run2PFrame(pong, delta);   return; }
@@ -1150,7 +1139,7 @@ function update(delta) {
   }
   if (moving) hideGestureMenu();
   if (moving) hideFridgeMenu();
-  if (moving) hideWardrobeMenu();
+  if (moving)
 
   if (moving) {
     const spd  = controls.sprint ? character.sprintSpeed : character.speed;
@@ -1440,69 +1429,6 @@ function hideFridgeMenu() {
   fridgeMenuOpen = false;
 }
 
-// ── Wardrobe menu ────────────────────────────────────────────────────────────
-const wardrobeMenu  = document.getElementById('wardrobe-menu');
-const wardrobeItems = document.getElementById('wardrobe-items');
-let wardrobeMenuOpen = false;
-
-function renderWardrobeMenu() {
-  const owned = getWardrobe();
-  const equippedId = getEquippedId();
-  wardrobeItems.textContent = '';
-  if (!Object.keys(owned).length) {
-    const empty = document.createElement('div');
-    empty.className = 'fridge-empty';
-    empty.textContent = 'Tu placard está vacío. Comprá ropa en la Tienda de Ropa.';
-    wardrobeItems.appendChild(empty);
-    return;
-  }
-  for (const item of TIENDA_CATALOG) {
-    if (!owned[item.id]) continue;
-    const row = document.createElement('div');
-    row.className = 'fridge-item';
-    const emoji = document.createElement('div');
-    emoji.className = 'fridge-emoji'; emoji.textContent = item.emoji;
-    const meta = document.createElement('div');
-    const title = document.createElement('div');
-    title.className = 'fridge-name'; title.textContent = item.name;
-    const eq = equippedId === item.id;
-    const status = document.createElement('div');
-    status.className = 'fridge-count'; status.textContent = eq ? '✓ Puesto' : '';
-    const btn = document.createElement('button');
-    btn.className = 'fridge-eat'; btn.dataset.id = item.id;
-    btn.textContent = eq ? 'Puesto' : 'Usar';
-    if (eq) btn.disabled = true;
-    meta.append(title, status);
-    row.append(emoji, meta, btn);
-    wardrobeItems.appendChild(row);
-  }
-}
-
-function openWardrobeMenu() {
-  hideGestureMenu(); hideFridgeMenu();
-  renderWardrobeMenu();
-  wardrobeMenu.classList.remove('hidden');
-  wardrobeMenuOpen = true;
-}
-function hideWardrobeMenu() {
-  if (!wardrobeMenuOpen) return;
-  wardrobeMenu.classList.add('hidden');
-  wardrobeMenuOpen = false;
-}
-document.getElementById('wardrobe-close').addEventListener('click', hideWardrobeMenu);
-wardrobeItems.addEventListener('click', e => {
-  const btn = e.target.closest('.fridge-eat');
-  if (!btn || btn.disabled) return;
-  const id = btn.dataset.id;
-  const item = TIENDA_CATALOG.find(c => c.id === id);
-  if (!item) return;
-  setEquippedId(id);
-  look = Object.assign({}, look, item.cfg);
-  if (character) Object.assign(character.cfg, look);
-  drawSelectionPreviews(); updateHUDPortrait(); saveState();
-  renderWardrobeMenu();
-});
-
 document.getElementById('fridge-close').addEventListener('click', hideFridgeMenu);
 fridgeItems.addEventListener('click', e => {
   const btn = e.target.closest('.fridge-eat');
@@ -1524,15 +1450,14 @@ canvas.addEventListener('click', e => {
   if (mode === 'interior' && interior && interior.containsFridge(worldX, worldY)) { showFridgeMenu(); return; }
   if (mode === 'interior' && interior && interior.containsKitchen(worldX, worldY)) { enterCocina(); return; }
   if (mode === 'interior' && interior && interior.containsBed(worldX, worldY)) { toggleLie(); return; }
-  if (mode === 'interior' && interior && interior.containsWardrobe(worldX, worldY)) { openWardrobeMenu(); return; }
-  if (characterAt(worldX, worldY)) { hideFridgeMenu(); hideWardrobeMenu(); showGestureMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsWardrobe(worldX, worldY)) { launchVestidor(_backToWorld('interior')); return; }
+  if (characterAt(worldX, worldY)) { hideFridgeMenu(); showGestureMenu(); return; }
   hideGestureMenu();
   hideFridgeMenu();
-  hideWardrobeMenu();
   if (mode !== 'exterior' || !world) return;
   if (world.getHolePortalAt(worldX, worldY)) { enterHoleFromWorld(); return; }
   if (world.getCinemaAt(worldX, worldY, WORLD_H)) { enterCinema(); return; }
-  if (world.getBoutiqueAt(worldX, worldY, WORLD_H)) { launchTienda(); return; }
+  if (world.getBoutiqueAt(worldX, worldY, WORLD_H)) { launchVestidor(_backToWorld('exterior')); return; }
   const house = world.getHouseAt(worldX, worldY, WORLD_H);
   if (house) enterHouse(house);
 });
@@ -1549,15 +1474,14 @@ canvas.addEventListener('touchend', e => {
   if (mode === 'interior' && interior && interior.containsFridge(worldX, worldY)) { e.preventDefault(); showFridgeMenu(); return; }
   if (mode === 'interior' && interior && interior.containsKitchen(worldX, worldY)) { e.preventDefault(); enterCocina(); return; }
   if (mode === 'interior' && interior && interior.containsBed(worldX, worldY)) { e.preventDefault(); toggleLie(); return; }
-  if (mode === 'interior' && interior && interior.containsWardrobe(worldX, worldY)) { e.preventDefault(); openWardrobeMenu(); return; }
-  if (characterAt(worldX, worldY)) { e.preventDefault(); hideFridgeMenu(); hideWardrobeMenu(); showGestureMenu(); return; }
+  if (mode === 'interior' && interior && interior.containsWardrobe(worldX, worldY)) { e.preventDefault(); launchVestidor(_backToWorld('interior')); return; }
+  if (characterAt(worldX, worldY)) { e.preventDefault(); hideFridgeMenu(); showGestureMenu(); return; }
   hideGestureMenu();
   hideFridgeMenu();
-  hideWardrobeMenu();
   if (mode !== 'exterior' || !world) return;
   if (world.getHolePortalAt(worldX, worldY)) { e.preventDefault(); enterHoleFromWorld(); return; }
   if (world.getCinemaAt(worldX, worldY, WORLD_H)) { e.preventDefault(); enterCinema(); return; }
-  if (world.getBoutiqueAt(worldX, worldY, WORLD_H)) { e.preventDefault(); launchTienda(); return; }
+  if (world.getBoutiqueAt(worldX, worldY, WORLD_H)) { e.preventDefault(); launchVestidor(_backToWorld('exterior')); return; }
   const house = world.getHouseAt(worldX, worldY, WORLD_H);
   if (house) { e.preventDefault(); enterHouse(house); }
 }, { passive: false });
@@ -1679,7 +1603,7 @@ window.addEventListener('keydown', e => {
 const holeSubmenuBack  = document.getElementById('hole-submenu-back');
 const holeSubmenuClassic = document.getElementById('hole-submenu-classic');
 const holeSubmenuFeast   = document.getElementById('hole-submenu-feast');
-if (holeSubmenuBack)    holeSubmenuBack.addEventListener('click',    () => { hideHoleSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
+if (holeSubmenuBack)    holeSubmenuBack.addEventListener('click',    () => { hideHoleSubmenu(); document.getElementById('uno-submenu').classList.remove('hidden'); });
 if (holeSubmenuClassic) { holeSubmenuClassic.addEventListener('click', launchHole); holeSubmenuClassic.addEventListener('touchend', e => { e.preventDefault(); launchHole(); }, { passive: false }); }
 if (holeSubmenuFeast)   { holeSubmenuFeast.addEventListener('click', launchHole2);  holeSubmenuFeast.addEventListener('touchend',   e => { e.preventDefault(); launchHole2(); },  { passive: false }); }
 
@@ -1862,17 +1786,6 @@ window.addEventListener('keydown', e => {
   if (mode === 'helado' && helado && e.code === 'Escape') { exitHelado(); e.preventDefault(); }
 });
 
-// ── Tienda controls ──────────────────────────────────────────────────────────
-const tiendaExit = document.getElementById('tienda-exit');
-if (tiendaExit) tiendaExit.addEventListener('click', exitTienda);
-canvas.addEventListener('pointerdown', e => {
-  if (mode !== 'tienda' || !tienda) return;
-  const p = canvasPoint(e); tienda.pointer(p.x, p.y);
-});
-window.addEventListener('keydown', e => {
-  if (mode === 'tienda' && tienda && e.code === 'Escape') { exitTienda(); e.preventDefault(); }
-});
-
 // ── Mob Control controls ──────────────────────────────────────────────────────
 const mobExit = document.getElementById('mob-exit');
 if (mobExit) mobExit.addEventListener('click', exitMob);
@@ -1891,11 +1804,13 @@ window.addEventListener('keydown', e => {
   if (mode === 'vestidor' && vestidor && e.code === 'Escape') { exitVestidor(); e.preventDefault(); }
 });
 
-// ── Customization panel — now redirects to wardrobe (purchased looks) ────────
-['cust-btn', 'customize-btn'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('click', openWardrobeMenu);
-});
+// "Personalizar" abre el Vestidor: es donde se arma el personaje
+const custBtn = document.getElementById('cust-btn');
+if (custBtn) custBtn.addEventListener('click', () => launchVestidor(_backToWorld(mode)));
+const customizeBtn = document.getElementById('customize-btn');
+if (customizeBtn) customizeBtn.addEventListener('click', () => launchVestidor(() => {
+  document.getElementById('select-screen').classList.remove('hidden');
+}));
 
 function applyLook(cat, value) {
   look[cat] = value;
@@ -2190,7 +2105,10 @@ window.addEventListener('keydown', e => {
 // ── 1-Player submenu buttons ──────────────────────────────────────────────────
 const unoBack = document.getElementById('uno-back');
 if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
-[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga], ['uno-panaderia', launchPanaderia], ['uno-vestidor', launchVestidor]].forEach(([id, launch]) => {
+[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga],
+ ['uno-panaderia', launchPanaderia], ['uno-vestidor', () => launchVestidor()],
+ ['uno-runner', launchRunner], ['uno-cocina', launchCocina],
+ ['uno-hole', showHoleSubmenu], ['uno-helado', launchHelado]].forEach(([id, launch]) => {
   const btn = document.getElementById(id);
   if (!btn) return;
   const go = () => { hideUnoSubmenu(); launch(); };
@@ -2236,15 +2154,7 @@ document.querySelectorAll('.hub-card').forEach(card => {
   if (card.closest('#cuatro-submenu')) return;
   const go = () => {
     const g = card.dataset.game;
-    if (g === 'runner') launchRunner();
-    else if (g === 'cocina')  launchCocina();
-    else if (g === 'match3')  launchMatch3();
-    else if (g === 'hole')    showHoleSubmenu();
-    else if (g === 'galaga')  launchGalaga();
-    else if (g === 'helado')  launchHelado();
-    else if (g === 'tienda')  launchTienda();
-    else if (g === 'mob')     launchMob();
-    else if (g === 'uno')     showUnoSubmenu();
+    if (g === 'uno')          showUnoSubmenu();
     else if (g === 'versus')  showVersusSubmenu();
     else if (g === 'tres')    showTresSubmenu();
     else if (g === 'cuatro')  showCuatroSubmenu();

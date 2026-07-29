@@ -3,7 +3,7 @@
 // peinado + color de pelo, ropa, zapatos y accesorios. Este archivo es sólo la
 // pantalla (pestañas, grilla, compras); el dibujo de la muñeca vive en
 // Muneca.js, que comparte con Mi Mundo. El inventario y las monedas salen de
-// Wallet.js, igual que en la Tienda de Ropa.
+// Wallet.js, compartidas con el resto del juego.
 import { getCoins, spendCoins, getWardrobe, addToWardrobe } from './Wallet.js';
 import {
   SKIN_TONES, HAIR_STYLES, HAIR_COLORS, OUTFITS, SHOES, ACCESSORIES,

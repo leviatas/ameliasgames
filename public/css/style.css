@@ -717,10 +717,10 @@ body {
   pointer-events: none;
 }
 
-/* ── Tienda UI overlay ── */
-#tienda-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
-#tienda-ui.hidden { display: none; }
-#tienda-ui button { pointer-events: all; }
+/* ── Vestidor UI overlay ── */
+#vestidor-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+#vestidor-ui.hidden { display: none; }
+#vestidor-ui button { pointer-events: all; }
 /* ── Shared "volver al menú" button (top of every mini-game) ── */
 .game-menu-btn {
   position: absolute; top: 14px; right: 14px;
@@ -734,10 +734,6 @@ body {
   z-index: 26;
 }
 .game-menu-btn:hover { background: rgba(0,0,0,0.75); }
-
-/* ── Hub card — tienda ── */
-.hub-card.tienda { background: linear-gradient(135deg, #FFB6C8 0%, #F0C0F0 100%); color: #5A0040; }
-.hub-card.tienda:hover { border-color: #FF80C8; box-shadow: 0 18px 40px rgba(255,128,200,0.4); }
 
 /* ── Hub card — mob control ── */
 .hub-card.mob { background: linear-gradient(135deg, #1A0838 0%, #3C1070 100%); color: #D8C8FF; }

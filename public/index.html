@@ -49,31 +49,6 @@
         <div class="hub-name">Mi Mundo</div>
         <div class="hub-desc">Explorá, personalizá y jugá</div>
       </button>
-      <button class="hub-card runner" data-game="runner">
-        <div class="hub-emoji">💜</div>
-        <div class="hub-name">Corre Labubu corre</div>
-        <div class="hub-desc">Corré, saltá y esquivá</div>
-      </button>
-      <button class="hub-card cocina" data-game="cocina">
-        <div class="hub-emoji">🍳</div>
-        <div class="hub-name">Cocina con Viole</div>
-        <div class="hub-desc">Buscá ingredientes y cociná</div>
-      </button>
-      <button class="hub-card hole" data-game="hole">
-        <div class="hub-emoji">🕳️</div>
-        <div class="hub-name">Agujero glotón</div>
-        <div class="hub-desc">Tragate todo y crecé</div>
-      </button>
-      <button class="hub-card helado" data-game="helado">
-        <div class="hub-emoji">🍦</div>
-        <div class="hub-name">Heladería Labubu</div>
-        <div class="hub-desc">Pintá helados y serví</div>
-      </button>
-      <button class="hub-card tienda" data-game="tienda">
-        <div class="hub-emoji">👗</div>
-        <div class="hub-name">Tienda de Ropa</div>
-        <div class="hub-desc">Comprá ropa con tus monedas</div>
-      </button>
       <button class="hub-card unop" data-game="uno">
         <div class="hub-emoji">🕹️</div>
         <div class="hub-name">1 Player</div>
@@ -209,15 +184,6 @@
     <button id="gesture-close" title="Cerrar">✕</button>
   </div>
 
-  <!-- Wardrobe (placard) inventory -->
-  <div id="wardrobe-menu" class="hidden">
-    <div class="fridge-header">
-      <span>👗 Placard</span>
-      <button id="wardrobe-close" title="Cerrar">✕</button>
-    </div>
-    <div id="wardrobe-items"></div>
-  </div>
-
   <!-- Fridge inventory -->
   <div id="fridge-menu" class="hidden">
     <div class="fridge-header">
@@ -274,6 +240,26 @@
         <div class="hub-emoji">👗</div>
         <div class="hub-name">Vestidor de Moda</div>
         <div class="hub-desc">Vestí a la nena: pelo, ropa y accesorios</div>
+      </button>
+      <button class="hub-card runner" id="uno-runner">
+        <div class="hub-emoji">💜</div>
+        <div class="hub-name">Corre Labubu corre</div>
+        <div class="hub-desc">Corré, saltá y esquivá</div>
+      </button>
+      <button class="hub-card cocina" id="uno-cocina">
+        <div class="hub-emoji">🍳</div>
+        <div class="hub-name">Cocina con Viole</div>
+        <div class="hub-desc">Buscá ingredientes y cociná</div>
+      </button>
+      <button class="hub-card hole" id="uno-hole">
+        <div class="hub-emoji">🕳️</div>
+        <div class="hub-name">Agujero glotón</div>
+        <div class="hub-desc">Tragate todo y crecé</div>
+      </button>
+      <button class="hub-card helado" id="uno-helado">
+        <div class="hub-emoji">🍦</div>
+        <div class="hub-name">Heladería Labubu</div>
+        <div class="hub-desc">Pintá helados y serví</div>
       </button>
     </div>
   </div>
@@ -609,11 +595,6 @@
     <button id="panaderia-level" class="game-menu-btn hidden" title="Cambiar de nivel">🧁 Pastelería</button>
   </div>
 
-  <!-- Clothing store controls -->
-  <div id="tienda-ui" class="hidden">
-    <button id="tienda-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
-  </div>
-
   <!-- Vestidor de Moda controls -->
   <div id="vestidor-ui" class="hidden">
     <button id="vestidor-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
@@ -635,7 +616,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.64.0</div>
+  <div id="app-version">v2.65.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">

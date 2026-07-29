@@ -72,9 +72,6 @@ export class Character {
     this.bobTime = 0; this.bobOffset = 0; this.walkPhase = 0;
     this.speed = 260; this.sprintSpeed = 520;
     this.state = 'walk';
-    // la muñeca del Vestidor manda salvo que se pida lo contrario (la Tienda de
-    // Ropa la apaga para poder previsualizar sus propios outfits)
-    this.useDoll = true;
     this.animTime = 0; this.poseT = 0;
     this.gesture = null; this.gestureTime = 0; this.gestureDur = 0;
   }
@@ -135,7 +132,7 @@ export class Character {
       ctx.beginPath(); ctx.ellipse(sx, sy, (isLie?52:32)*s, 6*s, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
     }
 
-    if (!SPRITE_READY && !(this.useDoll && dollSprite(currentLook()))) return;
+    if (!SPRITE_READY && !dollSprite(currentLook())) return;
 
     ctx.save();
     ctx.translate(sx,sy); ctx.translate(ox,oy); ctx.rotate(rot);
@@ -149,7 +146,7 @@ export class Character {
   }
 
   drawPreview(ctx, cx, cyFeet, scale) {
-    if (!SPRITE_READY && !(this.useDoll && dollSprite(currentLook()))) return;
+    if (!SPRITE_READY && !dollSprite(currentLook())) return;
     const H = 132*scale;
     ctx.save(); ctx.translate(cx, cyFeet);
     this._paint(ctx, H);
@@ -160,7 +157,7 @@ export class Character {
   _paint(ctx, H) {
     // La muñeca armada en el Vestidor es el personaje del juego. Sólo tiene
     // pose de pie, así que sentada se la achata y acostada se la gira.
-    const doll = this.useDoll ? dollSprite(currentLook()) : null;
+    const doll = dollSprite(currentLook());
     if (doll) {
       if (this.state === 'lie') {
         // se la acuesta de costado: girada 90°, con la cabeza hacia la izquierda
