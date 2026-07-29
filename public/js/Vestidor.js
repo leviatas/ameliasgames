@@ -19,6 +19,88 @@ const OC = 'rgba(40,20,10,0.55)';
 
 const SAVE_KEY = 'vestidor_look';
 
+// ── Sprites PNG ─────────────────────────────────────────────────────────────
+// El cuerpo y la ropa son PNG generados con IA (ver public/assets/vestidor/).
+// Mientras no cargan —o si faltan— se cae al dibujo vectorial de más abajo,
+// igual que hacen Helado.js y Panaderia.js.
+const ASSET = (p) => `/assets/vestidor/${p}.png`;
+const _imgs = {};
+function loadImg(path) {
+  if (path in _imgs) return _imgs[path];
+  let img = null;
+  try {
+    if (typeof Image !== 'undefined') { img = new Image(); img.src = ASSET(path); }
+  } catch (e) { img = null; }
+  _imgs[path] = img;
+  return img;
+}
+function ready(img) { return !!(img && img.complete && img.naturalWidth > 0); }
+
+// Puntos de referencia medidos sobre base/cuerpo.png (238x483 recortado).
+// Ojo: la IA dibujó una nena de ~2.3 cabezas de alto, así que el cuello cae al
+// 43% y no al 30% — estos valores salen de medir el PNG, no del prompt.
+const BODY = {
+  ar:        238 / 483,   // ancho/alto del sprite
+  headCy:    0.2153,      // centro de la cabeza (fracción de la altura)
+  headR:     0.2112,      // radio de la cabeza
+  neckY:     0.4306,
+  shoulderY: 0.4555,
+  hipY:      0.7412,
+  footY:     0.975,
+  footDx:    0.111,       // separación de cada pie (fracción del ancho)
+};
+// color de piel dominante del PNG: la base contra la que se calculan los tonos
+const BASE_SKIN = [0xF8, 0xC8, 0xA8];
+
+// Calibración de cada prenda: [ruta, yTop, yBot, xs?] en fracciones de la altura
+// del cuerpo (`xs` ensancha aparte). Los valores salen de superponer y mirar: no
+// hay forma de deducirlos, cada imagen viene centrada en su propio cuadro.
+const OUTFIT_ART = {
+  flores: { full: ['ropa_completa/flores', 0.44, 0.93] },
+  casual: { full: ['ropa_completa/casual', 0.44, 0.93] },
+  overol: { full: ['ropa_completa/overol', 0.44, 0.99] },
+  pijama: { full: ['ropa_completa/pijama', 0.44, 0.88] },
+  tutu:   { full: ['ropa_completa/tutu',   0.44, 0.90] },
+  fiesta: { full: ['ropa_completa/fiesta', 0.44, 0.90] },
+  // la cola viene angosta arriba: sin ensanchar se ven las piernas a los lados
+  sirena: { bot: ['ropa/sirena_bot', 0.68, 1.05, 1.4], top: ['ropa/sirena_top', 0.44, 0.79] },
+};
+
+// Cuerpo teñido según el tono de piel. Se recolorean sólo los píxeles cálidos y
+// claros (piel y rubor); los contornos y los ojos quedan intactos.
+const _skinCache = {};
+function skinBody(tone) {
+  const img = loadImg('base/cuerpo');
+  if (!ready(img)) return null;
+  if (_skinCache[tone]) return _skinCache[tone];
+  let cv;
+  try { cv = document.createElement('canvas'); } catch (e) { return null; }
+  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  const cx = cv.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const kr = parseInt(tone.slice(1, 3), 16) / BASE_SKIN[0];
+  const kg = parseInt(tone.slice(3, 5), 16) / BASE_SKIN[1];
+  const kb = parseInt(tone.slice(5, 7), 16) / BASE_SKIN[2];
+  if (Math.abs(kr - 1) > 0.02 || Math.abs(kg - 1) > 0.02 || Math.abs(kb - 1) > 0.02) {
+    try {
+      const d = cx.getImageData(0, 0, cv.width, cv.height), p = d.data;
+      for (let i = 0; i < p.length; i += 4) {
+        if (p[i + 3] < 8) continue;
+        const r = p[i], g = p[i + 1], b = p[i + 2];
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        if (mx < 115 || r <= b) continue;          // contornos, ojos, tonos fríos
+        if ((mx - mn) / mx < 0.10) continue;       // blancos del ojo
+        p[i]     = Math.min(255, r * kr);
+        p[i + 1] = Math.min(255, g * kg);
+        p[i + 2] = Math.min(255, b * kb);
+      }
+      cx.putImageData(d, 0, 0);
+    } catch (e) {}
+  }
+  _skinCache[tone] = cv;
+  return cv;
+}
+
 // ── Catálogo ──────────────────────────────────────────────────────────────
 export const SKIN_TONES = [
   { id:'clara',   color:'#FFE0C4', price:0 },
@@ -232,7 +314,8 @@ export class Vestidor {
     ctx.fillStyle = '#fff'; ctx.font = `bold ${fSize}px sans-serif`;
     ctx.textAlign = 'left'; ctx.fillText('👗 VESTIDOR', 20, barH / 2);
     ctx.fillStyle = '#FFE060'; ctx.textAlign = 'right'; ctx.font = `bold ${fSize * 0.9}px sans-serif`;
-    ctx.fillText(`💰 ${this.coins} monedas`, W - 70, barH / 2);
+    // el botón "← Menú" del overlay ocupa la esquina: dejarle lugar
+    ctx.fillText(`💰 ${this.coins}`, W - 125, barH / 2);
     ctx.textBaseline = 'alphabetic';
   }
 
@@ -242,8 +325,9 @@ export class Vestidor {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath(); ctx.roundRect(0, barH, leftW, H - barH, [0, 14, 14, 0]); ctx.fill();
     ctx.strokeStyle = 'rgba(120,80,160,0.25)'; ctx.lineWidth = 1.5; ctx.stroke();
-    const scale = (H * 0.62) / 300;
-    this._paintDoll(ctx, leftW / 2, barH + H * 0.9, scale);
+    // la muñeca ocupa casi todo el panel, con los pies apoyados cerca del borde
+    const panelH = H - barH;
+    this._paintDoll(ctx, leftW / 2, H - panelH * 0.06, (panelH * 0.86) / 300);
   }
 
   _drawTabs(ctx, W, H) {
@@ -288,6 +372,16 @@ export class Vestidor {
     }
   }
 
+  // achica la tipografía hasta que el texto entre en el ancho pedido
+  _fitFont(ctx, text, maxW, size, weight = 'bold') {
+    let s = Math.round(size);
+    ctx.font = `${weight} ${s}px sans-serif`;
+    while (s > 7 && ctx.measureText(text).width > maxW) {
+      s -= 1; ctx.font = `${weight} ${s}px sans-serif`;
+    }
+    return s;
+  }
+
   _drawCard(ctx, cx, cy, cw, ch, item, cat, isEquipped) {
     const isOwned = this._isOwned(cat, item);
     const top = item.color || item.main || '#F0D8F0';
@@ -308,7 +402,9 @@ export class Vestidor {
     }
 
     ctx.textAlign = 'center';
-    if (item.emoji) {
+    if (cat === 'ropa' && this._drawOutfitThumb(ctx, cx + cw / 2, cy + ch * 0.58, ch * 0.5, item.id)) {
+      // la tarjeta muestra el sprite real de la prenda
+    } else if (item.emoji) {
       ctx.font = `${Math.max(16, ch * 0.32)}px sans-serif`;
       ctx.fillText(item.emoji, cx + cw / 2, cy + ch * 0.42);
     } else {
@@ -317,7 +413,8 @@ export class Vestidor {
     }
 
     if (item.name) {
-      ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.font = `bold ${Math.max(8, ch * 0.13)}px sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      this._fitFont(ctx, item.name, cw - 10, Math.max(8, ch * 0.13));
       ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 3;
       ctx.fillText(item.name, cx + cw / 2, cy + ch * 0.68);
       ctx.shadowBlur = 0;
@@ -333,6 +430,24 @@ export class Vestidor {
       ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(8, ch * 0.11)}px sans-serif`;
       ctx.fillText('✓', cx + cw - 11, cy + 15);
     }
+  }
+
+  // Miniatura de una prenda para la tarjeta: usa las mismas fracciones que la
+  // muñeca, pero sin cuerpo. `bodyH` es la altura que tendría el cuerpo.
+  // Devuelve false si todavía no cargó el sprite (la tarjeta cae al emoji).
+  _drawOutfitThumb(ctx, cx, cyFeet, bodyH, outfitId) {
+    const art = OUTFIT_ART[outfitId];
+    if (!art) return false;
+    const pieces = ['full', 'bot', 'top'].filter(k => art[k]);
+    if (!pieces.every(k => ready(loadImg(art[k][0])))) return false;
+    for (const k of pieces) {
+      const [path, yTop, yBot, xs] = art[k];
+      const img = loadImg(path);
+      const gh = (yBot - yTop) * bodyH;
+      const gw = img.naturalWidth * (gh / img.naturalHeight) * (xs || 1);
+      ctx.drawImage(img, cx - gw / 2, cyFeet - (1 - yTop) * bodyH, gw, gh);
+    }
+    return true;
   }
 
   _drawPeloGrid(ctx, W, H) {
@@ -395,8 +510,81 @@ export class Vestidor {
     ctx.restore();
   }
 
-  // ── Muñeca (dibujo vectorial, cuerpo entero) ────────────────────────────
+  // ¿Cargaron el cuerpo y TODAS las piezas de la ropa elegida? Si falta alguna
+  // se dibuja todo vectorial, así no se ve el cuerpo desnudo mientras cargan.
+  _spriteReady() {
+    if (!ready(loadImg('base/cuerpo'))) return false;
+    const art = OUTFIT_ART[this.look.outfit];
+    if (!art) return false;
+    for (const k of ['full', 'bot', 'top']) if (art[k] && !ready(loadImg(art[k][0]))) return false;
+    return true;
+  }
+
   _paintDoll(ctx, cx, cyFeet, scale) {
+    if (this._spriteReady()) this._paintDollSprite(ctx, cx, cyFeet, scale);
+    else this._paintDollVector(ctx, cx, cyFeet, scale);
+  }
+
+  // ── Muñeca con sprites PNG ──────────────────────────────────────────────
+  // El pelo, los zapatos y los accesorios siguen siendo vectoriales (todavía no
+  // hay PNG de esas partes) y se ubican con los landmarks medidos del cuerpo.
+  _paintDollSprite(ctx, cx, cyFeet, scale) {
+    const L = this.look;
+    const H = 300 * scale;              // misma altura que la muñeca vectorial
+    const BW = H * BODY.ar;
+    const u = Math.max(1, H * 0.01);
+    const yOf = (f) => -(1 - f) * H;
+    const headCy = yOf(BODY.headCy), headR = BODY.headR * H;
+    const neckY = yOf(BODY.neckY), hipY = yOf(BODY.hipY);
+
+    ctx.save();
+    ctx.translate(cx, cyFeet);
+
+    ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(0, 2, H * 0.16, H * 0.03, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+    this._hairBack(ctx, L, headCy, headR, hipY, u);
+
+    const body = skinBody(L.skin);
+    if (body) ctx.drawImage(body, -BW / 2, -H, BW, H);
+
+    this._shoesSprite(ctx, L, H, BW);
+
+    const art = OUTFIT_ART[L.outfit];
+    if (art) {
+      // orden: primero la pieza de abajo, después el top (o la prenda entera)
+      for (const k of ['full', 'bot', 'top']) {
+        if (!art[k]) continue;
+        const [path, yTop, yBot, xs] = art[k];
+        const img = loadImg(path);
+        if (!ready(img)) continue;
+        const gh = (yBot - yTop) * H;
+        const gw = img.naturalWidth * (gh / img.naturalHeight) * (xs || 1);
+        ctx.drawImage(img, -gw / 2, yOf(yTop), gw, gh);
+      }
+    }
+
+    this._hairFront(ctx, L, headCy, headR, u);
+    this._accessory(ctx, L, headCy, headR, neckY, hipY, u);
+    ctx.restore();
+  }
+
+  _shoesSprite(ctx, L, H, BW) {
+    const S = SHOES.find(s => s.id === L.shoes) || SHOES[0];
+    const y = -(1 - BODY.footY) * H;
+    const rx = H * 0.062, ry = H * 0.032;
+    ctx.strokeStyle = OC; ctx.lineWidth = Math.max(1, H * 0.01);
+    for (const sgn of [-1, 1]) {
+      const x = sgn * BODY.footDx * BW;
+      ctx.fillStyle = S.color;
+      ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = S.accent;
+      ctx.beginPath(); ctx.ellipse(x, y + ry * 0.5, rx * 0.88, ry * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ── Muñeca vectorial (respaldo mientras cargan los PNG) ─────────────────
+  _paintDollVector(ctx, cx, cyFeet, scale) {
     const L = this.look;
     const H = 300 * scale;
     ctx.save();
@@ -725,7 +913,8 @@ export class Vestidor {
       ctx.beginPath(); ctx.arc(0, neckY + headR * 0.55, headR * 0.14, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = OC; ctx.lineWidth = u * 0.8; ctx.stroke();
     } else if (a === 'cartera') {
-      const bx = headR * 1.9, by = hipY * 0.3;
+      // colgada al costado, a la altura de la cadera y justo por fuera de la mano
+      const bx = headR * 1.35, by = hipY * 0.85;
       ctx.fillStyle = '#C0407A';
       ctx.beginPath(); ctx.roundRect(bx - headR * 0.32, by, headR * 0.64, headR * 0.5, 6 * u); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.arc(bx, by, headR * 0.28, Math.PI, 0); ctx.stroke();
