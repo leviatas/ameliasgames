@@ -22,7 +22,10 @@ export class Tienda {
     this.toast    = null;
     this._refreshState();
     this._previewChar = null;
-    onSpriteReady(() => { this._previewChar = new Character(0, 0, {}); });
+    onSpriteReady(() => {
+      this._previewChar = new Character(0, 0, {});
+      this._previewChar.useDoll = false;   // acá se previsualizan los outfits de la tienda
+    });
   }
 
   _refreshState() {

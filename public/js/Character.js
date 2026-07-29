@@ -1,3 +1,4 @@
+import { dollSprite, currentLook } from './Muneca.js';
 // ── Colour helpers ──────────────────────────────────────────────────────────
 function _lc(hex, amt) {
   const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
@@ -71,6 +72,9 @@ export class Character {
     this.bobTime = 0; this.bobOffset = 0; this.walkPhase = 0;
     this.speed = 260; this.sprintSpeed = 520;
     this.state = 'walk';
+    // la muñeca del Vestidor manda salvo que se pida lo contrario (la Tienda de
+    // Ropa la apaga para poder previsualizar sus propios outfits)
+    this.useDoll = true;
     this.animTime = 0; this.poseT = 0;
     this.gesture = null; this.gestureTime = 0; this.gestureDur = 0;
   }
@@ -131,7 +135,7 @@ export class Character {
       ctx.beginPath(); ctx.ellipse(sx, sy, (isLie?52:32)*s, 6*s, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
     }
 
-    if (!SPRITE_READY || !SPRITE) return;
+    if (!SPRITE_READY && !(this.useDoll && dollSprite(currentLook()))) return;
 
     ctx.save();
     ctx.translate(sx,sy); ctx.translate(ox,oy); ctx.rotate(rot);
@@ -145,7 +149,7 @@ export class Character {
   }
 
   drawPreview(ctx, cx, cyFeet, scale) {
-    if (!SPRITE_READY || !SPRITE) return;
+    if (!SPRITE_READY && !(this.useDoll && dollSprite(currentLook()))) return;
     const H = 132*scale;
     ctx.save(); ctx.translate(cx, cyFeet);
     this._paint(ctx, H);
@@ -154,6 +158,30 @@ export class Character {
 
   // ── Draw chibi sprite (feet at origin) ─────────────────────────────────────
   _paint(ctx, H) {
+    // La muñeca armada en el Vestidor es el personaje del juego. Sólo tiene
+    // pose de pie, así que sentada se la achata y acostada se la gira.
+    const doll = this.useDoll ? dollSprite(currentLook()) : null;
+    if (doll) {
+      if (this.state === 'lie') {
+        // se la acuesta de costado: girada 90°, con la cabeza hacia la izquierda
+        // y el cuerpo apoyado sobre el piso (y = 0)
+        const Hl = H * 0.92, Wl = doll.width * (Hl / doll.height);
+        ctx.save();
+        ctx.translate(Hl / 2, -Wl / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.drawImage(doll, -Wl / 2, -Hl, Wl, Hl);
+        ctx.restore();
+      } else if (this.state === 'sit') {
+        // no hay pose sentada: se la achata, que junto a la silla se entiende
+        const Hs = H * 0.74, Ws = doll.width * (H / doll.height);
+        ctx.drawImage(doll, -Ws / 2, -Hs, Ws, Hs);
+      } else {
+        const Wd = doll.width * (H / doll.height);
+        ctx.drawImage(doll, -Wd / 2, -H, Wd, H);
+      }
+      return;
+    }
+
     const oUrl = this.cfg.outfitSprite;
     if (oUrl && this.state !== 'sit' && this.state !== 'lie') {
       _loadOutfit(oUrl);

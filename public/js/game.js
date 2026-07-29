@@ -14,6 +14,7 @@ import { Helado }                from './Helado.js';
 import { Panaderia }             from './Panaderia.js';
 import { Tienda, CATALOG as TIENDA_CATALOG } from './Tienda.js';
 import { Vestidor } from './Vestidor.js';
+import { onDollReady } from './Muneca.js';
 import { Mob }                               from './Mob.js';
 import { PongChibi }      from './PongChibi.js';
 import { Globos2P }       from './Globos2P.js';
@@ -2276,6 +2277,7 @@ setTimeout(() => loading.remove(), 600);
 
 syncCustActive();
 onSpriteReady(() => { drawSelectionPreviews(); updateHUDPortrait(); });
+onDollReady(() => { drawSelectionPreviews(); updateHUDPortrait(); });
 drawSelectionPreviews();
 
 // Start at the game-chooser hub (kept visible by default in the HTML)
