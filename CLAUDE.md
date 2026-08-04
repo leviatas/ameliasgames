@@ -37,8 +37,14 @@ posiciones absolutas.
   1. `-fuzz 7% -trim +repage` (recorte sobre blanco)
   2. `-alpha set -bordercolor white -border 1 -fill none -draw 'matte 0,0 floodfill' -shave 1x1`
   3. `-resize '700x700>'`
-  4. `-channel A -evaluate subtract 12% +channel -trim +repage` (limpia artefactos)
-  5. re-crop por caja de alfa ≥45% (`-alpha extract -threshold 45% -trim` → `-crop`)
+  4. `-channel A -evaluate subtract 12% +channel` (limpia artefactos)
+  5. ⚠️ `-channel A -level 0%,88% +channel -trim +repage` — el paso 4 le resta
+     12% de alfa a **todos** los píxeles, así que el sprite entero queda
+     translúcido; esto le devuelve la opacidad a las zonas sólidas sin revivir
+     los halos. Sin este paso se ve el fondo (o el cuerpo, si se apilan capas)
+     a través del dibujo. Verificar con
+     `convert x.png -alpha extract -format '%[fx:maxima*255]' info:` → 255.
+  6. re-crop por caja de alfa ≥45% (`-alpha extract -threshold 45% -trim` → `-crop`)
 - En el código: patrón `loadImg(name)` / `ready(img)` con **fallback vectorial o
   emoji** mientras carga (ver `Helado.js` y `Panaderia.js`). Partes animadas van
   en sprites separados (ej.: aspas del molino, gallina) para rotarlas/moverlas
