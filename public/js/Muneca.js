@@ -1,8 +1,9 @@
 // ── Muñeca ───────────────────────────────────────────────────────────────────
 // Dibujo de la nena vestida, compartido por el Vestidor (donde se la arma) y
 // por Mi Mundo (donde se la camina). El cuerpo y la ropa son sprites PNG; el
-// pelo, los zapatos y los accesorios siguen siendo vectoriales. Si los PNG no
-// cargaron todavía se dibuja todo vectorial, para no mostrarla desnuda.
+// pelo acepta PNG por peinado (HAIR_ART) y cae a vectorial el que no lo tenga;
+// zapatos y accesorios siguen siendo vectoriales. Si los PNG no cargaron
+// todavía se dibuja todo vectorial, para no mostrarla desnuda.
 // El look elegido vive en localStorage y es la única fuente de verdad.
 
 // ── Colour helpers (paleta pastel + sombreado suave, como Character.js) ──────
@@ -80,6 +81,70 @@ const OUTFIT_ART = {
   // la cola viene angosta arriba: sin ensanchar se ven las piernas a los lados
   sirena: { bot: ['ropa/sirena_bot', 0.68, 1.05, 1.4], top: ['ropa/sirena_top', 0.44, 0.79] },
 };
+
+// Calibración de cada peinado: mismas fracciones que OUTFIT_ART (0 = corona de
+// la cabeza, 1 = pies). `front` va sobre la cara, `back` detrás del cuerpo.
+// Mientras un peinado no tenga PNG se dibuja con el pelo vectorial de más abajo,
+// así que la tabla puede ir creciendo de a un peinado por vez.
+// Referencias del cuerpo: corona 0.004, mentón 0.43, hombros 0.4555, cadera 0.74.
+// Ejemplo: colitas: { front:['pelo/colitas_frente',0,0.46], back:['pelo/colitas_atras',0.10,0.62] }
+const HAIR_ART = {};
+
+// Los PNG de pelo se generan en gris neutro (#C8C8C8 de base, ver
+// docs/prompts-pelo.md) para poder teñirlos con cualquiera de los HAIR_COLORS
+// sin generar una imagen por color.
+const BASE_HAIR = 0xC8;
+const _hairCache = {};
+function tintHair(path, color) {
+  const img = loadImg(path);
+  if (!ready(img)) return null;
+  const key = path + color;
+  if (_hairCache[key]) return _hairCache[key];
+  let cv;
+  try { cv = document.createElement('canvas'); } catch (e) { return null; }
+  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  const cx = cv.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const kr = parseInt(color.slice(1, 3), 16) / BASE_HAIR;
+  const kg = parseInt(color.slice(3, 5), 16) / BASE_HAIR;
+  const kb = parseInt(color.slice(5, 7), 16) / BASE_HAIR;
+  try {
+    const d = cx.getImageData(0, 0, cv.width, cv.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      if (p[i + 3] < 8) continue;
+      const r = p[i], g = p[i + 1], b = p[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      // sólo lo desaturado es pelo: los contornos marrones y los moños de color
+      // se dibujaron saturados justamente para que el teñido no los toque
+      if (mx > 0 && (mx - mn) / mx > 0.18) continue;
+      p[i]     = Math.min(255, r * kr);
+      p[i + 1] = Math.min(255, g * kg);
+      p[i + 2] = Math.min(255, b * kb);
+    }
+    cx.putImageData(d, 0, 0);
+  } catch (e) {}
+  _hairCache[key] = cv;
+  return cv;
+}
+
+// Las dos capas de pelo salen juntas o ninguna: si sólo cargó una se vería un
+// peinado mitad PNG mitad vectorial.
+function hairSpriteReady(look) {
+  const art = HAIR_ART[look.hair];
+  if (!art) return false;
+  return ['back', 'front'].every(k => !art[k] || ready(loadImg(art[k][0])));
+}
+
+function hairSprite(ctx, look, layer, H) {
+  const piece = (HAIR_ART[look.hair] || {})[layer];
+  if (!piece) return;
+  const [path, yTop, yBot, xs] = piece;
+  const img = loadImg(path);
+  if (!ready(img)) return;
+  const gh = (yBot - yTop) * H;
+  const gw = img.naturalWidth * (gh / img.naturalHeight) * (xs || 1);
+  ctx.drawImage(tintHair(path, look.hairColor) || img, -gw / 2, -(1 - yTop) * H, gw, gh);
+}
 
 // Cuerpo teñido según el tono de piel. Se recolorean sólo los píxeles cálidos y
 // claros (piel y rubor); los contornos y los ojos quedan intactos.
@@ -237,7 +302,9 @@ function paintDollSprite(ctx, look, cx, cyFeet, scale, opts = {}) {
     ctx.beginPath(); ctx.ellipse(0, 2, H * 0.16, H * 0.03, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
 
-  hairBack(ctx, L, headCy, headR, hipY, u);
+  const hairPng = hairSpriteReady(L);
+  if (hairPng) hairSprite(ctx, L, 'back', H);
+  else hairBack(ctx, L, headCy, headR, hipY, u);
 
   const body = skinBody(L.skin);
   if (body) ctx.drawImage(body, -BW / 2, -H, BW, H);
@@ -258,7 +325,8 @@ function paintDollSprite(ctx, look, cx, cyFeet, scale, opts = {}) {
     }
   }
 
-  hairFront(ctx, L, headCy, headR, u);
+  if (hairPng) hairSprite(ctx, L, 'front', H);
+  else hairFront(ctx, L, headCy, headR, u);
   accessory(ctx, L, headCy, headR, neckY, hipY, u);
   ctx.restore();
 }
