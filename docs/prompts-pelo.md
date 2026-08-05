@@ -12,64 +12,242 @@ por PNGs, en `public/assets/vestidor/pelo/<id>_frente.png` y `<id>_atras.png`.
   Los peinados cortos usan sólo `_frente`.
 - **Color neutro gris plata**, no el color final: el código lo tiñe por multiply
   con los 9 `HAIR_COLORS`, igual que `skinBody()` hace con la piel.
+- **Los moños y hebillas van en rosa saturado** `#E84B7A`: `tintHair()` sólo tiñe
+  lo desaturado, así que lo que tiene color propio sobrevive al teñido. Un moño
+  gris se pintaría del color del pelo y desaparecería.
 - **Vista frontal, simétrica**, proporción chibi: la cabeza de la muñeca es casi
   la mitad del cuerpo, así que la peluca tiene que ser grande y redonda.
 
-## Bloque base (pegar SIEMPRE al principio)
+## Cómo usarlos
+
+Cada bloque de abajo es un prompt **completo**: se copia entero y se pega en el
+generador, sin agregarle nada. Los que dicen *(capa de atrás)* son una segunda
+imagen del mismo peinado.
+
+Los moños, scrunchies y hebillas van **en rosa saturado `#E84B7A`** a propósito:
+el teñido del código sólo toca lo desaturado, así que el pelo cambia de color y
+el moño se queda rosa. Si salen grises, se tiñen junto con el pelo.
+
+## Peinados del catálogo
+
+### colitas — Colitas 🎀
 
 ```
-Cute children's game 2D illustration, chibi cartoon style, soft cel shading,
-clean thin outlines, warm pastel colors, isolated on plain white background.
-Front view, perfectly symmetrical, centered, flat orthographic view.
-Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes,
-NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand.
-The inner opening where the face would be is pure empty white.
-Proportions for a chibi doll with a very large round head: the wig cap hugs a big
-circular head, roughly as wide as it is tall.
-Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft
-highlights, dark warm brown outlines (#5A4034). No other colors in the hair.
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: two low pigtails, one on each side just below ear level, each tied with a small bow, straight blunt bangs across the forehead, the pigtails flare outward and end just below jaw level.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). The two bows are the only colored element: saturated pink #E84B7A.
 Plain pure white background, no drop shadow, no gradient, no props, no text.
 ```
 
-Después del bloque base, agregar la línea del peinado.
-
-## Peinados
-
-### Ya en el catálogo (`HAIR_STYLES`)
-
-| id | archivo(s) | línea del prompt |
-|---|---|---|
-| `colitas` | frente + atrás | `Two low pigtails, one on each side, tied with small bows, straight bangs across the forehead, the pigtails flare outward and end just below the jaw line.` |
-| `corto` | frente | `Short rounded bob haircut, chin length, straight blunt bangs, soft inward curl at the tips, neat and tidy.` |
-| `rodete` | frente | `Hair pulled up into one round bun on top of the head, smooth cap, tiny wispy strands near the temples, short bangs.` |
-| `largo` | frente + atrás | `Long straight hair worn loose, falling down past the shoulders to hip length, straight bangs, two front locks framing the face.` |
-| `trenza` | frente + atrás | `One thick braid resting over the right shoulder, tied with a small bow at the tip, side-swept bangs, chunky visible braid segments.` |
-
-### Nuevos propuestos
-
-| id sugerido | nombre / emoji | línea del prompt |
-|---|---|---|
-| `dos_trenzas` | Trenzas 🧶 | `Two thick braids, one over each shoulder, each tied with a small bow at the tip, straight bangs, chunky visible braid segments, symmetrical.` |
-| `rulos` | Rulos 🌀 | `Big bouncy ringlet curls, shoulder length, voluminous rounded silhouette, curly bangs, each curl drawn as a clear spiral shape.` |
-| `afro` | Afro ☁️ | `Full round natural afro, big soft cloud-like silhouette wider than the head, tiny coil texture marks, no bangs, perfectly round outline.` |
-| `ondulado` | Ondas 🌊 | `Long wavy hair worn loose, soft S-shaped waves, waist length, middle part, no bangs, two wavy locks framing the face.` |
-| `colita_alta` | Colita alta 🎽 | `High ponytail on top of the back of the head, tied with a scrunchie, the tail falls long behind, smooth pulled-back cap, short bangs.` |
-| `media_cola` | Media cola 🦋 | `Half-up hairstyle: top half gathered in a small clip at the back, the rest falling loose to the shoulders, soft side bangs.` |
-| `rodetes` | Rodetes 🍡 | `Two round space buns, one on each side of the top of the head, small loose strands hanging beside each bun, straight bangs, symmetrical.` |
-| `hime` | Princesa 👑 | `Hime cut: very long straight hair, straight blunt bangs, two shorter straight side locks cut at cheek level, glossy and neat.` |
-| `pixie` | Pixie ✨ | `Very short pixie cut, textured spiky tips, wispy side-swept bangs, ears area left open, tomboy look.` |
-| `moño_alto` | Moñito 🎀 | `Hair tied up into a big fabric-like bow-shaped bun on top of the head, smooth cap, short bangs, cute idol look.` |
-
-### Variante para la capa de atrás
-
-Cuando el peinado necesita `_atras`, generar una segunda imagen con el bloque base
-y esta línea, reemplazando `<descripción>`:
+### corto — Corto ✂️
 
 ```
-Only the BACK MASS of the hairstyle: <descripción de la melena/trenza/colita>,
-seen from the front but drawn as the part that hangs BEHIND the head and body.
-No wig cap, no bangs, no face opening — just the falling hair mass, a single
-silhouette shape, wider at the top and tapering at the bottom.
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: short rounded bob haircut, chin length, straight blunt bangs, soft inward curl at the tips, neat and tidy.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### rodete — Rodete 🍡
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: hair pulled up into one round bun sitting on top of the head, smooth sleek cap, short bangs, tiny wispy strands near the temples.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### largo — Suelto 💁‍♀️
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: long straight hair worn loose, straight blunt bangs, two long front locks framing the face and falling forward past the shoulders.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### largo — Suelto *(capa de atrás)*
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: ONLY THE BACK MASS of a hairstyle — the part that hangs behind the head and body, seen from the front. NO wig cap, NO bangs, NO face opening, NO head, NO face, NO body, NO shoulders. One single continuous silhouette of falling hair.
+STYLE: a long straight curtain of hair reaching hip length, widest at the top where it would sit behind the head, softly rounded bottom edge, smooth vertical strand lines.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### trenza — Trenza 🧵
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: one thick braid resting over the right shoulder, chunky clearly visible braid segments, tied with a small bow at the tip, side-swept bangs.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). The bow is the only colored element: saturated pink #E84B7A.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### trenza — Trenza *(capa de atrás)*
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, centered, flat orthographic view.
+Subject: ONLY THE BACK MASS of a hairstyle — the part that hangs behind the head and body, seen from the front. NO wig cap, NO bangs, NO face opening, NO head, NO face, NO body, NO shoulders. One single continuous silhouette.
+STYLE: a single thick braid hanging straight down to hip length, chunky clearly visible braid segments, tapering toward the tip, tied with a small bow at the bottom.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). The bow is the only colored element: saturated pink #E84B7A.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+## Peinados nuevos
+
+Estos **todavía no están en `HAIR_STYLES`**: se agregan al catálogo recién cuando
+tienen su PNG (ver la nota al final).
+
+### dos_trenzas — Trenzas 🧶
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: two thick braids, one hanging over each shoulder, chunky clearly visible braid segments, each tied with a small bow at the tip, straight blunt bangs, perfectly symmetrical.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). The two bows are the only colored element: saturated pink #E84B7A.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### rulos — Rulos 🌀
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: big bouncy ringlet curls, shoulder length, voluminous rounded silhouette, curly bangs, each curl drawn as a clear chunky spiral shape.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### afro — Afro ☁️
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig hugs a big circular head, roughly as wide as it is tall.
+STYLE: full round natural afro, big soft cloud-like silhouette clearly wider than the head, tiny coil texture marks all over, no bangs, almost perfectly circular outline.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### ondulado — Ondas 🌊
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: long wavy hair worn loose, soft S-shaped waves, middle part, no bangs, two wavy locks framing the face and falling forward past the shoulders.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### ondulado — Ondas *(capa de atrás)*
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: ONLY THE BACK MASS of a hairstyle — the part that hangs behind the head and body, seen from the front. NO wig cap, NO bangs, NO face opening, NO head, NO face, NO body, NO shoulders. One single continuous silhouette of falling hair.
+STYLE: a long wavy curtain of hair reaching hip length, soft S-shaped waves along both edges, widest at the top, scalloped wavy bottom edge.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### colita_alta — Colita alta 🎽
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: high ponytail tied at the top back of the head with a scrunchie, smooth sleek pulled-back cap, short bangs; only the base and the very top of the ponytail peek above the head.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). The scrunchie is the only colored element: saturated pink #E84B7A.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### colita_alta — Colita alta *(capa de atrás)*
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, centered, flat orthographic view.
+Subject: ONLY THE BACK MASS of a hairstyle — the part that hangs behind the head and body, seen from the front. NO wig cap, NO bangs, NO face opening, NO head, NO face, NO body, NO shoulders. One single continuous silhouette.
+STYLE: one long ponytail hanging down from a gathered point at the very top, sweeping down and slightly to one side, flaring out in the middle and tapering to a soft pointed tip.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### media_cola — Media cola 🦋
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: half-up hairstyle, the top half gathered into a small clip at the back of the head, the rest falling loose to shoulder length, soft side-swept bangs.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). The clip is the only colored element: saturated pink #E84B7A.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### rodetes — Rodetes 🍡🍡
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: two round space buns, one on each side of the top of the head, a small loose strand hanging beside each bun, straight blunt bangs, perfectly symmetrical.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### hime — Princesa 👑
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: hime cut — straight blunt bangs and two shorter perfectly straight side locks cut sharply at cheek level, glossy and neat, the rest of the hair very long and straight.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### hime — Princesa *(capa de atrás)*
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: ONLY THE BACK MASS of a hairstyle — the part that hangs behind the head and body, seen from the front. NO wig cap, NO bangs, NO face opening, NO head, NO face, NO body, NO shoulders. One single continuous silhouette of falling hair.
+STYLE: a very long perfectly straight curtain of hair reaching hip length, glossy, straight blunt horizontal bottom edge, smooth vertical strand lines.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### pixie — Pixie ✨
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: very short pixie cut hugging the head, textured spiky tips, wispy side-swept bangs, playful tomboy look.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
+```
+
+### mono_alto — Moñito 🎀
+
+```
+Cute children's game 2D illustration, chibi cartoon style, soft cel shading, clean thin outlines, isolated on plain white background. Front view, perfectly symmetrical, centered, flat orthographic view.
+Subject: a WIG ONLY — a hairstyle floating on an invisible head. NO face, NO eyes, NO mouth, NO skin, NO ears, NO neck, NO body, NO mannequin head, NO wig stand. The inner opening where the face would be is pure empty white.
+Proportions for a chibi doll with a very large round head: the wig cap hugs a big circular head, roughly as wide as it is tall.
+STYLE: hair gathered on top of the head into a big bun shaped like a bow, made of hair itself, smooth sleek cap below it, short bangs, cute idol look.
+Hair colored neutral silver grey: #C8C8C8 base, #9C9C9C shadows, #E8E8E8 soft highlights, dark warm brown outlines (#5A4034). No other colors.
+Plain pure white background, no drop shadow, no gradient, no props, no text.
 ```
 
 ## Post-proceso
