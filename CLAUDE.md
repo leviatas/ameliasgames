@@ -26,6 +26,9 @@ Cada juego es una clase en `public/js/<Nombre>.js` con `constructor(canvas, ...)
 - ⚠️ si es 2P: sumar `#<juego>-ui` a las **tres** listas de "2P game UI overlays"
   de `style.css`. Si falta en la del `.hidden`, el overlay nunca se oculta y el
   botón `← Menú` queda flotando invisible sobre el hub robándose los clicks.
+- si es un juego de mesa: entrada en `GAME_HELP` (game.js) + botón
+  `<button id="<juego>-help" class="game-help-btn">❓</button>` en su overlay; el
+  wiring del botón es automático a partir de las claves de `GAME_HELP`.
 - ⚠️ si es 2P: además de lo de arriba van `SHARED_BOARD_MODES` (si es tablero
   compartido, para que el toque cuente para quien tiene el turno y no según la
   mitad de pantalla), `ONLINE_GAMES`, `_wireOnlineBtn()` y `ONLINE_EXIT_FNS`, más

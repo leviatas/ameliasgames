@@ -30,6 +30,9 @@ import { PuntosYCajas }   from './PuntosYCajas.js';
 import { CincoEnLinea }   from './CincoEnLinea.js';
 import { Mancala }        from './Mancala.js';
 import { Oca }            from './Oca.js';
+import { Molino }         from './Molino.js';
+import { Laberinto }      from './Laberinto.js';
+import { DamasChinas }    from './DamasChinas.js';
 import { ThreePlayers }   from './ThreePlayers.js';
 import { FourPlayers }    from './FourPlayers.js';
 import { NetSession }     from './Net.js';
@@ -74,6 +77,9 @@ let puntos    = null;
 let cinco     = null;
 let mancala   = null;
 let oca       = null;
+let molino    = null;
+let laberinto = null;
+let damas     = null;
 let tres     = null;
 let cuatro   = null;
 const _2pTouches = new Map(); // pointerId → 'p1' | 'p2'
@@ -337,6 +343,7 @@ function showHub(menuId = 'hub-screen') {
   vuelo = null; corazones = null; memoria2p = null;
   tresenraya = null; conecta4 = null; ppt = null; ahorcado = null;
   puntos = null; cinco = null; mancala = null; oca = null;
+  molino = null; laberinto = null; damas = null;
   _2pTouches.clear();
   document.getElementById('pong-ui').classList.add('hidden');
   document.getElementById('globos-ui').classList.add('hidden');
@@ -353,6 +360,10 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('cinco-ui').classList.add('hidden');
   document.getElementById('mancala-ui').classList.add('hidden');
   document.getElementById('oca-ui').classList.add('hidden');
+  document.getElementById('molino-ui').classList.add('hidden');
+  document.getElementById('laberinto-ui').classList.add('hidden');
+  document.getElementById('damas-ui').classList.add('hidden');
+  document.getElementById('game-help').classList.add('hidden');
   document.getElementById('tres-ui').classList.add('hidden');
   document.getElementById('cuatro-ui').classList.add('hidden');
   hideGestureMenu();
@@ -655,13 +666,17 @@ function _active2P() {
   if (mode === 'cinco'   && cinco)   return cinco;
   if (mode === 'mancala' && mancala) return mancala;
   if (mode === 'oca'     && oca)     return oca;
+  if (mode === 'molino'    && molino)    return molino;
+  if (mode === 'laberinto' && laberinto) return laberinto;
+  if (mode === 'damas'     && damas)     return damas;
   return null;
 }
 // Games with one shared centered board (not split left/right on a single
 // device) — any local tap should count for whoever's turn it is, not
 // whichever half of the screen it lands on.
 const SHARED_BOARD_MODES = new Set(['memoria2p', 'tresenraya', 'conecta4', 'ahorcado',
-                                    'puntos', 'cinco', 'mancala', 'oca']);
+                                    'puntos', 'cinco', 'mancala', 'oca',
+                                    'molino', 'laberinto', 'damas']);
 canvas.addEventListener('pointerdown', e => {
   const g = _active2P(); if (!g) return;
   e.preventDefault();
@@ -896,6 +911,13 @@ function exitCinco()   { _resetNetState(); cinco   = null; _exitVersus('cinco-ui
 function exitMancala() { _resetNetState(); mancala = null; _exitVersus('mancala-ui'); }
 function exitOca()     { _resetNetState(); oca     = null; _exitVersus('oca-ui');     }
 
+function launchMolino()    { molino    = new Molino(canvas);      _launchVersus('molino-ui',    'molino');    }
+function launchLaberinto() { laberinto = new Laberinto(canvas);   _launchVersus('laberinto-ui', 'laberinto'); }
+function launchDamas()     { damas     = new DamasChinas(canvas); _launchVersus('damas-ui',     'damas');     }
+function exitMolino()    { _resetNetState(); molino    = null; _exitVersus('molino-ui');    }
+function exitLaberinto() { _resetNetState(); laberinto = null; _exitVersus('laberinto-ui'); }
+function exitDamas()     { _resetNetState(); damas     = null; _exitVersus('damas-ui');     }
+
 // ── 3-Players submenu & launchers (share the versus launch/exit helpers) ─────
 function showTresSubmenu() {
   document.getElementById('hub-screen').classList.add('hidden');
@@ -1121,6 +1143,9 @@ function gameLoop(now) {
   if (mode === 'cinco'   && cinco)   { _run2PFrame(cinco, delta);   return; }
   if (mode === 'mancala' && mancala) { _run2PFrame(mancala, delta); return; }
   if (mode === 'oca'     && oca)     { _run2PFrame(oca, delta);     return; }
+  if (mode === 'molino'    && molino)    { _run2PFrame(molino, delta);    return; }
+  if (mode === 'laberinto' && laberinto) { _run2PFrame(laberinto, delta); return; }
+  if (mode === 'damas'     && damas)     { _run2PFrame(damas, delta);     return; }
   if (mode === 'tres'   && tres)   { tres.update(delta);   tres.render(ctx);   return; }
   if (mode === 'cuatro' && cuatro) { cuatro.update(delta); cuatro.render(ctx); return; }
   update(delta);
@@ -1925,6 +1950,12 @@ if (vsPuntos)  { vsPuntos.addEventListener('click',  launchPuntos);  vsPuntos.ad
 if (vsCinco)   { vsCinco.addEventListener('click',   launchCinco);   vsCinco.addEventListener('touchend',   e => { e.preventDefault(); launchCinco();   }, { passive: false }); }
 if (vsMancala) { vsMancala.addEventListener('click', launchMancala); vsMancala.addEventListener('touchend', e => { e.preventDefault(); launchMancala(); }, { passive: false }); }
 if (vsOca)     { vsOca.addEventListener('click',     launchOca);     vsOca.addEventListener('touchend',     e => { e.preventDefault(); launchOca();     }, { passive: false }); }
+const vsMolino    = document.getElementById('versus-molino');
+const vsLaberinto = document.getElementById('versus-laberinto');
+const vsDamas     = document.getElementById('versus-damas');
+if (vsMolino)    { vsMolino.addEventListener('click',    launchMolino);    vsMolino.addEventListener('touchend',    e => { e.preventDefault(); launchMolino();    }, { passive: false }); }
+if (vsLaberinto) { vsLaberinto.addEventListener('click', launchLaberinto); vsLaberinto.addEventListener('touchend', e => { e.preventDefault(); launchLaberinto(); }, { passive: false }); }
+if (vsDamas)     { vsDamas.addEventListener('click',     launchDamas);     vsDamas.addEventListener('touchend',     e => { e.preventDefault(); launchDamas();     }, { passive: false }); }
 
 // ── Online play: room-code create/join (all 11 versus games) ─────────────────
 const ONLINE_GAMES = {
@@ -1941,8 +1972,11 @@ const ONLINE_GAMES = {
   ahorcado:  { title: '🎪 Ahorcado — Online',           build: () => new Ahorcado(canvas),   uiId: 'ahorcado-ui',  apply: v => { ahorcado  = v; } },
   puntos:    { title: '⬜ Puntos y Cajas — Online',     build: () => new PuntosYCajas(canvas), uiId: 'puntos-ui',  apply: v => { puntos    = v; } },
   cinco:     { title: '⚫ 5 en Línea — Online',          build: () => new CincoEnLinea(canvas), uiId: 'cinco-ui',   apply: v => { cinco     = v; } },
-  mancala:   { title: '🫘 Mancala — Online',            build: () => new Mancala(canvas),    uiId: 'mancala-ui',   apply: v => { mancala   = v; } },
+  mancala:   { title: '🌰 Mancala — Online',            build: () => new Mancala(canvas),    uiId: 'mancala-ui',   apply: v => { mancala   = v; } },
   oca:       { title: '🦢 La Oca — Online',             build: () => new Oca(canvas),        uiId: 'oca-ui',       apply: v => { oca       = v; } },
+  molino:    { title: '🎯 Molino — Online',             build: () => new Molino(canvas),      uiId: 'molino-ui',    apply: v => { molino    = v; } },
+  laberinto: { title: '🧱 Laberinto — Online',          build: () => new Laberinto(canvas),   uiId: 'laberinto-ui', apply: v => { laberinto = v; } },
+  damas:     { title: '⭐ Damas Chinas — Online',       build: () => new DamasChinas(canvas), uiId: 'damas-ui',     apply: v => { damas     = v; } },
 };
 
 function _wireOnlineBtn(id, gameKey) {
@@ -1967,6 +2001,9 @@ _wireOnlineBtn('versus-puntos-online',    'puntos');
 _wireOnlineBtn('versus-cinco-online',     'cinco');
 _wireOnlineBtn('versus-mancala-online',   'mancala');
 _wireOnlineBtn('versus-oca-online',       'oca');
+_wireOnlineBtn('versus-molino-online',    'molino');
+_wireOnlineBtn('versus-laberinto-online', 'laberinto');
+_wireOnlineBtn('versus-damas-online',     'damas');
 
 function _showOnlineStep(stepId) {
   ['online-choose', 'online-waiting', 'online-join-form', 'online-status']
@@ -2074,6 +2111,7 @@ const ONLINE_EXIT_FNS = {
   ppt: () => exitPPT(), ahorcado: () => exitAhorcado(),
   puntos: () => exitPuntos(), cinco: () => exitCinco(),
   mancala: () => exitMancala(), oca: () => exitOca(),
+  molino: () => exitMolino(), laberinto: () => exitLaberinto(), damas: () => exitDamas(),
 };
 document.getElementById('online-disconnect-back').addEventListener('click', () => {
   document.getElementById('online-disconnect-banner').classList.add('hidden');
@@ -2111,9 +2149,105 @@ if (puntosExitBtn)  puntosExitBtn.addEventListener('click',  exitPuntos);
 if (cincoExitBtn)   cincoExitBtn.addEventListener('click',   exitCinco);
 if (mancalaExitBtn) mancalaExitBtn.addEventListener('click', exitMancala);
 if (ocaExitBtn)     ocaExitBtn.addEventListener('click',     exitOca);
+const molinoExitBtn    = document.getElementById('molino-exit');
+const laberintoExitBtn = document.getElementById('laberinto-exit');
+const damasExitBtn     = document.getElementById('damas-exit');
+if (molinoExitBtn)    molinoExitBtn.addEventListener('click',    exitMolino);
+if (laberintoExitBtn) laberintoExitBtn.addEventListener('click', exitLaberinto);
+if (damasExitBtn)     damasExitBtn.addEventListener('click',     exitDamas);
+
+// ── Manual: cómo se juega cada juego de mesa ─────────────────────────────────
+// Varios de los de tablero no son conocidos (Mancala, Molino, Quoridor), así que
+// cada uno tiene su botón ❓ con las reglas explicadas en criollo.
+const GAME_HELP = {
+  puntos: { title: '⬜ Puntos y Cajas', steps: [
+    'Por turnos, cada una pinta una rayita entre dos puntos pegados.',
+    'La que pone la rayita que cierra un cuadradito se lo queda… ¡y juega de nuevo!',
+    'Si con una sola rayita cerrás dos cuadraditos, te llevás los dos.',
+    'Cuando no queda ninguna rayita libre, gana la que tenga más cuadraditos.',
+    'El truco: tratá de no regalarle el tercer lado de un cuadradito a la otra.',
+  ] },
+  cinco: { title: '⚫ 5 en Línea', steps: [
+    'Por turnos, cada una pone una ficha en cualquier casilla libre.',
+    'Gana la primera que alinea CINCO fichas seguidas.',
+    'Vale en cualquier dirección: fila, columna o diagonal.',
+    'La última ficha jugada queda con un anillito, para no perderla de vista.',
+    'El truco: cuando la otra tiene tres seguidas, tapale una punta.',
+  ] },
+  mancala: { title: '🌰 Mancala', steps: [
+    'Cada una maneja los 6 hoyos de su fila y el granero grande de su costado.',
+    'Tocás un hoyo tuyo: se levantan TODAS sus semillas y se van dejando de a una en los hoyos siguientes, en contra de las agujas del reloj.',
+    'Al pasar por tu granero dejás una semilla; por el granero de la otra pasás de largo.',
+    'Si la última semilla cae justo en tu granero, ¡volvés a jugar!',
+    'Si la última cae en un hoyo TUYO que estaba vacío, te llevás esa semilla y todas las de enfrente.',
+    'Cuando un lado queda sin semillas se termina: cada una guarda las suyas y gana la del granero más lleno.',
+  ] },
+  oca: { title: '🦢 La Oca', steps: [
+    'Tocá la pantalla para tirar el dado y avanzar por el camino.',
+    '🦢 Oca: saltás a la oca siguiente y volvés a tirar.',
+    '🌉 Puente y 🎲 Dado: te llevan más adelante y volvés a tirar.',
+    '🕳️ Pozo: perdés 2 turnos. 🌀 Laberinto: retrocedés unas casillas.',
+    '💀 Calavera: ¡de vuelta a la salida!',
+    'Gana la primera que llega al 🏆 del final. Es todo suerte, así que cualquiera puede ganar.',
+  ] },
+  molino: { title: '🎯 Molino', steps: [
+    'Primera parte: por turnos, cada una pone sus 9 fichas en los puntos libres.',
+    'Después las fichas se mueven de a una, siempre a un punto pegado por una raya.',
+    'Cada vez que juntás TRES en línea hacés un molino y le comés una ficha a la otra.',
+    'No se pueden comer fichas que estén dentro de un molino… salvo que estén todas adentro de uno.',
+    'Cuando te quedan sólo 3 fichas podés volar: te movés a cualquier punto libre del tablero.',
+    'Perdés si te quedan 2 fichas, o si no te queda ningún movimiento posible.',
+  ] },
+  laberinto: { title: '🧱 Laberinto', steps: [
+    'Tu peón arranca de un lado y tiene que llegar a la fila de enfrente.',
+    'En tu turno hacés UNA de dos cosas: movés el peón, o ponés una pared.',
+    'Para mover: tocá uno de los casilleros marcados con un puntito de tu color.',
+    'Para poner pared: tocá un cruce del tablero. Si tocás a los costados del cruce la pared queda acostada; si tocás arriba o abajo, queda parada.',
+    'Tenés 7 paredes. Nunca podés dejar a nadie sin ningún camino a su meta: si probás, el juego no te deja.',
+    'Si los peones quedan pegados, uno salta por arriba del otro.',
+    'Gana la primera que cruza del todo al otro lado.',
+  ] },
+  damas: { title: '⭐ Damas Chinas', steps: [
+    'Tenés 6 fichas en tu punta de la estrella y tenés que meterlas todas en la punta de enfrente.',
+    'Tocá una ficha tuya y se marcan en dorado todos los lugares a donde puede ir.',
+    'Podés moverla a un hoyo pegado, para cualquiera de los seis lados.',
+    'O saltar por arriba de una ficha (tuya o de la otra) y caer en el hoyo vacío de atrás.',
+    'Los saltos se encadenan: uno atrás del otro podés cruzar medio tablero de una sola vez.',
+    'Gana la primera que llena la punta de enfrente con sus 6 fichas.',
+  ] },
+};
+
+const helpOverlay = document.getElementById('game-help');
+function openGameHelp(key) {
+  const h = GAME_HELP[key];
+  if (!h || !helpOverlay) return;
+  document.getElementById('game-help-title').textContent = h.title;
+  const ul = document.getElementById('game-help-body');
+  ul.innerHTML = '';
+  for (const step of h.steps) {
+    const li = document.createElement('li');
+    li.textContent = step;
+    ul.appendChild(li);
+  }
+  helpOverlay.classList.remove('hidden');
+}
+function closeGameHelp() { if (helpOverlay) helpOverlay.classList.add('hidden'); }
+for (const key of Object.keys(GAME_HELP)) {
+  const btn = document.getElementById(`${key}-help`);
+  if (!btn) continue;
+  const open = () => openGameHelp(key);
+  btn.addEventListener('click', open);
+  btn.addEventListener('touchend', e => { e.preventDefault(); open(); }, { passive: false });
+}
+const helpCloseBtn = document.getElementById('game-help-close');
+if (helpCloseBtn) helpCloseBtn.addEventListener('click', closeGameHelp);
+// tocar el fondo oscuro también cierra el manual
+if (helpOverlay) helpOverlay.addEventListener('click', e => { if (e.target === helpOverlay) closeGameHelp(); });
 
 window.addEventListener('keydown', e => {
   if (e.code !== 'Escape') return;
+  // con el manual abierto, Escape lo cierra en vez de salirse del juego
+  if (helpOverlay && !helpOverlay.classList.contains('hidden')) { closeGameHelp(); e.preventDefault(); return; }
   if      (mode === 'pong'    && pong)   { exitPong();    e.preventDefault(); }
   else if (mode === 'globos'  && globos) { exitGlobos();  e.preventDefault(); }
   else if (mode === 'sumo'    && sumo)   { exitSumo();    e.preventDefault(); }
@@ -2129,6 +2263,9 @@ window.addEventListener('keydown', e => {
   else if (mode === 'cinco'   && cinco)   { exitCinco();   e.preventDefault(); }
   else if (mode === 'mancala' && mancala) { exitMancala(); e.preventDefault(); }
   else if (mode === 'oca'     && oca)     { exitOca();     e.preventDefault(); }
+  else if (mode === 'molino'    && molino)    { exitMolino();    e.preventDefault(); }
+  else if (mode === 'laberinto' && laberinto) { exitLaberinto(); e.preventDefault(); }
+  else if (mode === 'damas'     && damas)     { exitDamas();     e.preventDefault(); }
   else if (mode === 'tres'    && tres)   { exitTres();    e.preventDefault(); }
   else if (mode === 'cuatro'  && cuatro) { exitCuatro();  e.preventDefault(); }
 });

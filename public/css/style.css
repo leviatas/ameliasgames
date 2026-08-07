@@ -735,6 +735,56 @@ body {
 }
 .game-menu-btn:hover { background: rgba(0,0,0,0.75); }
 
+/* ── Botón de ayuda de los juegos de mesa, al lado del ← Menú ── */
+.game-help-btn {
+  position: absolute; top: 14px; right: 118px;
+  width: 38px; height: 38px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.5); color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-size: 1.05rem; line-height: 1;
+  cursor: pointer; pointer-events: all;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  z-index: 26;
+}
+.game-help-btn:hover { background: rgba(0,0,0,0.75); border-color: #FFD700; }
+
+/* ── Manual: panel de "cómo se juega" ── */
+#game-help {
+  position: fixed; inset: 0; z-index: 130;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.78);
+  padding: 16px; overflow-y: auto;
+}
+#game-help.hidden { display: none; }
+.help-panel {
+  max-width: 560px; width: 100%; margin: auto;
+  background: linear-gradient(160deg, #241a3a 0%, #16102a 100%);
+  border: 2px solid rgba(255,255,255,0.16);
+  border-radius: 20px;
+  padding: 22px 24px 18px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+}
+.help-panel h2 {
+  margin: 0 0 14px; font-size: 1.5rem; color: #FFD700; text-align: center;
+}
+.help-panel ul { margin: 0; padding: 0 0 0 4px; list-style: none; }
+.help-panel li {
+  color: #E8E0F5; font-size: 1rem; line-height: 1.45;
+  padding: 7px 0 7px 26px; position: relative;
+}
+.help-panel li::before {
+  content: '▸'; position: absolute; left: 4px; color: #FF80C0; font-weight: 900;
+}
+.help-close-btn {
+  display: block; width: 100%; margin-top: 16px;
+  padding: 12px; border: none; border-radius: 999px;
+  background: linear-gradient(135deg, #FF6FA8 0%, #A050E0 100%);
+  color: #fff; font-size: 1.05rem; font-weight: 800;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.help-close-btn:hover { filter: brightness(1.1); }
+
 /* ── Hub card — mob control ── */
 .hub-card.mob { background: linear-gradient(135deg, #1A0838 0%, #3C1070 100%); color: #D8C8FF; }
 .hub-card.mob:hover { border-color: #8A50FF; box-shadow: 0 18px 40px rgba(120,60,255,0.45); }
@@ -1107,6 +1157,12 @@ body {
 .hub-card.mancala:hover { border-color: #78E090; box-shadow: 0 18px 40px rgba(110,220,140,0.45); }
 .hub-card.oca { background: linear-gradient(135deg, #2B1836 0%, #7A3EA0 100%); color: #EFD4FF; }
 .hub-card.oca:hover { border-color: #C888FF; box-shadow: 0 18px 40px rgba(190,120,255,0.45); }
+.hub-card.molino { background: linear-gradient(135deg, #1C1430 0%, #5A4A96 100%); color: #DCD4FF; }
+.hub-card.molino:hover { border-color: #9C8CFF; box-shadow: 0 18px 40px rgba(150,130,255,0.45); }
+.hub-card.laberinto { background: linear-gradient(135deg, #101C2E 0%, #38618E 100%); color: #CFE2FF; }
+.hub-card.laberinto:hover { border-color: #78B0F0; box-shadow: 0 18px 40px rgba(110,170,240,0.45); }
+.hub-card.damas { background: linear-gradient(135deg, #2A1420 0%, #9A3E6A 100%); color: #FFD4E6; }
+.hub-card.damas:hover { border-color: #FF88BB; box-shadow: 0 18px 40px rgba(255,130,190,0.45); }
 
 /* ── 3 Players hub card + submenu cards ── */
 .hub-card.tresp { background: linear-gradient(135deg, #40103A 0%, #A0206A 100%); color: #FFC0E8; }
@@ -1195,17 +1251,20 @@ body {
    ← Menú queda flotando sobre el hub robándose los clicks. */
 #pong-ui, #globos-ui, #sumo-ui, #cocinas-ui, #vuelo-ui, #corazones-ui, #memoria2p-ui,
 #tresenraya-ui, #conecta4-ui, #ppt-ui, #ahorcado-ui,
-#puntos-ui, #cinco-ui, #mancala-ui, #oca-ui {
+#puntos-ui, #cinco-ui, #mancala-ui, #oca-ui,
+#molino-ui, #laberinto-ui, #damas-ui {
   position: fixed; inset: 0; z-index: 25; pointer-events: none;
 }
 #pong-ui.hidden, #globos-ui.hidden, #sumo-ui.hidden, #cocinas-ui.hidden,
 #vuelo-ui.hidden, #corazones-ui.hidden, #memoria2p-ui.hidden,
 #tresenraya-ui.hidden, #conecta4-ui.hidden, #ppt-ui.hidden, #ahorcado-ui.hidden,
-#puntos-ui.hidden, #cinco-ui.hidden, #mancala-ui.hidden, #oca-ui.hidden { display: none; }
+#puntos-ui.hidden, #cinco-ui.hidden, #mancala-ui.hidden, #oca-ui.hidden,
+#molino-ui.hidden, #laberinto-ui.hidden, #damas-ui.hidden { display: none; }
 #pong-ui button, #globos-ui button, #sumo-ui button, #cocinas-ui button,
 #vuelo-ui button, #corazones-ui button, #memoria2p-ui button,
 #tresenraya-ui button, #conecta4-ui button, #ppt-ui button, #ahorcado-ui button,
-#puntos-ui button, #cinco-ui button, #mancala-ui button, #oca-ui button { pointer-events: all; }
+#puntos-ui button, #cinco-ui button, #mancala-ui button, #oca-ui button,
+#molino-ui button, #laberinto-ui button, #damas-ui button { pointer-events: all; }
 
 /* ── Online-play entry point on the 2P game cards ───────────────────────── */
 .hub-card-wrap { position: relative; }

@@ -376,7 +376,7 @@
       </div>
       <div class="hub-card-wrap">
         <button class="hub-card mancala" id="versus-mancala">
-          <div class="hub-emoji">🫘</div>
+          <div class="hub-emoji">🌰</div>
           <div class="hub-name">Mancala</div>
           <div class="hub-desc">Sembrá semillas y llená tu granero</div>
         </button>
@@ -389,6 +389,30 @@
           <div class="hub-desc">Tirá el dado y cuidado con el pozo</div>
         </button>
         <button class="hub-online-btn" id="versus-oca-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card molino" id="versus-molino">
+          <div class="hub-emoji">🎯</div>
+          <div class="hub-name">Molino</div>
+          <div class="hub-desc">Alineá tres y comele una ficha</div>
+        </button>
+        <button class="hub-online-btn" id="versus-molino-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card laberinto" id="versus-laberinto">
+          <div class="hub-emoji">🧱</div>
+          <div class="hub-name">Laberinto</div>
+          <div class="hub-desc">Cruzá al otro lado y poné paredes</div>
+        </button>
+        <button class="hub-online-btn" id="versus-laberinto-online" title="Jugar online con código">🌐</button>
+      </div>
+      <div class="hub-card-wrap">
+        <button class="hub-card damas" id="versus-damas">
+          <div class="hub-emoji">⭐</div>
+          <div class="hub-name">Damas Chinas</div>
+          <div class="hub-desc">Saltá en cadena hasta la otra punta</div>
+        </button>
+        <button class="hub-online-btn" id="versus-damas-online" title="Jugar online con código">🌐</button>
       </div>
     </div>
   </div>
@@ -578,22 +602,53 @@
 
   <!-- Puntos y Cajas controls -->
   <div id="puntos-ui" class="hidden">
+    <button id="puntos-help" class="game-help-btn" title="Cómo se juega">❓</button>
     <button id="puntos-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- 5 en Línea controls -->
   <div id="cinco-ui" class="hidden">
+    <button id="cinco-help" class="game-help-btn" title="Cómo se juega">❓</button>
     <button id="cinco-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- Mancala controls -->
   <div id="mancala-ui" class="hidden">
+    <button id="mancala-help" class="game-help-btn" title="Cómo se juega">❓</button>
     <button id="mancala-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
   <!-- La Oca controls -->
   <div id="oca-ui" class="hidden">
+    <button id="oca-help" class="game-help-btn" title="Cómo se juega">❓</button>
     <button id="oca-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Molino controls -->
+  <div id="molino-ui" class="hidden">
+    <button id="molino-help" class="game-help-btn" title="Cómo se juega">❓</button>
+    <button id="molino-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Laberinto controls -->
+  <div id="laberinto-ui" class="hidden">
+    <button id="laberinto-help" class="game-help-btn" title="Cómo se juega">❓</button>
+    <button id="laberinto-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Damas Chinas controls -->
+  <div id="damas-ui" class="hidden">
+    <button id="damas-help" class="game-help-btn" title="Cómo se juega">❓</button>
+    <button id="damas-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Manual: cómo se juega (se llena desde GAME_HELP en game.js) -->
+  <div id="game-help" class="hidden">
+    <div class="help-panel">
+      <h2 id="game-help-title">Cómo se juega</h2>
+      <ul id="game-help-body"></ul>
+      <button id="game-help-close" class="help-close-btn">¡Dale, a jugar!</button>
+    </div>
   </div>
 
   <!-- Online match setup (create/join room code) -->
@@ -668,7 +723,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.66.0</div>
+  <div id="app-version">v2.67.0</div>
 
   <!-- Galaga controls -->
   <div id="galaga-ui" class="hidden">
