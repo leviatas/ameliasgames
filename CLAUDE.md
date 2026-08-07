@@ -23,6 +23,14 @@ Cada juego es una clase en `public/js/<Nombre>.js` con `constructor(canvas, ...)
 - botón/tarjeta en `public/index.html` (submenú que corresponda) + overlay
   `#<juego>-ui` con botón `← Menú` (clase `.game-menu-btn`)
 - estilo `.hub-card.<juego>` en `public/css/style.css`
+- ⚠️ si es 2P: sumar `#<juego>-ui` a las **tres** listas de "2P game UI overlays"
+  de `style.css`. Si falta en la del `.hidden`, el overlay nunca se oculta y el
+  botón `← Menú` queda flotando invisible sobre el hub robándose los clicks.
+- ⚠️ si es 2P: además de lo de arriba van `SHARED_BOARD_MODES` (si es tablero
+  compartido, para que el toque cuente para quien tiene el turno y no según la
+  mitad de pantalla), `ONLINE_GAMES`, `_wireOnlineBtn()` y `ONLINE_EXIT_FNS`, más
+  `getNetState()`/`setNetState()` en la clase. Salir de un juego 2P vuelve al
+  submenú de 2 Players, no al hub.
 
 Los layouts se recalculan por frame en un `_layout()` proporcional a
 `canvas.width/height` con factor `s = clamp(min(W,H)/720, 0.5, 1)` — nunca

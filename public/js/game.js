@@ -26,6 +26,10 @@ import { TresEnRaya }     from './TresEnRaya.js';
 import { Conecta4 }       from './Conecta4.js';
 import { PiedraPapelTijera } from './PiedraPapelTijera.js';
 import { Ahorcado }       from './Ahorcado.js';
+import { PuntosYCajas }   from './PuntosYCajas.js';
+import { CincoEnLinea }   from './CincoEnLinea.js';
+import { Mancala }        from './Mancala.js';
+import { Oca }            from './Oca.js';
 import { ThreePlayers }   from './ThreePlayers.js';
 import { FourPlayers }    from './FourPlayers.js';
 import { NetSession }     from './Net.js';
@@ -66,6 +70,10 @@ let tresenraya = null;
 let conecta4  = null;
 let ppt       = null;
 let ahorcado  = null;
+let puntos    = null;
+let cinco     = null;
+let mancala   = null;
+let oca       = null;
 let tres     = null;
 let cuatro   = null;
 const _2pTouches = new Map(); // pointerId → 'p1' | 'p2'
@@ -328,6 +336,7 @@ function showHub(menuId = 'hub-screen') {
   pong = null; globos = null; sumo = null; cocinas = null; tres = null; cuatro = null;
   vuelo = null; corazones = null; memoria2p = null;
   tresenraya = null; conecta4 = null; ppt = null; ahorcado = null;
+  puntos = null; cinco = null; mancala = null; oca = null;
   _2pTouches.clear();
   document.getElementById('pong-ui').classList.add('hidden');
   document.getElementById('globos-ui').classList.add('hidden');
@@ -340,6 +349,10 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('conecta4-ui').classList.add('hidden');
   document.getElementById('ppt-ui').classList.add('hidden');
   document.getElementById('ahorcado-ui').classList.add('hidden');
+  document.getElementById('puntos-ui').classList.add('hidden');
+  document.getElementById('cinco-ui').classList.add('hidden');
+  document.getElementById('mancala-ui').classList.add('hidden');
+  document.getElementById('oca-ui').classList.add('hidden');
   document.getElementById('tres-ui').classList.add('hidden');
   document.getElementById('cuatro-ui').classList.add('hidden');
   hideGestureMenu();
@@ -638,12 +651,17 @@ function _active2P() {
   if (mode === 'conecta4' && conecta4) return conecta4;
   if (mode === 'ppt'     && ppt)     return ppt;
   if (mode === 'ahorcado' && ahorcado) return ahorcado;
+  if (mode === 'puntos'  && puntos)  return puntos;
+  if (mode === 'cinco'   && cinco)   return cinco;
+  if (mode === 'mancala' && mancala) return mancala;
+  if (mode === 'oca'     && oca)     return oca;
   return null;
 }
 // Games with one shared centered board (not split left/right on a single
 // device) — any local tap should count for whoever's turn it is, not
 // whichever half of the screen it lands on.
-const SHARED_BOARD_MODES = new Set(['memoria2p', 'tresenraya', 'conecta4', 'ahorcado']);
+const SHARED_BOARD_MODES = new Set(['memoria2p', 'tresenraya', 'conecta4', 'ahorcado',
+                                    'puntos', 'cinco', 'mancala', 'oca']);
 canvas.addEventListener('pointerdown', e => {
   const g = _active2P(); if (!g) return;
   e.preventDefault();
@@ -869,6 +887,15 @@ function exitConecta4()   { _resetNetState(); conecta4   = null; _exitVersus('co
 function exitPPT()        { _resetNetState(); ppt        = null; _exitVersus('ppt-ui');        }
 function exitAhorcado()   { _resetNetState(); ahorcado   = null; _exitVersus('ahorcado-ui');   }
 
+function launchPuntos()  { puntos  = new PuntosYCajas(canvas); _launchVersus('puntos-ui',  'puntos');  }
+function launchCinco()   { cinco   = new CincoEnLinea(canvas); _launchVersus('cinco-ui',   'cinco');   }
+function launchMancala() { mancala = new Mancala(canvas);      _launchVersus('mancala-ui', 'mancala'); }
+function launchOca()     { oca     = new Oca(canvas);          _launchVersus('oca-ui',     'oca');     }
+function exitPuntos()  { _resetNetState(); puntos  = null; _exitVersus('puntos-ui');  }
+function exitCinco()   { _resetNetState(); cinco   = null; _exitVersus('cinco-ui');   }
+function exitMancala() { _resetNetState(); mancala = null; _exitVersus('mancala-ui'); }
+function exitOca()     { _resetNetState(); oca     = null; _exitVersus('oca-ui');     }
+
 // ── 3-Players submenu & launchers (share the versus launch/exit helpers) ─────
 function showTresSubmenu() {
   document.getElementById('hub-screen').classList.add('hidden');
@@ -1090,6 +1117,10 @@ function gameLoop(now) {
   if (mode === 'conecta4' && conecta4) { _run2PFrame(conecta4, delta); return; }
   if (mode === 'ppt'     && ppt)     { _run2PFrame(ppt, delta);     return; }
   if (mode === 'ahorcado' && ahorcado) { _run2PFrame(ahorcado, delta); return; }
+  if (mode === 'puntos'  && puntos)  { _run2PFrame(puntos, delta);  return; }
+  if (mode === 'cinco'   && cinco)   { _run2PFrame(cinco, delta);   return; }
+  if (mode === 'mancala' && mancala) { _run2PFrame(mancala, delta); return; }
+  if (mode === 'oca'     && oca)     { _run2PFrame(oca, delta);     return; }
   if (mode === 'tres'   && tres)   { tres.update(delta);   tres.render(ctx);   return; }
   if (mode === 'cuatro' && cuatro) { cuatro.update(delta); cuatro.render(ctx); return; }
   update(delta);
@@ -1886,6 +1917,14 @@ if (vsTresEnRaya) { vsTresEnRaya.addEventListener('click', launchTresEnRaya); vs
 if (vsConecta4)   { vsConecta4.addEventListener('click',   launchConecta4);   vsConecta4.addEventListener('touchend',   e => { e.preventDefault(); launchConecta4();   }, { passive: false }); }
 if (vsPPT)        { vsPPT.addEventListener('click',        launchPPT);        vsPPT.addEventListener('touchend',        e => { e.preventDefault(); launchPPT();        }, { passive: false }); }
 if (vsAhorcado)   { vsAhorcado.addEventListener('click',   launchAhorcado);   vsAhorcado.addEventListener('touchend',   e => { e.preventDefault(); launchAhorcado();   }, { passive: false }); }
+const vsPuntos  = document.getElementById('versus-puntos');
+const vsCinco   = document.getElementById('versus-cinco');
+const vsMancala = document.getElementById('versus-mancala');
+const vsOca     = document.getElementById('versus-oca');
+if (vsPuntos)  { vsPuntos.addEventListener('click',  launchPuntos);  vsPuntos.addEventListener('touchend',  e => { e.preventDefault(); launchPuntos();  }, { passive: false }); }
+if (vsCinco)   { vsCinco.addEventListener('click',   launchCinco);   vsCinco.addEventListener('touchend',   e => { e.preventDefault(); launchCinco();   }, { passive: false }); }
+if (vsMancala) { vsMancala.addEventListener('click', launchMancala); vsMancala.addEventListener('touchend', e => { e.preventDefault(); launchMancala(); }, { passive: false }); }
+if (vsOca)     { vsOca.addEventListener('click',     launchOca);     vsOca.addEventListener('touchend',     e => { e.preventDefault(); launchOca();     }, { passive: false }); }
 
 // ── Online play: room-code create/join (all 11 versus games) ─────────────────
 const ONLINE_GAMES = {
@@ -1900,6 +1939,10 @@ const ONLINE_GAMES = {
   conecta4:  { title: '🔵 Conecta 4 — Online',          build: () => new Conecta4(canvas),   uiId: 'conecta4-ui',  apply: v => { conecta4  = v; } },
   ppt:       { title: '✊ Piedra, Papel o Tijera — Online', build: () => new PiedraPapelTijera(canvas), uiId: 'ppt-ui', apply: v => { ppt = v; } },
   ahorcado:  { title: '🎪 Ahorcado — Online',           build: () => new Ahorcado(canvas),   uiId: 'ahorcado-ui',  apply: v => { ahorcado  = v; } },
+  puntos:    { title: '⬜ Puntos y Cajas — Online',     build: () => new PuntosYCajas(canvas), uiId: 'puntos-ui',  apply: v => { puntos    = v; } },
+  cinco:     { title: '⚫ 5 en Línea — Online',          build: () => new CincoEnLinea(canvas), uiId: 'cinco-ui',   apply: v => { cinco     = v; } },
+  mancala:   { title: '🫘 Mancala — Online',            build: () => new Mancala(canvas),    uiId: 'mancala-ui',   apply: v => { mancala   = v; } },
+  oca:       { title: '🦢 La Oca — Online',             build: () => new Oca(canvas),        uiId: 'oca-ui',       apply: v => { oca       = v; } },
 };
 
 function _wireOnlineBtn(id, gameKey) {
@@ -1920,6 +1963,10 @@ _wireOnlineBtn('versus-tresenraya-online','tresenraya');
 _wireOnlineBtn('versus-conecta4-online',  'conecta4');
 _wireOnlineBtn('versus-ppt-online',       'ppt');
 _wireOnlineBtn('versus-ahorcado-online',  'ahorcado');
+_wireOnlineBtn('versus-puntos-online',    'puntos');
+_wireOnlineBtn('versus-cinco-online',     'cinco');
+_wireOnlineBtn('versus-mancala-online',   'mancala');
+_wireOnlineBtn('versus-oca-online',       'oca');
 
 function _showOnlineStep(stepId) {
   ['online-choose', 'online-waiting', 'online-join-form', 'online-status']
@@ -2025,6 +2072,8 @@ const ONLINE_EXIT_FNS = {
   corazones: () => exitCorazones(), memoria2p: () => exitMemoria2P(),
   tresenraya: () => exitTresEnRaya(), conecta4: () => exitConecta4(),
   ppt: () => exitPPT(), ahorcado: () => exitAhorcado(),
+  puntos: () => exitPuntos(), cinco: () => exitCinco(),
+  mancala: () => exitMancala(), oca: () => exitOca(),
 };
 document.getElementById('online-disconnect-back').addEventListener('click', () => {
   document.getElementById('online-disconnect-banner').classList.add('hidden');
@@ -2054,6 +2103,14 @@ if (tresenrayaExitBtn) tresenrayaExitBtn.addEventListener('click', exitTresEnRay
 if (conecta4ExitBtn)   conecta4ExitBtn.addEventListener('click',   exitConecta4);
 if (pptExitBtn)        pptExitBtn.addEventListener('click',        exitPPT);
 if (ahorcadoExitBtn)   ahorcadoExitBtn.addEventListener('click',   exitAhorcado);
+const puntosExitBtn  = document.getElementById('puntos-exit');
+const cincoExitBtn   = document.getElementById('cinco-exit');
+const mancalaExitBtn = document.getElementById('mancala-exit');
+const ocaExitBtn     = document.getElementById('oca-exit');
+if (puntosExitBtn)  puntosExitBtn.addEventListener('click',  exitPuntos);
+if (cincoExitBtn)   cincoExitBtn.addEventListener('click',   exitCinco);
+if (mancalaExitBtn) mancalaExitBtn.addEventListener('click', exitMancala);
+if (ocaExitBtn)     ocaExitBtn.addEventListener('click',     exitOca);
 
 window.addEventListener('keydown', e => {
   if (e.code !== 'Escape') return;
@@ -2068,6 +2125,10 @@ window.addEventListener('keydown', e => {
   else if (mode === 'conecta4' && conecta4) { exitConecta4(); e.preventDefault(); }
   else if (mode === 'ppt'     && ppt)     { exitPPT();      e.preventDefault(); }
   else if (mode === 'ahorcado' && ahorcado) { exitAhorcado(); e.preventDefault(); }
+  else if (mode === 'puntos'  && puntos)  { exitPuntos();  e.preventDefault(); }
+  else if (mode === 'cinco'   && cinco)   { exitCinco();   e.preventDefault(); }
+  else if (mode === 'mancala' && mancala) { exitMancala(); e.preventDefault(); }
+  else if (mode === 'oca'     && oca)     { exitOca();     e.preventDefault(); }
   else if (mode === 'tres'    && tres)   { exitTres();    e.preventDefault(); }
   else if (mode === 'cuatro'  && cuatro) { exitCuatro();  e.preventDefault(); }
 });
