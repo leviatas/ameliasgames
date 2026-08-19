@@ -33,6 +33,7 @@ import { Oca }            from './Oca.js';
 import { Molino }         from './Molino.js';
 import { Laberinto }      from './Laberinto.js';
 import { DamasChinas }    from './DamasChinas.js';
+import { SopaLoca }       from './SopaLoca.js';
 import { ThreePlayers }   from './ThreePlayers.js';
 import { FourPlayers }    from './FourPlayers.js';
 import { NetSession }     from './Net.js';
@@ -80,6 +81,7 @@ let oca       = null;
 let molino    = null;
 let laberinto = null;
 let damas     = null;
+let sopa      = null;
 let tres     = null;
 let cuatro   = null;
 const _2pTouches = new Map(); // pointerId → 'p1' | 'p2'
@@ -343,7 +345,7 @@ function showHub(menuId = 'hub-screen') {
   vuelo = null; corazones = null; memoria2p = null;
   tresenraya = null; conecta4 = null; ppt = null; ahorcado = null;
   puntos = null; cinco = null; mancala = null; oca = null;
-  molino = null; laberinto = null; damas = null;
+  molino = null; laberinto = null; damas = null; sopa = null;
   _2pTouches.clear();
   document.getElementById('pong-ui').classList.add('hidden');
   document.getElementById('globos-ui').classList.add('hidden');
@@ -363,6 +365,7 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('molino-ui').classList.add('hidden');
   document.getElementById('laberinto-ui').classList.add('hidden');
   document.getElementById('damas-ui').classList.add('hidden');
+  document.getElementById('sopa-ui').classList.add('hidden');
   document.getElementById('game-help').classList.add('hidden');
   document.getElementById('tres-ui').classList.add('hidden');
   document.getElementById('cuatro-ui').classList.add('hidden');
@@ -669,6 +672,7 @@ function _active2P() {
   if (mode === 'molino'    && molino)    return molino;
   if (mode === 'laberinto' && laberinto) return laberinto;
   if (mode === 'damas'     && damas)     return damas;
+  if (mode === 'sopa'      && sopa)      return sopa;
   return null;
 }
 // Games with one shared centered board (not split left/right on a single
@@ -914,9 +918,11 @@ function exitOca()     { _resetNetState(); oca     = null; _exitVersus('oca-ui')
 function launchMolino()    { molino    = new Molino(canvas);      _launchVersus('molino-ui',    'molino');    }
 function launchLaberinto() { laberinto = new Laberinto(canvas);   _launchVersus('laberinto-ui', 'laberinto'); }
 function launchDamas()     { damas     = new DamasChinas(canvas); _launchVersus('damas-ui',     'damas');     }
+function launchSopa()      { sopa      = new SopaLoca(canvas);    _launchVersus('sopa-ui',      'sopa');      }
 function exitMolino()    { _resetNetState(); molino    = null; _exitVersus('molino-ui');    }
 function exitLaberinto() { _resetNetState(); laberinto = null; _exitVersus('laberinto-ui'); }
 function exitDamas()     { _resetNetState(); damas     = null; _exitVersus('damas-ui');     }
+function exitSopa()      { _resetNetState(); sopa      = null; _exitVersus('sopa-ui');      }
 
 // ── 3-Players submenu & launchers (share the versus launch/exit helpers) ─────
 function showTresSubmenu() {
@@ -1146,6 +1152,7 @@ function gameLoop(now) {
   if (mode === 'molino'    && molino)    { _run2PFrame(molino, delta);    return; }
   if (mode === 'laberinto' && laberinto) { _run2PFrame(laberinto, delta); return; }
   if (mode === 'damas'     && damas)     { _run2PFrame(damas, delta);     return; }
+  if (mode === 'sopa'      && sopa)      { _run2PFrame(sopa, delta);      return; }
   if (mode === 'tres'   && tres)   { tres.update(delta);   tres.render(ctx);   return; }
   if (mode === 'cuatro' && cuatro) { cuatro.update(delta); cuatro.render(ctx); return; }
   update(delta);
@@ -1956,6 +1963,8 @@ const vsDamas     = document.getElementById('versus-damas');
 if (vsMolino)    { vsMolino.addEventListener('click',    launchMolino);    vsMolino.addEventListener('touchend',    e => { e.preventDefault(); launchMolino();    }, { passive: false }); }
 if (vsLaberinto) { vsLaberinto.addEventListener('click', launchLaberinto); vsLaberinto.addEventListener('touchend', e => { e.preventDefault(); launchLaberinto(); }, { passive: false }); }
 if (vsDamas)     { vsDamas.addEventListener('click',     launchDamas);     vsDamas.addEventListener('touchend',     e => { e.preventDefault(); launchDamas();     }, { passive: false }); }
+const vsSopa      = document.getElementById('versus-sopa');
+if (vsSopa)      { vsSopa.addEventListener('click',      launchSopa);      vsSopa.addEventListener('touchend',      e => { e.preventDefault(); launchSopa();      }, { passive: false }); }
 
 // ── Online play: room-code create/join (all 11 versus games) ─────────────────
 const ONLINE_GAMES = {
@@ -1977,6 +1986,7 @@ const ONLINE_GAMES = {
   molino:    { title: '🎯 Molino — Online',             build: () => new Molino(canvas),      uiId: 'molino-ui',    apply: v => { molino    = v; } },
   laberinto: { title: '🧱 Laberinto — Online',          build: () => new Laberinto(canvas),   uiId: 'laberinto-ui', apply: v => { laberinto = v; } },
   damas:     { title: '⭐ Damas Chinas — Online',       build: () => new DamasChinas(canvas), uiId: 'damas-ui',     apply: v => { damas     = v; } },
+  sopa:      { title: '🍲 Sopa Loca — Online',          build: () => new SopaLoca(canvas),    uiId: 'sopa-ui',      apply: v => { sopa      = v; } },
 };
 
 function _wireOnlineBtn(id, gameKey) {
@@ -2004,6 +2014,7 @@ _wireOnlineBtn('versus-oca-online',       'oca');
 _wireOnlineBtn('versus-molino-online',    'molino');
 _wireOnlineBtn('versus-laberinto-online', 'laberinto');
 _wireOnlineBtn('versus-damas-online',     'damas');
+_wireOnlineBtn('versus-sopa-online',      'sopa');
 
 function _showOnlineStep(stepId) {
   ['online-choose', 'online-waiting', 'online-join-form', 'online-status']
@@ -2112,6 +2123,7 @@ const ONLINE_EXIT_FNS = {
   puntos: () => exitPuntos(), cinco: () => exitCinco(),
   mancala: () => exitMancala(), oca: () => exitOca(),
   molino: () => exitMolino(), laberinto: () => exitLaberinto(), damas: () => exitDamas(),
+  sopa: () => exitSopa(),
 };
 document.getElementById('online-disconnect-back').addEventListener('click', () => {
   document.getElementById('online-disconnect-banner').classList.add('hidden');
@@ -2155,6 +2167,8 @@ const damasExitBtn     = document.getElementById('damas-exit');
 if (molinoExitBtn)    molinoExitBtn.addEventListener('click',    exitMolino);
 if (laberintoExitBtn) laberintoExitBtn.addEventListener('click', exitLaberinto);
 if (damasExitBtn)     damasExitBtn.addEventListener('click',     exitDamas);
+const sopaExitBtn = document.getElementById('sopa-exit');
+if (sopaExitBtn)      sopaExitBtn.addEventListener('click',      exitSopa);
 
 // ── Manual: cómo se juega cada juego de mesa ─────────────────────────────────
 // Varios de los de tablero no son conocidos (Mancala, Molino, Quoridor), así que
@@ -2206,6 +2220,16 @@ const GAME_HELP = {
     'Tenés 7 paredes. Nunca podés dejar a nadie sin ningún camino a su meta: si probás, el juego no te deja.',
     'Si los peones quedan pegados, uno salta por arriba del otro.',
     'Gana la primera que cruza del todo al otro lado.',
+  ] },
+  sopa: { title: '🍲 Sopa Loca', steps: [
+    'Hay UNA sola olla en el medio y los ingredientes giran alrededor a la vista de las dos.',
+    'P1 juega con lo dulce 🍓 (izquierda) y P2 con lo salado 🧀 (derecha).',
+    'Sólo podés manotear lo que va pasando por TU mitad de la pantalla: tocalo y sale volando a la olla.',
+    'Cada cosa de tu sabor corre la sopa para tu lado. Ganás la olla cuando llega del todo a tu punta.',
+    'Si tirás algo del sabor de la otra se quema 🔥 y la sopa se te va un poquito en contra… pero se lo sacaste de encima. ¡Ahí está el truco!',
+    'Los brillantes son poderes para cualquiera: 🌶️ empujón doble, 🧊 le congela la cuchara a la otra, 🌀 da vuelta el carrusel, 🍯 frena todo.',
+    'Tu cuchara 🥄 tarda medio segundo en volver, así que no sirve tocar como loca: elegí bien.',
+    'Gana la primera que se lleva 3 ollas.',
   ] },
   damas: { title: '⭐ Damas Chinas', steps: [
     'Tenés 6 fichas en tu punta de la estrella y tenés que meterlas todas en la punta de enfrente.',
@@ -2266,6 +2290,7 @@ window.addEventListener('keydown', e => {
   else if (mode === 'molino'    && molino)    { exitMolino();    e.preventDefault(); }
   else if (mode === 'laberinto' && laberinto) { exitLaberinto(); e.preventDefault(); }
   else if (mode === 'damas'     && damas)     { exitDamas();     e.preventDefault(); }
+  else if (mode === 'sopa'      && sopa)      { exitSopa();      e.preventDefault(); }
   else if (mode === 'tres'    && tres)   { exitTres();    e.preventDefault(); }
   else if (mode === 'cuatro'  && cuatro) { exitCuatro();  e.preventDefault(); }
 });

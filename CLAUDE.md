@@ -34,6 +34,12 @@ Cada juego es una clase en `public/js/<Nombre>.js` con `constructor(canvas, ...)
   mitad de pantalla), `ONLINE_GAMES`, `_wireOnlineBtn()` y `ONLINE_EXIT_FNS`, más
   `getNetState()`/`setNetState()` en la clase. Salir de un juego 2P vuelve al
   submenú de 2 Players, no al hub.
+- ⚠️ online: **la invitada nunca corre `update()`**, sólo `render()` con el
+  estado que le llega. Toda animación tiene que salir del estado sincronizado o
+  del reloj (`performance.now()`), nunca de contadores que se acumulen en el
+  render. Y `_lerpValue` (game.js) sólo suaviza las claves `x/y/vx/vy/t`: lo que
+  se mueve continuo (ángulos, posiciones) conviene mandarlo con esos nombres o
+  se ve a 20 fps.
 
 Los layouts se recalculan por frame en un `_layout()` proporcional a
 `canvas.width/height` con factor `s = clamp(min(W,H)/720, 0.5, 1)` — nunca

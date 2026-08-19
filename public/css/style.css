@@ -1163,6 +1163,8 @@ body {
 .hub-card.laberinto:hover { border-color: #78B0F0; box-shadow: 0 18px 40px rgba(110,170,240,0.45); }
 .hub-card.damas { background: linear-gradient(135deg, #2A1420 0%, #9A3E6A 100%); color: #FFD4E6; }
 .hub-card.damas:hover { border-color: #FF88BB; box-shadow: 0 18px 40px rgba(255,130,190,0.45); }
+.hub-card.sopa { background: linear-gradient(135deg, #3A1030 0%, #C0406A 55%, #3A6BC0 100%); color: #FFE0EC; }
+.hub-card.sopa:hover { border-color: #FFB0D0; box-shadow: 0 18px 40px rgba(255,140,190,0.45); }
 
 /* ── 3 Players hub card + submenu cards ── */
 .hub-card.tresp { background: linear-gradient(135deg, #40103A 0%, #A0206A 100%); color: #FFC0E8; }
@@ -1252,19 +1254,19 @@ body {
 #pong-ui, #globos-ui, #sumo-ui, #cocinas-ui, #vuelo-ui, #corazones-ui, #memoria2p-ui,
 #tresenraya-ui, #conecta4-ui, #ppt-ui, #ahorcado-ui,
 #puntos-ui, #cinco-ui, #mancala-ui, #oca-ui,
-#molino-ui, #laberinto-ui, #damas-ui {
+#molino-ui, #laberinto-ui, #damas-ui, #sopa-ui {
   position: fixed; inset: 0; z-index: 25; pointer-events: none;
 }
 #pong-ui.hidden, #globos-ui.hidden, #sumo-ui.hidden, #cocinas-ui.hidden,
 #vuelo-ui.hidden, #corazones-ui.hidden, #memoria2p-ui.hidden,
 #tresenraya-ui.hidden, #conecta4-ui.hidden, #ppt-ui.hidden, #ahorcado-ui.hidden,
 #puntos-ui.hidden, #cinco-ui.hidden, #mancala-ui.hidden, #oca-ui.hidden,
-#molino-ui.hidden, #laberinto-ui.hidden, #damas-ui.hidden { display: none; }
+#molino-ui.hidden, #laberinto-ui.hidden, #damas-ui.hidden, #sopa-ui.hidden { display: none; }
 #pong-ui button, #globos-ui button, #sumo-ui button, #cocinas-ui button,
 #vuelo-ui button, #corazones-ui button, #memoria2p-ui button,
 #tresenraya-ui button, #conecta4-ui button, #ppt-ui button, #ahorcado-ui button,
 #puntos-ui button, #cinco-ui button, #mancala-ui button, #oca-ui button,
-#molino-ui button, #laberinto-ui button, #damas-ui button { pointer-events: all; }
+#molino-ui button, #laberinto-ui button, #damas-ui button, #sopa-ui button { pointer-events: all; }
 
 /* ── Online-play entry point on the 2P game cards ───────────────────────── */
 .hub-card-wrap { position: relative; }
