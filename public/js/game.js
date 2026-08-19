@@ -2174,6 +2174,15 @@ if (sopaExitBtn)      sopaExitBtn.addEventListener('click',      exitSopa);
 // Varios de los de tablero no son conocidos (Mancala, Molino, Quoridor), así que
 // cada uno tiene su botón ❓ con las reglas explicadas en criollo.
 const GAME_HELP = {
+  ppt: { title: '✊ Piedra, Papel o Tijera', steps: [
+    'Cada una tiene sus tres botones de su lado de la pantalla.',
+    'Mirá la cuenta del medio: 3… 2… 1… ¡YA! Recién ahí los botones funcionan.',
+    'Las dos eligen a la vez, rapidito: apenas tocás, tus botones se tapan con 🔒 y nadie ve qué elegiste.',
+    'Ojo: los tres íconos cambian de lugar en cada ronda, así que mirar el dedo de la otra no sirve.',
+    'Si te dormís y no llegás a tocar, te sale una al azar.',
+    'Piedra ✊ le gana a tijera ✌️, tijera ✌️ le gana a papel 🖐, papel 🖐 le gana a piedra ✊.',
+    'Gana la primera que llega a 3 puntos.',
+  ] },
   puntos: { title: '⬜ Puntos y Cajas', steps: [
     'Por turnos, cada una pinta una rayita entre dos puntos pegados.',
     'La que pone la rayita que cierra un cuadradito se lo queda… ¡y juega de nuevo!',
