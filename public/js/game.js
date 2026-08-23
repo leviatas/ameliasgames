@@ -9,6 +9,7 @@ import { Match3 }                from './Match3.js';
 import { Hole }                  from './Hole.js';
 import { Hole2 }                 from './Hole2.js';
 import { Galaga }                from './Galaga.js';
+import { Dash }                  from './Dash.js';
 import { Cinema }                from './Cinema.js';
 import { Helado }                from './Helado.js';
 import { Panaderia }             from './Panaderia.js';
@@ -58,6 +59,7 @@ let match3   = null;
 let hole     = null;
 let hole2    = null;
 let galaga   = null;
+let dash     = null;
 let theater  = null;
 let helado   = null;
 let panaderia = null;
@@ -336,6 +338,7 @@ function showHub(menuId = 'hub-screen') {
   if (vestidor) { vestidor.destroy(); vestidor = null; }
   if (mob)    { mob.destroy(); mob = null; }
   if (galaga) { galaga.destroy(); galaga = null; }
+  if (dash)   { dash.destroy();   dash = null; }
   hideHoleSubmenu();
   hideUnoSubmenu();
   hideVersusSubmenu();
@@ -382,6 +385,7 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('vestidor-ui').classList.add('hidden');
   document.getElementById('mob-ui').classList.add('hidden');
   document.getElementById('galaga-ui').classList.add('hidden');
+  document.getElementById('dash-ui').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('online-setup').classList.add('hidden');
@@ -649,6 +653,24 @@ function launchGalaga() {
 function exitGalaga() {
   document.getElementById('galaga-ui').classList.add('hidden');
   if (galaga) { galaga.destroy(); galaga = null; }
+  showHub('uno-submenu');
+}
+
+// ── Dash 3D — corredor de 3 carriles ──────────────────────────────────────────
+function launchDash() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('dash-ui').classList.remove('hidden');
+  dash = new Dash(canvas, look);
+  mode = 'dash';
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitDash() {
+  document.getElementById('dash-ui').classList.add('hidden');
+  if (dash) { dash.destroy(); dash = null; }
   showHub('uno-submenu');
 }
 
@@ -1129,6 +1151,7 @@ function gameLoop(now) {
   if (mode === 'hole'  && hole)  { hole.update(delta);  hole.render(ctx);  return; }
   if (mode === 'hole2'  && hole2)  { hole2.update(delta);  hole2.render(ctx);  return; }
   if (mode === 'galaga' && galaga) { galaga.update(delta); galaga.render(ctx); return; }
+  if (mode === 'dash'   && dash)   { dash.update(delta);   dash.render(ctx);   return; }
   if (mode === 'cinema' && theater) { theater.update(delta); theater.render(ctx); return; }
   if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
   if (mode === 'panaderia' && panaderia) { panaderia.update(delta); panaderia.render(ctx); return; }
@@ -1777,6 +1800,35 @@ window.addEventListener('keyup', e => {
   else if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') galaga.stopFire();
 });
 
+// ── Dash controls (gestos en el canvas; flechas en teclado) ──────────────────
+// La detección del swipe vive adentro de Dash.js: acá sólo se reenvían los
+// eventos del canvas ya convertidos a coordenadas del canvas.
+const dashExit = document.getElementById('dash-exit');
+if (dashExit) dashExit.addEventListener('click', exitDash);
+
+canvas.addEventListener('pointerdown', e => {
+  if (mode !== 'dash' || !dash) return;
+  e.preventDefault();
+  const p = canvasPoint(e); dash.pointerDown(p.x, p.y);
+});
+canvas.addEventListener('pointermove', e => {
+  if (mode !== 'dash' || !dash) return;
+  const p = canvasPoint(e); dash.pointerMove(p.x, p.y);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev =>
+  canvas.addEventListener(ev, () => { if (mode === 'dash' && dash) dash.pointerUp(); }));
+
+window.addEventListener('keydown', e => {
+  if (mode !== 'dash' || !dash) return;
+  if (e.code === 'Escape') { exitDash(); return; }
+  const dir = (e.code === 'ArrowLeft'  || e.code === 'KeyA') ? 'left'
+            : (e.code === 'ArrowRight' || e.code === 'KeyD') ? 'right'
+            : (e.code === 'ArrowUp'    || e.code === 'KeyW' || e.code === 'Space') ? 'up'
+            : (e.code === 'ArrowDown'  || e.code === 'KeyS') ? 'down' : null;
+  if (!dir) return;
+  dash.swipe(dir); e.preventDefault();
+});
+
 // ── Cinema controls (‹ › to change movie; tap screen sides) ──────────────────
 const cinExit = document.getElementById('cinema-exit');
 if (cinExit) cinExit.addEventListener('click', exitCinema);
@@ -2174,6 +2226,15 @@ if (sopaExitBtn)      sopaExitBtn.addEventListener('click',      exitSopa);
 // Varios de los de tablero no son conocidos (Mancala, Molino, Quoridor), así que
 // cada uno tiene su botón ❓ con las reglas explicadas en criollo.
 const GAME_HELP = {
+  dash: { title: '🏃‍♀️ Dash 3D', steps: [
+    'Corrés sola para adelante y no parás nunca: lo único que manejás es esquivar.',
+    'Hay tres carriles. Deslizá el dedo a la izquierda ⬅ o a la derecha ➡ para cambiarte.',
+    'Deslizá para arriba ⬆ y saltás: así pasás las vallas rojas 🟥.',
+    'Deslizá para abajo ⬇ y te agachás: así pasás por debajo de las vigas celestes 🟦.',
+    'Los bloques violetas y los trenes naranjas no se saltan ni se esquivan agachándose: hay que cambiar de carril.',
+    'Juntá 🪙 monedas, que se suman a tu alcancía cuando terminás.',
+    'Tenés 3 vidas ❤️. Cada tanto sube el nivel: se va más rápido y aparecen más cosas.',
+  ] },
   ppt: { title: '✊ Piedra, Papel o Tijera', steps: [
     'Cada una tiene sus tres botones de su lado de la pantalla.',
     'Mirá la cuenta del medio: 3… 2… 1… ¡YA! Recién ahí los botones funcionan.',
@@ -2340,7 +2401,8 @@ if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); documen
 [['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga],
  ['uno-panaderia', launchPanaderia], ['uno-vestidor', () => launchVestidor()],
  ['uno-runner', launchRunner], ['uno-cocina', launchCocina],
- ['uno-hole', showHoleSubmenu], ['uno-helado', launchHelado]].forEach(([id, launch]) => {
+ ['uno-hole', showHoleSubmenu], ['uno-helado', launchHelado],
+ ['uno-dash', launchDash]].forEach(([id, launch]) => {
   const btn = document.getElementById(id);
   if (!btn) return;
   const go = () => { hideUnoSubmenu(); launch(); };

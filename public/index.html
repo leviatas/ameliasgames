@@ -216,6 +216,11 @@
     <h1 class="select-title">🕹️ 1 Player</h1>
     <p class="select-subtitle">Elegí un juego para vos</p>
     <div class="hub-grid">
+      <button class="hub-card dash" id="uno-dash">
+        <div class="hub-emoji">🏃‍♀️</div>
+        <div class="hub-name">Dash 3D</div>
+        <div class="hub-desc">Corré en 3 carriles, saltá y agachate</div>
+      </button>
       <button class="hub-card match3" id="uno-match3">
         <div class="hub-emoji">🍬</div>
         <div class="hub-name">Dulces de Labubu</div>
@@ -738,9 +743,14 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.69.0</div>
+  <div id="app-version">v2.70.0</div>
 
   <!-- Galaga controls -->
+  <div id="dash-ui" class="hidden">
+    <button id="dash-help" class="game-help-btn" title="Cómo se juega">❓</button>
+    <button id="dash-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
   <div id="galaga-ui" class="hidden">
     <button id="galaga-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
     <button id="galaga-left"  class="galaga-btn" title="Izquierda">◀</button>
@@ -841,7 +851,7 @@
         'hole_best', 'cocina_best', 'match3_best',
         'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
         'pasteleria_state', 'pizzeria_state', 'panaderia_money', 'panaderia_meta',
-        'vestidor_look',
+        'vestidor_look', 'dash_best',
       ];
       keys.forEach(k => localStorage.removeItem(k));
       location.reload();
