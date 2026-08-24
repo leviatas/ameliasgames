@@ -2232,8 +2232,9 @@ const GAME_HELP = {
     'Deslizá para arriba ⬆ y saltás: así pasás las vallas rojas 🟥.',
     'Deslizá para abajo ⬇ y te agachás: así pasás por debajo de las vigas celestes 🟦.',
     'Los bloques violetas y los trenes naranjas no se saltan ni se esquivan agachándose: hay que cambiar de carril.',
-    'Juntá 🪙 monedas, que se suman a tu alcancía cuando terminás.',
-    'Tenés 3 vidas ❤️. Cada tanto sube el nivel: se va más rápido y aparecen más cosas.',
+    'Juntá 🪙 monedas: las que van en fila las agarrás corriendo, pero las que suben en arco hay que saltarlas.',
+    'Las monedas se suman a tu alcancía cuando terminás.',
+    'Tenés 3 vidas ❤️. Cada 350 metros subís de nivel y no hay último: se va más rápido y va cambiando de día a atardecer, noche y amanecer.',
   ] },
   ppt: { title: '✊ Piedra, Papel o Tijera', steps: [
     'Cada una tiene sus tres botones de su lado de la pantalla.',

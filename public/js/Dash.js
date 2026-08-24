@@ -28,12 +28,40 @@ const JUMP_V    = 9.2;    // pico ≈ 1.63 m, ≈ 0.7 s en el aire
 const SLIDE_T   = 0.62;
 
 const SPD0      = 13;     // velocidad inicial
-const SPD_MAX   = 34;
-const RAMP_T    = 100;    // segundos hasta la dificultad máxima
+const SPD_MAX   = 34;     // techo: más rápido que esto no se puede reaccionar
+const LEVEL_M   = 350;    // metros por nivel — no hay último nivel
+const RAMP_L    = 4.5;    // niveles en los que la dificultad se acerca al techo
 const HURT_T    = 1.4;    // invulnerabilidad tras un golpe
 const MAX_LIVES = 3;
 
 const SEG       = 6;      // largo del segmento de asfalto (rayas y banquina)
+
+// Paletas: cada nivel usa la siguiente y vuelven a empezar, así que aunque los
+// niveles no se terminen nunca, siempre hay algo distinto para mirar.
+const THEMES = [
+  { name: 'Día',       emoji: '☀️', skyTop: '#4FA8FF', skyBot: '#CFEEFF', sun: '#FFF3B0', sunY: 0.20,
+    hills: '#8FBF6E', grass: '#7FC96B', road: '#6B6F8A', rumble: '#FF6B8B', tree: '#4CAF50',
+    cloud: 0.75, star: 0, lamp: 0 },
+  { name: 'Atardecer', emoji: '🌅', skyTop: '#3B2C6B', skyBot: '#FF9E6B', sun: '#FF7043', sunY: 0.06,
+    hills: '#5E4E72', grass: '#6E8F5E', road: '#56506E', rumble: '#C4506E', tree: '#3C7A46',
+    cloud: 0.45, star: 0.15, lamp: 0.5 },
+  { name: 'Noche',     emoji: '🌙', skyTop: '#080B26', skyBot: '#2B2F63', sun: '#E8ECFF', sunY: 0.26,
+    hills: '#252546', grass: '#2C4740', road: '#2E2C42', rumble: '#8E3A55', tree: '#1F4632',
+    cloud: 0.18, star: 1, lamp: 1 },
+  { name: 'Amanecer',  emoji: '🌄', skyTop: '#6E5AA8', skyBot: '#FFC9A0', sun: '#FFD9A0', sunY: 0.11,
+    hills: '#7A8F6E', grass: '#6FA36A', road: '#5A5A78', rumble: '#E0708E', tree: '#3F8A4E',
+    cloud: 0.6, star: 0.25, lamp: 0.35 },
+];
+function mixTheme(a, b, t) {
+  const out = {};
+  for (const k of Object.keys(a)) {
+    const va = a[k], vb = b[k];
+    out[k] = typeof va === 'number' ? lerp(va, vb, t)
+           : (typeof va === 'string' && va[0] === '#') ? mixHex(va, vb, t)
+           : (t < 0.5 ? va : vb);
+  }
+  return out;
+}
 
 // Tipos de obstáculo: qué son y cómo se esquivan.
 const KINDS = {
@@ -106,7 +134,25 @@ export class Dash {
   }
 
   get _playerH() { return this.slideT > 0 ? SLIDE_H : RUN_H; }
-  get _diff()    { return clamp(this.time / RAMP_T, 0, 1); }
+  // Niveles transcurridos, con decimales. No tiene tope: el nivel sube cada
+  // LEVEL_M metros para siempre.
+  get _prog()    { return this.dist / LEVEL_M; }
+  // La dificultad se acerca al techo sin llegar nunca. Así los niveles pueden
+  // ser infinitos sin que el juego se vuelva imposible: siempre queda un
+  // poquito más de velocidad y un poquito menos de margen, pero nunca cruza el
+  // límite de lo que una nena puede reaccionar.
+  get _diff()    { return 1 - Math.exp(-this._prog / RAMP_L); }
+
+  // Paleta del nivel actual, mezclada con la del siguiente sobre el final del
+  // nivel para que el cambio de luz sea un fundido y no un salto.
+  _theme() {
+    const p = this._prog;
+    const i = Math.floor(p) % THEMES.length;
+    const frac = p - Math.floor(p);
+    const t = clamp((frac - 0.65) / 0.35, 0, 1);
+    return mixTheme(THEMES[i], THEMES[(i + 1) % THEMES.length], t);
+  }
+  _themeAt(level) { return THEMES[(level - 1) % THEMES.length]; }
 
   // ── Entrada ───────────────────────────────────────────────────────────────
   swipe(dir) {
@@ -197,13 +243,14 @@ export class Dash {
     if (free.length && Math.random() < 0.75) {
       const l = free[Math.floor(Math.random() * free.length)];
       const room = Math.floor((this.nextWz - 3 - wz) / 1.9) + 1;
-      const n = Math.min(3 + Math.floor(Math.random() * 4), Math.max(0, room));
-      const arc = Math.random() < 0.3;
+      const arc = Math.random() < 0.35 && room >= 5;
+      const n = Math.min(arc ? 5 + Math.floor(Math.random() * 2) : 3 + Math.floor(Math.random() * 4),
+                         Math.max(0, room));
       for (let i = 0; i < n; i++) {
         const t = n > 1 ? i / (n - 1) : 0;
         this.obs.push({
           coin: true, x: LANE_X[l], wz: wz + i * 1.9,
-          y: arc ? 0.9 + Math.sin(t * Math.PI) * 1.5 : 1.0, got: false,
+          y: arc ? 1.0 + Math.sin(t * Math.PI) * 1.9 : 1.0, got: false,
         });
       }
     }
@@ -233,10 +280,11 @@ export class Dash {
     this.dist  += this.speed * dt;
     if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
 
-    const lvl = 1 + Math.floor(diff * 4.999);
+    const lvl = 1 + Math.floor(this.dist / LEVEL_M);
     if (lvl > this.level) {
       this.level = lvl;
-      this.toast = { txt: `¡Nivel ${lvl}!`, t: 1.6 };
+      const th = this._themeAt(lvl);
+      this.toast = { txt: `¡Nivel ${lvl}!`, sub: `${th.emoji} ${th.name}`, t: 1.8 };
       Sound.serveGood();
     }
 
@@ -264,7 +312,10 @@ export class Dash {
       if (o.coin) {
         if (o.got || z > 1.2 || z < -1.2) continue;
         if (Math.abs(o.x - this.px) > 1.15) continue;
-        if (o.y < py - 0.5 || o.y > py + ph + 0.5) continue;
+        // Se agarra lo que está al alcance de la mano: de los pies hasta un
+        // poquito más arriba de la cabeza. Con más tolerancia que esto, las
+        // monedas del arco se juntaban sin saltar y el arco no servía de nada.
+        if (o.y < py - 0.35 || o.y > py + ph + 0.15) continue;
         o.got = true; this.coins++; Sound.add();
         continue;
       }
@@ -362,9 +413,10 @@ export class Dash {
       ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
     }
 
-    this._sky(ctx);
-    this._ground(ctx);
-    this._scenery(ctx);
+    const T = this._theme();
+    this._sky(ctx, T);
+    this._ground(ctx, T);
+    this._scenery(ctx, T);
 
     // Painter: de lejos a cerca. El personaje va en z = 0, así que lo que ya
     // pasó de largo (z < 0) se dibuja después y tapa como corresponde.
@@ -390,24 +442,34 @@ export class Dash {
     if (this.state === 'over')  this._over(ctx);
   }
 
-  _sky(ctx) {
+  _sky(ctx, T) {
     const { W, H } = this;
-    const d = this._diff;
-    // El cielo va del mediodía al atardecer a medida que sube la dificultad.
-    const top = mixHex('#4FA8FF', '#3B2C6B', d), bot = mixHex('#CFEEFF', '#FF9E6B', d);
     const g = ctx.createLinearGradient(0, 0, 0, this.horizon + 2);
-    g.addColorStop(0, top); g.addColorStop(1, bot);
+    g.addColorStop(0, T.skyTop); g.addColorStop(1, T.skyBot);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, this.horizon + 2);
 
-    const sunX = W * 0.72 - this.camX * 12, sunY = this.horizon - H * (0.20 - d * 0.14);
-    ctx.fillStyle = mixHex('#FFF3B0', '#FF7043', d);
+    // Estrellas (se encienden de noche)
+    if (T.star > 0.02) {
+      ctx.fillStyle = '#FFFFFF';
+      for (let i = 0; i < 70; i++) {
+        const sx = ((hash(i) + this.camX * 0.0012) % 1) * W;
+        const sy = hash(i + 77) * this.horizon * 0.92;
+        ctx.globalAlpha = T.star * (0.35 + hash(i + 5) * 0.65) *
+                          (0.7 + 0.3 * Math.sin(this.time * 2 + i));
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    const sunX = W * 0.72 - this.camX * 12, sunY = this.horizon - H * T.sunY;
+    ctx.fillStyle = T.sun;
     ctx.beginPath(); ctx.arc(sunX, sunY, H * 0.075, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 0.25;
     ctx.beginPath(); ctx.arc(sunX, sunY, H * 0.12, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
 
     // Nubes con parallax lento
-    ctx.fillStyle = `rgba(255,255,255,${0.75 - d * 0.35})`;
+    ctx.fillStyle = `rgba(255,255,255,${T.cloud})`;
     for (let i = 0; i < 5; i++) {
       const cx = ((i * 0.27 + this.dist * 0.0008) % 1.3 - 0.15) * W - this.camX * 8;
       const cy = this.horizon - H * (0.12 + hash(i) * 0.2);
@@ -420,7 +482,7 @@ export class Dash {
     }
 
     // Cerros del fondo
-    ctx.fillStyle = mixHex('#8FBF6E', '#4A3A6A', d);
+    ctx.fillStyle = T.hills;
     ctx.beginPath();
     ctx.moveTo(0, this.horizon + 2);
     for (let x = 0; x <= W; x += W / 28) {
@@ -432,14 +494,13 @@ export class Dash {
     ctx.closePath(); ctx.fill();
   }
 
-  _ground(ctx) {
+  _ground(ctx, T) {
     const { W, H } = this;
-    const d = this._diff;
-    ctx.fillStyle = mixHex('#7FC96B', '#3E5A46', d);
+    ctx.fillStyle = T.grass;
     ctx.fillRect(0, this.horizon, W, H - this.horizon);
 
     const zN = -CAM_Z + 1.2, zF = DRAW_Z;
-    const road = mixHex('#6B6F8A', '#3A3350', d);
+    const road = T.road;
     this._quad(ctx, [this._p(-ROAD_HALF, 0, zN), this._p(ROAD_HALF, 0, zN),
                      this._p(ROAD_HALF, 0, zF), this._p(-ROAD_HALF, 0, zF)], road);
 
@@ -456,7 +517,7 @@ export class Dash {
       if (z1 <= zN) continue;
       const z0 = Math.max(zRaw, zN);
       const alt = (idx & 1) === 0;
-      const rum = alt ? mixHex('#FF6B8B', '#B03A5B', d) : '#FFFFFF';
+      const rum = alt ? T.rumble : mixHex('#FFFFFF', '#C9CEE8', T.star);
       for (const sgn of [-1, 1]) {
         this._quad(ctx, [this._p(sgn * ROAD_HALF, 0, z0), this._p(sgn * (ROAD_HALF + 0.9), 0, z0),
                          this._p(sgn * (ROAD_HALF + 0.9), 0, z1), this._p(sgn * ROAD_HALF, 0, z1)], rum);
@@ -473,10 +534,9 @@ export class Dash {
   }
 
   // Árboles y farolas al costado, generados por segmento (sin estado).
-  _scenery(ctx) {
+  _scenery(ctx, T) {
     const first = Math.floor(this.dist / SEG);
     const n = Math.ceil(DRAW_Z / SEG);
-    const d = this._diff;
     for (let i = n; i >= 0; i--) {
       const idx = first + i;
       const z = idx * SEG - this.dist;
@@ -490,16 +550,22 @@ export class Dash {
         const x = sgn * (ROAD_HALF + 4.6 + hv * 4.5);
         if (hv < 0.14) {                                  // farola
           const p0 = this._p(x, 0, z), p1 = this._p(x, 4.2, z);
-          ctx.strokeStyle = '#55506B'; ctx.lineWidth = Math.max(1, 0.16 * p0.s);
+          ctx.strokeStyle = mixHex('#55506B', '#2A2740', T.lamp); ctx.lineWidth = Math.max(1, 0.16 * p0.s);
           ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
-          ctx.fillStyle = d > 0.4 ? '#FFE9A8' : '#DDE3EE';
-          ctx.beginPath(); ctx.arc(p1.x, p1.y, Math.max(1.5, 0.34 * p0.s), 0, Math.PI * 2); ctx.fill();
+          const bulbR = Math.max(1.5, 0.34 * p0.s);
+          if (T.lamp > 0.05) {                            // halo de la luz prendida
+            ctx.globalAlpha = T.lamp * 0.35; ctx.fillStyle = '#FFE9A8';
+            ctx.beginPath(); ctx.arc(p1.x, p1.y, bulbR * 2.6, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+          ctx.fillStyle = mixHex('#DDE3EE', '#FFE9A8', T.lamp);
+          ctx.beginPath(); ctx.arc(p1.x, p1.y, bulbR, 0, Math.PI * 2); ctx.fill();
         } else {                                          // arbolito
           const th = 2.6 + hash(idx + 31) * 2.2;
           const p0 = this._p(x, 0, z), p1 = this._p(x, th, z);
-          ctx.strokeStyle = '#7A4B2A'; ctx.lineWidth = Math.max(1, 0.26 * p0.s);
+          ctx.strokeStyle = mixHex('#7A4B2A', '#2E2436', T.star); ctx.lineWidth = Math.max(1, 0.26 * p0.s);
           ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
-          ctx.fillStyle = mixHex(hv < 0.34 ? '#4CAF50' : '#66BB6A', '#2E4A38', d);
+          ctx.fillStyle = hv < 0.34 ? T.tree : mixHex(T.tree, '#FFFFFF', 0.12);
           const r = Math.max(2, (0.75 + hash(idx + 7) * 0.4) * p0.s);
           ctx.beginPath();
           ctx.arc(p1.x, p1.y, r, 0, Math.PI * 2);
@@ -669,11 +735,19 @@ export class Dash {
       ctx.fillText(`récord ${this.best} m`, W - 18 * s, 80 * s);
     }
 
-    // Nivel
+    // Nivel (no hay último: sigue subiendo cada LEVEL_M metros)
+    const th = this._themeAt(this.level);
     ctx.textAlign = 'left';
     ctx.font = `bold ${18 * s}px system-ui`;
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    ctx.fillText(`Nivel ${this.level}`, 22 * s, 48 * s);
+    ctx.fillText(`Nivel ${this.level}  ${th.emoji}`, 22 * s, 48 * s);
+    // Barrita de lo que falta para el próximo
+    const pw2 = 86 * s, px2 = 22 * s, py2 = 72 * s, phh = 5 * s;
+    const frac = (this.dist % LEVEL_M) / LEVEL_M;
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath(); ctx.roundRect(px2, py2, pw2, phh, phh / 2); ctx.fill();
+    ctx.fillStyle = '#FFD84D';
+    ctx.beginPath(); ctx.roundRect(px2, py2, pw2 * frac, phh, phh / 2); ctx.fill();
 
     if (this.toast) {
       const a = clamp(this.toast.t / 0.4, 0, 1);
@@ -685,6 +759,13 @@ export class Dash {
       ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 6 * s;
       ctx.strokeText(this.toast.txt, W / 2, H * 0.24);
       ctx.fillText(this.toast.txt, W / 2, H * 0.24);
+      if (this.toast.sub) {
+        ctx.font = `bold ${26 * s}px system-ui`;
+        ctx.lineWidth = 4 * s;
+        ctx.fillStyle = '#fff';
+        ctx.strokeText(this.toast.sub, W / 2, H * 0.24 + 46 * s);
+        ctx.fillText(this.toast.sub, W / 2, H * 0.24 + 46 * s);
+      }
       ctx.restore();
     }
   }
