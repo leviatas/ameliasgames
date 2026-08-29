@@ -11,6 +11,12 @@
 import { addCoins } from './Wallet.js';
 import { Sound } from './Sound.js';
 
+// ── Sprite del personaje (con fallback vectorial mientras carga) ────────────
+const ASSET = (name) => `/assets/dash/${name}.png`;
+function loadImg(name) { const im = new Image(); im.src = ASSET(name); return im; }
+function ready(img) { return img && img.complete && img.naturalWidth > 0; }
+const IMG = { jugadora: loadImg('jugadora') };
+
 // ── Mundo (unidades ≈ metros) ──
 const LANE_X    = [-2.2, 0, 2.2];
 const ROAD_HALF = 3.6;
@@ -594,10 +600,7 @@ export class Dash {
     ctx.restore();
   }
 
-  // Personaje chibi dibujado por código: se personaliza con los colores del
-  // vestidor y se anima (piernas, brazos, salto y panza al agacharse).
   _runner(ctx) {
-    const blink = this.hurtT > 0 && Math.floor(this.hurtT * 12) % 2 === 0;
     const feet = this._p(this.px, this.py, 0);
     const gp   = this._p(this.px, 0, 0);
     const sliding = this.slideT > 0;
@@ -613,6 +616,48 @@ export class Dash {
     ctx.fill();
     ctx.restore();
 
+    if (ready(IMG.jugadora)) this._runnerSprite(ctx, feet, h, sliding);
+    else                     this._runnerVector(ctx, feet, h, sliding);
+  }
+
+  // Sprite ilustrado, visto de espaldas (encaja con la cámara al hombro).
+  // Una sola pose corrida: la corrida/salto/agachada se fingen por código
+  // (bamboleo, inclinación y estirado/achicado), como en Panaderia.js.
+  _runnerSprite(ctx, feet, h, sliding) {
+    const blink = this.hurtT > 0 && Math.floor(this.hurtT * 12) % 2 === 0;
+    const img = IMG.jugadora;
+    const w = h * (img.naturalWidth / img.naturalHeight);
+    const ph = this.runPhase;
+
+    let oy = 0, rot = 0, scaleX = 1, scaleY = 1;
+    if (sliding) {
+      // `h` ya viene achicado a SLIDE_H: sólo hace falta ensanchar un poco,
+      // sin volver a aplastar (si no, se aplasta dos veces) ni levantar los
+      // pies del piso.
+      scaleX = 1.18;
+    } else if (this.air) {
+      const t = clamp(this.vy / JUMP_V, -1, 1);                // >0 subiendo, <0 cayendo
+      scaleY = 1 + 0.12 * t; scaleX = 1 - 0.06 * t;             // estirado al subir, achicado al caer
+      rot = t * 0.05;
+    } else {
+      oy = Math.abs(Math.sin(ph)) * h * 0.045;                 // pique al pisar
+      rot = Math.sin(ph) * 0.045;
+    }
+
+    ctx.save();
+    if (blink) ctx.globalAlpha = 0.35;
+    ctx.translate(feet.x, feet.y - oy);
+    ctx.rotate(rot);
+    ctx.scale(scaleX, scaleY);
+    ctx.drawImage(img, -w / 2, -h, w, h);
+    ctx.restore();
+  }
+
+  // Personaje chibi dibujado por código (fallback mientras carga el sprite):
+  // se personaliza con los colores del vestidor y se anima por código
+  // (piernas, brazos, salto y panza al agacharse).
+  _runnerVector(ctx, feet, h, sliding) {
+    const blink = this.hurtT > 0 && Math.floor(this.hurtT * 12) % 2 === 0;
     const look = this.look || {};
     const skin = '#F7D5B5';
     const hair = look.hairColor || '#EDEDED';
