@@ -15,7 +15,10 @@ import { Sound } from './Sound.js';
 const ASSET = (name) => `/assets/dash/${name}.png`;
 function loadImg(name) { const im = new Image(); im.src = ASSET(name); return im; }
 function ready(img) { return img && img.complete && img.naturalWidth > 0; }
-const IMG = { jugadora: loadImg('jugadora') };
+const IMG = {
+  jugadora: loadImg('jugadora'),         // salto / agachada: una pose, se anima por código
+  corre1: loadImg('corre_1'), corre2: loadImg('corre_2'), // corrida: 2 cuadros alternados
+};
 
 // ── Mundo (unidades ≈ metros) ──
 const LANE_X    = [-2.2, 0, 2.2];
@@ -616,16 +619,27 @@ export class Dash {
     ctx.fill();
     ctx.restore();
 
-    if (ready(IMG.jugadora)) this._runnerSprite(ctx, feet, h, sliding);
-    else                     this._runnerVector(ctx, feet, h, sliding);
+    // Corriendo en el piso: alterna los dos cuadros de zancada. Saltando o
+    // agachada usa la pose única (no hay dibujo para esas poses) y se anima
+    // por código, como antes.
+    let img = null;
+    if (!this.air && !sliding) {
+      img = Math.sin(this.runPhase) >= 0 ? IMG.corre1 : IMG.corre2;
+      if (!ready(img)) img = ready(IMG.jugadora) ? IMG.jugadora : null;
+    } else if (ready(IMG.jugadora)) {
+      img = IMG.jugadora;
+    }
+
+    if (img) this._runnerSprite(ctx, feet, h, sliding, img);
+    else      this._runnerVector(ctx, feet, h, sliding);
   }
 
   // Sprite ilustrado, visto de espaldas (encaja con la cámara al hombro).
-  // Una sola pose corrida: la corrida/salto/agachada se fingen por código
+  // Corriendo alterna 2 cuadros; saltando/agachada usa la pose única de
+  // `jugadora.png` y la corrida/salto/agachada se fingen por código
   // (bamboleo, inclinación y estirado/achicado), como en Panaderia.js.
-  _runnerSprite(ctx, feet, h, sliding) {
+  _runnerSprite(ctx, feet, h, sliding, img) {
     const blink = this.hurtT > 0 && Math.floor(this.hurtT * 12) % 2 === 0;
-    const img = IMG.jugadora;
     const w = h * (img.naturalWidth / img.naturalHeight);
     const ph = this.runPhase;
 
