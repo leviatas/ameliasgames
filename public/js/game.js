@@ -49,6 +49,8 @@ let match3   = null;
 let hole     = null;
 let hole2    = null;
 let galaga   = null;
+let dash3d   = null;   // Dash 3D (Three.js, se carga bajo demanda)
+let dash3dLoading = 0;  // token para cancelar una carga si se sale antes
 let theater  = null;
 let helado   = null;
 let panaderia = null;
@@ -319,6 +321,8 @@ function showHub(menuId = 'hub-screen') {
   tienda = null;
   if (mob)    { mob.destroy(); mob = null; }
   if (galaga) { galaga.destroy(); galaga = null; }
+  if (dash3d) { dash3d.destroy(); dash3d = null; }
+  dash3dLoading++;
   hideHoleSubmenu();
   hideUnoSubmenu();
   hideVersusSubmenu();
@@ -355,6 +359,7 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('tienda-ui').classList.add('hidden');
   document.getElementById('mob-ui').classList.add('hidden');
   document.getElementById('galaga-ui').classList.add('hidden');
+  document.getElementById('dash3d-ui').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('online-setup').classList.add('hidden');
@@ -592,6 +597,36 @@ function launchGalaga() {
 function exitGalaga() {
   document.getElementById('galaga-ui').classList.add('hidden');
   if (galaga) { galaga.destroy(); galaga = null; }
+  showHub('uno-submenu');
+}
+
+// ── Dash 3D — runner en 3D real (Three.js se importa recién al entrar) ─────────
+async function launchDash3D() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  const ui = document.getElementById('dash3d-ui');
+  ui.classList.remove('hidden');
+  const msg = document.getElementById('dash3d-msg');
+  msg.classList.remove('hidden');
+  msg.innerHTML = '<div class="d3-title">Dash 3D</div><div class="d3-sub">Cargando mundo 3D…</div>';
+  mode = 'dash3d';
+  const token = ++dash3dLoading;
+  try {
+    const { Dash3D } = await import('./Dash3D.js');
+    if (token !== dash3dLoading || mode !== 'dash3d') return;   // salió mientras cargaba
+    dash3d = new Dash3D(canvas);
+  } catch (err) {
+    console.error('Dash 3D:', err);
+    msg.innerHTML = '<div class="d3-title">Ups 😿</div><div class="d3-sub">Este dispositivo no pudo abrir el 3D</div>';
+    return;
+  }
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitDash3D() {
+  document.getElementById('dash3d-ui').classList.add('hidden');
   showHub('uno-submenu');
 }
 
@@ -1044,6 +1079,7 @@ function gameLoop(now) {
   if (mode === 'hole'  && hole)  { hole.update(delta);  hole.render(ctx);  return; }
   if (mode === 'hole2'  && hole2)  { hole2.update(delta);  hole2.render(ctx);  return; }
   if (mode === 'galaga' && galaga) { galaga.update(delta); galaga.render(ctx); return; }
+  if (mode === 'dash3d') { if (dash3d) { dash3d.update(delta); dash3d.render(); } return; }
   if (mode === 'cinema' && theater) { theater.update(delta); theater.render(ctx); return; }
   if (mode === 'helado' && helado) { helado.update(delta); helado.render(ctx); return; }
   if (mode === 'panaderia' && panaderia) { panaderia.update(delta); panaderia.render(ctx); return; }
@@ -1721,6 +1757,24 @@ window.addEventListener('keyup', e => {
   hole2ApplyKeys();
 });
 
+// ── Dash 3D controls ─────────────────────────────────────────────────────────
+const d3Exit = document.getElementById('dash3d-exit');
+if (d3Exit) d3Exit.addEventListener('click', exitDash3D);
+[['dash3d-left', () => dash3d && dash3d.move(-1)], ['dash3d-right', () => dash3d && dash3d.move(1)],
+ ['dash3d-jump', () => dash3d && dash3d.jump()]].forEach(([id, fn]) => {
+  const b = document.getElementById(id);
+  if (b) b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fn(); });
+});
+window.addEventListener('keydown', e => {
+  if (mode !== 'dash3d') return;
+  if (e.code === 'Escape') { exitDash3D(); return; }
+  if (!dash3d || e.repeat) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA')       { dash3d.move(-1); e.preventDefault(); }
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') { dash3d.move(1);  e.preventDefault(); }
+  else if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') { dash3d.jump(); e.preventDefault(); }
+  else if (e.code === 'Enter') { dash3d.start(); e.preventDefault(); }
+});
+
 // ── Galaga controls ───────────────────────────────────────────────────────────
 const gExit = document.getElementById('galaga-exit');
 if (gExit) gExit.addEventListener('click', exitGalaga);
@@ -2138,7 +2192,7 @@ window.addEventListener('keydown', e => {
 // ── 1-Player submenu buttons ──────────────────────────────────────────────────
 const unoBack = document.getElementById('uno-back');
 if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); document.getElementById('hub-screen').classList.remove('hidden'); });
-[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga], ['uno-panaderia', launchPanaderia]].forEach(([id, launch]) => {
+[['uno-match3', launchMatch3], ['uno-mob', launchMob], ['uno-galaga', launchGalaga], ['uno-panaderia', launchPanaderia], ['uno-dash3d', launchDash3D]].forEach(([id, launch]) => {
   const btn = document.getElementById(id);
   if (!btn) return;
   const go = () => { hideUnoSubmenu(); launch(); };
