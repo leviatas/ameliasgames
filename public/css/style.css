@@ -1334,3 +1334,11 @@ body {
 #dash3d-right { left: 106px; }
 #dash3d-jump  { right: 22px; width: 92px; height: 92px; background: rgba(255,110,180,0.45); border-color: rgba(255,190,225,0.8); }
 @media (pointer: fine) { .dash3d-btn { display: none; } }
+
+/* ── Guardia de arranque (error visible en "Cargando...") ── */
+#boot-error { margin-top: 22px; max-width: 88vw; text-align: center; letter-spacing: 0; }
+#boot-error-text { font-size: 0.85rem; color: #ffd6e6; white-space: pre-wrap; word-break: break-word; }
+#boot-fix {
+  margin-top: 14px; padding: 12px 24px; border: none; border-radius: 999px; cursor: pointer;
+  font-size: 1rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #FF6FB0, #9A6BFF);
+}

@@ -1,4 +1,4 @@
-const CACHE = 'avatarworld-v5';
+const CACHE = 'avatarworld-v6';
 const SHELL = [
   '/', '/js/game.js', '/js/Character.js', '/js/World.js', '/js/Interior.js',
   '/js/Runner.js', '/js/Cocina.js', '/js/Match3.js', '/js/Hole.js', '/js/Cinema.js',
@@ -41,6 +41,12 @@ self.addEventListener('fetch', e => {
       const clone = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, clone));
       return res;
-    }).catch(() => caches.match(e.request).then(c => c || caches.match('/')))
+    }).catch(() => caches.match(e.request).then(c => {
+      if (c) return c;
+      // la página principal solo para navegaciones: devolver HTML a un pedido de
+      // JS rompe el arranque del módulo (se queda en "Cargando...")
+      if (e.request.mode === 'navigate') return caches.match('/');
+      return Response.error();
+    }))
   );
 });
