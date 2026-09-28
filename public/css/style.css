@@ -1269,3 +1269,68 @@ body {
   gap: 16px; background: rgba(6,20,40,0.92); color: #fff; text-align: center; padding: 20px;
 }
 #online-disconnect-banner.hidden { display: none; }
+
+/* ── Dash 3D (Three.js) ── */
+.hub-card.dash3d { background: linear-gradient(135deg, #FFC2E2 0%, #B9A8FF 55%, #8FE3E0 100%); color: #3A1A5A; }
+.hub-card.dash3d:hover { border-color: #C9A0FF; box-shadow: 0 18px 40px rgba(170,140,255,0.45); }
+#dash3d-canvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20;
+  display: block; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#dash3d-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none;
+  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif; }
+#dash3d-ui.hidden { display: none; }
+#dash3d-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#dash3d-hud {
+  position: absolute; top: 14px; left: 14px; display: flex; gap: 10px; flex-wrap: wrap;
+}
+#dash3d-hud span {
+  padding: 7px 14px; border-radius: 999px; font-weight: 800; font-size: 1.05rem; color: #4A2360;
+  background: rgba(255,255,255,0.72); backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(80,40,120,0.18);
+}
+#dash3d-toast {
+  position: absolute; top: 70px; left: 50%; transform: translate(-50%, -10px);
+  padding: 10px 22px; border-radius: 999px; font-weight: 800; font-size: 1.2rem; color: #fff;
+  background: linear-gradient(135deg, rgba(255,110,180,0.85), rgba(150,120,255,0.85));
+  box-shadow: 0 8px 24px rgba(120,60,180,0.3); opacity: 0; white-space: nowrap;
+}
+#dash3d-toast.show { animation: d3toast 2.4s ease forwards; }
+@keyframes d3toast {
+  0% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  20% { transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+#dash3d-msg {
+  position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%);
+  min-width: min(360px, 86vw); padding: 18px 26px; border-radius: 26px; text-align: center;
+  color: #4A2360; background: rgba(255,255,255,0.78); backdrop-filter: blur(10px);
+  box-shadow: 0 14px 40px rgba(90,40,140,0.25);
+}
+#dash3d-msg.hidden { display: none; }
+#dash3d-msg .d3-title { font-size: 2rem; font-weight: 900;
+  background: linear-gradient(90deg, #FF5FA8, #9A6BFF, #36C2D0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#dash3d-msg .d3-sub { font-size: 1.2rem; font-weight: 800; margin-top: 4px; animation: d3pulse 1.2s ease-in-out infinite; }
+#dash3d-msg .d3-help { font-size: 0.95rem; margin-top: 10px; opacity: 0.8; line-height: 1.5; }
+#dash3d-msg .d3-best { font-size: 0.95rem; margin-top: 8px; font-weight: 700; opacity: 0.75; }
+#dash3d-msg .d3-stats { display: flex; justify-content: center; gap: 18px; font-size: 1.3rem; font-weight: 800; margin-top: 8px; }
+#dash3d-msg .d3-again {
+  margin-top: 14px; padding: 12px 30px; border: none; border-radius: 999px; cursor: pointer;
+  font-size: 1.2rem; font-weight: 900; color: #fff;
+  background: linear-gradient(135deg, #FF6FB0, #9A6BFF); box-shadow: 0 8px 20px rgba(154,107,255,0.45);
+}
+#dash3d-msg .d3-again:active { transform: scale(0.95); }
+@keyframes d3pulse { 50% { opacity: 0.55; } }
+.dash3d-btn {
+  position: absolute; bottom: 20px; width: 76px; height: 76px; border-radius: 50%;
+  font-size: 1.8rem; color: #fff; cursor: pointer; user-select: none;
+  border: 3px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.22);
+  backdrop-filter: blur(6px); box-shadow: 0 6px 18px rgba(60,20,90,0.25);
+}
+.dash3d-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.42); }
+#dash3d-left  { left: 18px; }
+#dash3d-right { left: 106px; }
+#dash3d-jump  { right: 22px; width: 92px; height: 92px; background: rgba(255,110,180,0.45); border-color: rgba(255,190,225,0.8); }
+@media (pointer: fine) { .dash3d-btn { display: none; } }

@@ -270,6 +270,11 @@
         <div class="hub-name">Panadería</div>
         <div class="hub-desc">Cosechá trigo, horneá y vendé pan</div>
       </button>
+      <button class="hub-card dash3d" id="uno-dash3d">
+        <div class="hub-emoji">🐰</div>
+        <div class="hub-name">Dash 3D</div>
+        <div class="hub-desc">Corré y saltá en un mundo 3D de caramelo</div>
+      </button>
     </div>
   </div>
 
@@ -625,9 +630,24 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.57.3</div>
+  <div id="app-version">v2.58.0</div>
 
   <!-- Galaga controls -->
+  <!-- Dash 3D (Three.js): el canvas WebGL lo crea Dash3D.js -->
+  <div id="dash3d-ui" class="hidden">
+    <button id="dash3d-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+    <div id="dash3d-hud">
+      <span id="dash3d-dist">0 m</span>
+      <span id="dash3d-coins">🪙 0</span>
+      <span id="dash3d-hearts">💖💖💖</span>
+    </div>
+    <div id="dash3d-toast"></div>
+    <div id="dash3d-msg" class="hidden"></div>
+    <button id="dash3d-left"  class="dash3d-btn" title="Izquierda">◀</button>
+    <button id="dash3d-right" class="dash3d-btn" title="Derecha">▶</button>
+    <button id="dash3d-jump"  class="dash3d-btn" title="Saltar">⬆</button>
+  </div>
+
   <div id="galaga-ui" class="hidden">
     <button id="galaga-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
     <button id="galaga-left"  class="galaga-btn" title="Izquierda">◀</button>
@@ -644,6 +664,9 @@
     </div>
   </div>
 
+  <script type="importmap">
+    { "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }
+  </script>
   <script type="module" src="/js/game.js"></script>
   <script>
     // Service Worker
@@ -726,7 +749,7 @@
         'wallet_coins', 'wardrobe_items', 'wardrobe_equipped',
         'mimundo_state_v2', 'fridge_foods',
         'hole_best', 'cocina_best', 'match3_best',
-        'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
+        'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state', 'dash3d_best',
         'pasteleria_state', 'panaderia_money', 'panaderia_meta',
       ];
       keys.forEach(k => localStorage.removeItem(k));

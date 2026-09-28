@@ -76,3 +76,15 @@ y `pointer()` sintético. Guardarlos en el scratchpad de la sesión, junto a una
 copia del archivo (`node --check` primero). Ojo con el "ruido" de los
 trabajadores automáticos en los tests: apagarlos (`g.workers.x = false`) y
 frenar spawns (`custSpawnT = 9999`, etc.) para aislar lo que se mide.
+
+## Juegos 3D (Three.js) — `Dash3D.js`
+
+- Three.js sale de `node_modules/three` (servido en `/three`) vía el `importmap` de
+  `index.html` (`three`, `three/addons/`). El juego se importa **bajo demanda**
+  (`await import('./Dash3D.js')` en `launchDash3D()`), así el hub no carga WebGL.
+- Crea su propio `<canvas id="dash3d-canvas">` WebGL encima del canvas 2D;
+  `render()` ignora `ctx`. `destroy()` libera geometrías/materiales y el contexto.
+- Calidad adaptativa: si baja de ~40 fps apaga bloom y luego baja resolución.
+- El primer `dt` puede llegar negativo (rAF vs `performance.now()`): clamp a `[0, 0.05]`.
+- Verificación visual: Playwright + Chromium con `--use-angle=swiftshader`
+  (lento, ~1 fps: simular con `update(1/60)` en loop y sacar capturas).
