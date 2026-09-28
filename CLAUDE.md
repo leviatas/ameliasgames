@@ -109,6 +109,10 @@ frenar spawns (`custSpawnT = 9999`, etc.) para aislar lo que se mide.
   con formas de Three.js (sin modelos externos) y expone `legs/arms/head/ears/eyes/hair`
   para la animación genérica de `_updateHero()` (lo que no tiene, queda vacío).
   ⚠️ `this.parts` son las partículas; las del héroe son `this.heroParts`.
+- Dificultad (`DIFFICULTIES`: Fácil ×0.5, Normal ×1, Difícil ×2) multiplica la
+  velocidad en `_speedAt()`; guardada en `dash3d_diff`, récord separado por
+  dificultad (`dash3d_best` = Normal, `dash3d_best_facil`, `dash3d_best_dificil`).
+  Cambiarla en la pantalla de inicio llama a `reset()` para regenerar la pista.
 
 - Three.js sale de `node_modules/three` (servido en `/three`) vía el `importmap` de
   `index.html` (`three`, `three/addons/`). El juego se importa **bajo demanda**

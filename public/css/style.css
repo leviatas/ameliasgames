@@ -1413,6 +1413,8 @@ body {
 #dash3d-msg .d3-char.on { background: #fff; border-color: #9A6BFF; transform: scale(1.08);
   box-shadow: 0 6px 16px rgba(154,107,255,0.35); }
 #dash3d-msg .d3-char:active { transform: scale(0.95); }
+#dash3d-msg .d3-diffs .d3-char { flex-direction: row; gap: 5px; min-width: 0; padding: 5px 10px; }
+#dash3d-msg .d3-diffs .d3-char span { font-size: 1.15rem; }
 .dash3d-btn {
   position: absolute; bottom: 20px; width: 76px; height: 76px; border-radius: 50%;
   font-size: 1.8rem; color: #fff; cursor: pointer; user-select: none;
