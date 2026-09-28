@@ -127,6 +127,7 @@ export class Dash3D {
     c.id = 'dash3d-canvas';
     document.body.appendChild(c);
     this.el = c;
+    c.addEventListener('webglcontextlost', ev => { ev.preventDefault(); this.showError(new Error('la placa de video cortó el 3D (tocá ← Menú y volvé a entrar)')); });
     const touch = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
     this.touch = touch;
     const r = new THREE.WebGLRenderer({ canvas: c, antialias: true, powerPreference: 'high-performance' });
@@ -1071,6 +1072,28 @@ export class Dash3D {
     if (!e) return;
     e.textContent = text;
     e.classList.remove('show'); void e.offsetWidth; e.classList.add('show');
+  }
+
+  // Compila los shaders antes de mostrar el juego (en celulares puede tardar
+  // unos segundos: mejor con el cartel de "Preparando…" que con la pantalla congelada)
+  async warmup() {
+    this.update(0);
+    try {
+      if (this.renderer.compileAsync) {
+        await Promise.race([this.renderer.compileAsync(this.scene, this.camera), new Promise(r => setTimeout(r, 8000))]);
+      }
+    } catch (e) { /* si falla, se compila en el primer frame */ }
+    this.render();
+    const gl = this.renderer.getContext();
+    if (gl.isContextLost && gl.isContextLost()) throw new Error('la placa de video cortó el 3D (contexto WebGL perdido)');
+  }
+  showReady() { this._msg(this.state === 'ready' ? 'ready' : null); }
+  showError(err) {
+    const e = $('dash3d-msg');
+    if (!e) return;
+    e.classList.remove('hidden');
+    e.innerHTML = `<div class="d3-title">Ups 😿</div><div class="d3-sub">El 3D se trabó</div>
+      <div class="d3-help"><small>${String((err && err.message) || err).replace(/</g, '&lt;')}</small></div>`;
   }
 
   // ── Render / calidad ─────────────────────────────────────────────────────
