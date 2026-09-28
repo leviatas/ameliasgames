@@ -971,30 +971,48 @@ export class Dash3D {
   }
 
   // ── Entrada ──────────────────────────────────────────────────────────────
+  // Swipes: ⬅️ ➡️ cambian de carril, ⬆️ salta; un toque corto también salta.
+  // Se pueden encadenar swipes sin levantar el dedo (izq-der-arriba…): tras
+  // cada gesto el ancla sigue al dedo mientras vaya en la misma dirección (un
+  // swipe largo es UN carril) y el próximo gesto cuenta desde donde dobla.
   _initInput() {
-    let sx = 0, sy = 0, st = 0, done = true;
+    let id = null, sx = 0, sy = 0, st = 0, last = null;
+    const th = () => clamp(Math.min(window.innerWidth, window.innerHeight) * 0.06, 22, 44);
+    // Devuelve true si el desplazamiento desde el ancla es un swipe nuevo (y lo ejecuta)
+    const gesture = (x, y) => {
+      const dx = x - sx, dy = y - sy, t = th();
+      const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy < 0 ? 'u' : 'd');
+      if (dir === last) { sx = x; sy = y; return false; }
+      if (Math.abs(dx) > t && (dir === 'r' || dir === 'l')) this.move(dx > 0 ? 1 : -1);
+      else if (-dy > t && dir === 'u') this.jump();
+      else return false;
+      sx = x; sy = y; last = dir;
+      return true;
+    };
     this._pd = e => {
-      sx = e.clientX; sy = e.clientY; st = performance.now(); done = false;
       e.preventDefault();
+      if (id !== null) return;            // un solo dedo manda
+      id = e.pointerId; sx = e.clientX; sy = e.clientY; st = performance.now(); last = null;
     };
     this._pm = e => {
-      if (done) return;
-      const dx = e.clientX - sx, dy = e.clientY - sy;
-      const th = 28;
-      if (Math.abs(dx) > th && Math.abs(dx) > Math.abs(dy)) { done = true; this.move(dx > 0 ? 1 : -1); }
-      else if (dy < -th && Math.abs(dy) > Math.abs(dx)) { done = true; this.jump(); }
+      if (e.pointerId !== id) return;
+      gesture(e.clientX, e.clientY);
     };
     this._pu = e => {
-      if (done) return;
-      done = true;
+      if (e.pointerId !== id) return;
+      id = null;
+      // un "flick" rápido puede llegar sin pointermove intermedios: se evalúa al soltar
+      if (gesture(e.clientX, e.clientY) || last) return;
       if (performance.now() - st < 450) {
         const r = this.el.getBoundingClientRect();
         this.pointer(e.clientX - r.left, e.clientY - r.top);
       }
     };
+    this._pc = e => { if (e.pointerId === id) id = null; };
     this.el.addEventListener('pointerdown', this._pd);
     window.addEventListener('pointermove', this._pm);
     window.addEventListener('pointerup', this._pu);
+    window.addEventListener('pointercancel', this._pc);
   }
 
   // Tap: arranca / salta (la entrada estándar de los mini-juegos)
@@ -1476,7 +1494,7 @@ export class Dash3D {
         <div class="d3-pick d3-diffs">${DIFFICULTIES.map(d => `<button class="d3-char d3-diff${d.id === this.diff.id ? ' on' : ''}"
           data-diff="${d.id}"><span>${d.emoji}</span>${d.name}</button>`).join('')}</div>
         <div class="d3-sub">Tocá para empezar</div>
-        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ tocá para saltar · ⭐ = escudo</div>
+        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ deslizá arriba o tocá para saltar · ⭐ = escudo</div>
         <div class="d3-best">${this.best ? `Récord (${this.diff.name}): ${this.best} m` : ''}</div>`;
       // Elegir dificultad (sin arrancar la carrera)
       for (const b of e.querySelectorAll('.d3-diff')) {
@@ -1578,6 +1596,7 @@ export class Dash3D {
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('pointermove', this._pm);
     window.removeEventListener('pointerup', this._pu);
+    window.removeEventListener('pointercancel', this._pc);
     this.el.removeEventListener('pointerdown', this._pd);
     for (const d of this._disposables) { try { d.dispose(); } catch (e) {} }
     try { this.envTex.dispose(); } catch (e) {}

@@ -113,6 +113,9 @@ frenar spawns (`custSpawnT = 9999`, etc.) para aislar lo que se mide.
   velocidad en `_speedAt()`; guardada en `dash3d_diff`, récord separado por
   dificultad (`dash3d_best` = Normal, `dash3d_best_facil`, `dash3d_best_dificil`).
   Cambiarla en la pantalla de inicio llama a `reset()` para regenerar la pista.
+- Swipes (`_initInput`): ⬅️➡️ carril, ⬆️ salto, toque corto = salto. Se encadenan
+  sin levantar el dedo; seguir en la misma dirección sólo re-ancla (un swipe largo
+  = UN carril). El gesto también se evalúa en `pointerup` (flicks sin pointermove).
 
 - Three.js sale de `node_modules/three` (servido en `/three`) vía el `importmap` de
   `index.html` (`three`, `three/addons/`). El juego se importa **bajo demanda**
