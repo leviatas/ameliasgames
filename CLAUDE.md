@@ -100,7 +100,15 @@ copia del archivo (`node --check` primero). Ojo con el "ruido" de los
 trabajadores automáticos en los tests: apagarlos (`g.workers.x = false`) y
 frenar spawns (`custSpawnT = 9999`, etc.) para aislar lo que se mide.
 
-## Juegos 3D (Three.js) — `Dash3D.js`
+## Juegos 3D (Three.js) — Sky Run (`Dash3D.js`)
+
+- En la UI se llama **Sky Run** (para no confundirlo con el Dash 2D de la nena);
+  el código, ids DOM (`dash3d-*`) y claves de localStorage siguen como `dash3d`.
+- Personajes elegibles en la pantalla de inicio (`CHARACTERS`: nena, Labubu,
+  conejito), guardado en `dash3d_hero`. Cada uno se arma en `_build_<id>(rig, mesh, P)`
+  con formas de Three.js (sin modelos externos) y expone `legs/arms/head/ears/eyes/hair`
+  para la animación genérica de `_updateHero()` (lo que no tiene, queda vacío).
+  ⚠️ `this.parts` son las partículas; las del héroe son `this.heroParts`.
 
 - Three.js sale de `node_modules/three` (servido en `/three`) vía el `importmap` de
   `index.html` (`three`, `three/addons/`). El juego se importa **bajo demanda**

@@ -218,7 +218,7 @@
     <div class="hub-grid">
       <button class="hub-card dash" id="uno-dash">
         <div class="hub-emoji">🏃‍♀️</div>
-        <div class="hub-name">Dash 3D</div>
+        <div class="hub-name">Dash</div>
         <div class="hub-desc">Corré en 3 carriles, saltá y agachate</div>
       </button>
       <button class="hub-card match3" id="uno-match3">
@@ -267,9 +267,9 @@
         <div class="hub-desc">Pintá helados y serví</div>
       </button>
       <button class="hub-card dash3d" id="uno-dash3d">
-        <div class="hub-emoji">🐰</div>
-        <div class="hub-name">Dash 3D</div>
-        <div class="hub-desc">Corré y saltá en un mundo 3D de caramelo</div>
+        <div class="hub-emoji">☁️</div>
+        <div class="hub-name">Sky Run</div>
+        <div class="hub-desc">Corré entre las nubes en 3D: elegí a la nena, Labubu o el conejito</div>
       </button>
     </div>
   </div>
@@ -748,7 +748,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.74.0</div>
+  <div id="app-version">v2.74.1</div>
 
   <!-- Galaga controls -->
   <div id="dash-ui" class="hidden">
@@ -756,7 +756,7 @@
     <button id="dash-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
   </div>
 
-  <!-- Dash 3D (Three.js): el canvas WebGL lo crea Dash3D.js -->
+  <!-- Sky Run (Dash3D.js, Three.js): el canvas WebGL lo crea Dash3D.js -->
   <div id="dash3d-ui" class="hidden">
     <button id="dash3d-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
     <div id="dash3d-hud">
@@ -787,10 +787,58 @@
     </div>
   </div>
 
+  <!-- Guardia de arranque: si la app no arranca, mostrar el motivo y un botón para reparar -->
+  <script>
+    (function () {
+      var shown = false;
+      function box() {
+        var l = document.getElementById('loading');
+        if (!l || l.classList.contains('hidden')) return null;
+        var b = document.getElementById('boot-error');
+        if (!b) {
+          l.style.flexDirection = 'column';
+          var row = document.createElement('div');   // "Cargando..." queda en una sola línea
+          while (l.firstChild) row.appendChild(l.firstChild);
+          l.appendChild(row);
+          l.style.zIndex = '100000';   // por encima del cartel de "girá el celular"
+          b = document.createElement('div');
+          b.id = 'boot-error';
+          b.innerHTML = '<div id="boot-error-text"></div>' +
+            '<button id="boot-fix">🔧 Reparar y recargar</button>';
+          l.appendChild(b);
+          document.getElementById('boot-fix').onclick = window.__bootRepair;
+        }
+        return b;
+      }
+      window.__bootFail = function (msg) {
+        var b = box();
+        if (!b) return;
+        var t = document.getElementById('boot-error-text');
+        t.textContent = (shown ? t.textContent + '\n' : '') + msg;
+        shown = true;
+      };
+      // Borra service worker + cachés (lo guardado para jugar sin internet) y recarga
+      window.__bootRepair = function () {
+        var jobs = [];
+        try { if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); })); } catch (e) {}
+        try { if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })); } catch (e) {}
+        Promise.all(jobs).catch(function () {}).then(function () { location.replace('/?r=' + Date.now()); });
+      };
+      window.addEventListener('error', function (e) {
+        if (e.target && e.target !== window) { if (e.target.tagName === 'SCRIPT') __bootFail('No se pudo descargar: ' + (e.target.src || 'script').split('/').slice(-2).join('/')); return; }
+        __bootFail('Error: ' + (e.message || '?') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason; __bootFail('Error: ' + ((r && r.message) || r));
+      });
+      setTimeout(function () { __bootFail('La app está tardando en arrancar.'); }, 12000);
+      if (!(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap'))) __bootFail('Aviso: el navegador no soporta importmap (actualizalo).');
+    })();
+  </script>
   <script type="importmap">
     { "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }
   </script>
-  <script type="module" src="/js/game.js"></script>
+  <script type="module" src="/js/game.js" onerror="__bootFail('No se pudo descargar el juego (game.js)')"></script>
   <script>
     // Service Worker
     if ('serviceWorker' in navigator) {
