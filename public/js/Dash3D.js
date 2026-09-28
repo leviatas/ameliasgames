@@ -1,5 +1,5 @@
-// ── Dash 3D — runner en 3D real (Three.js / WebGL) ──────────────────────────
-// Un cubito saltarín corre por una pista de caramelo flotando entre las nubes.
+// ── Sky Run (Dash3D.js) — runner en 3D real (Three.js / WebGL) ──────────────────────────
+// La nena, Labubu o el conejito (a elección) corren por una pista de caramelo flotando entre las nubes.
 // ◀ ▶ (o deslizar) cambia de carril, ⬆ / tocar salta. Pasteles y conos se
 // saltan, las gelatinas altas se esquivan. Monedas → billetera global.
 //
@@ -25,6 +25,7 @@ const PAD_V    = 20;               // trampolín: súper salto
 const SPEED0   = 14, SPEED_MAX = 27;
 const THEME_M  = 600;              // metros por escenario
 const HEARTS   = 3;
+const HERO_CY  = 0.8;              // altura del centro de giro del héroe
 const N_DECOR  = 26, DECOR_GAP = 7;
 const DECOR_SPAN = N_DECOR * DECOR_GAP;
 
@@ -41,6 +42,12 @@ const THEMES = [
   { name: '🌿 Menta fresca', skyTop: 0x2fb4e0, skyBot: 0xc4f7e6, sun: 0xffffff, sunI: 2.2,
     hemiSky: 0xdcfff4, hemiGnd: 0x78c8aa, hemiI: 0.85, tileA: 0x4fd0a8, tileB: 0xd4fbec,
     base: 0x2f8a70, rail: 0xffffff, cloud: 0xffffff, night: 0 },
+];
+
+const CHARACTERS = [
+  { id: 'nena',     name: 'Nena',     emoji: '👧' },
+  { id: 'labubu',   name: 'Labubu',   emoji: '💜' },
+  { id: 'conejito', name: 'Conejito', emoji: '🐰' },
 ];
 
 const CANDY = [0xff7eb6, 0xb58cff, 0x6fd6ff, 0xffd84d, 0x7fe0a8, 0xff9f6b];
@@ -267,70 +274,25 @@ export class Dash3D {
   }
 
   _initHero() {
+    // Tres personajes a elegir en la pantalla de inicio. Cada uno se arma en su
+    // propio `rig` (origen en los pies) y expone las partes que se animan:
+    // legs / arms / head / ears / eyes / hair (las que no tiene, vacías).
+    // `pivot` está a la altura del centro del cuerpo: la voltereta y el
+    // aplastar giran ahí.
     const hero = this.hero = new THREE.Group();
     const pivot = this.heroPivot = new THREE.Group();
-    pivot.position.y = 0.5;
+    pivot.position.y = HERO_CY;
     hero.add(pivot);
-    const skin = this.heroMat = this._mat(new THREE.MeshPhysicalMaterial({
-      color: 0xff5fae, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.12,
-      sheen: 0.3, sheenColor: new THREE.Color(0xffffff), envMapIntensity: 0.6,
-    }));
-    const body = new THREE.Mesh(this._geo(new RoundedBoxGeometry(1, 1, 1, 6, 0.26)), skin);
-    body.castShadow = true;
-    pivot.add(body);
-
-    // Orejitas de conejo
-    const earG = this._geo(new THREE.CapsuleGeometry(0.11, 0.36, 8, 16));
-    const innerMat = this._mat(new THREE.MeshStandardMaterial({ color: 0xffd0e6, roughness: 0.6 }));
-    const innerG = this._geo(new THREE.CapsuleGeometry(0.055, 0.26, 6, 12));
-    this.ears = [];
-    for (const s of [-1, 1]) {
-      const ear = new THREE.Group();
-      ear.position.set(0.24 * s, 0.5, 0.05);
-      const e = new THREE.Mesh(earG, skin); e.position.y = 0.26; e.castShadow = true;
-      const inn = new THREE.Mesh(innerG, innerMat); inn.position.set(0, 0.26, -0.07); inn.scale.z = 0.6;
-      ear.add(e, inn);
-      ear.rotation.z = -0.22 * s;
-      pivot.add(ear);
-      this.ears.push(ear);
+    this.chars = {};
+    for (const c of CHARACTERS) {
+      const rig = new THREE.Group();
+      rig.position.y = -HERO_CY;
+      rig.visible = false;
+      pivot.add(rig);
+      const P = { rig, legs: [], arms: [], head: null, ears: [], eyes: [], hair: [] };
+      this['_build_' + c.id](rig, this._mesher(rig), P);
+      this.chars[c.id] = P;
     }
-    // Colita
-    const white = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }));
-    const tail = new THREE.Mesh(this._geo(new THREE.SphereGeometry(0.16, 20, 14)), white);
-    tail.position.set(0, -0.18, 0.52);
-    pivot.add(tail);
-
-    // Carita (mira hacia adelante, -z)
-    const face = this.face = new THREE.Group();
-    face.position.z = -0.5;
-    pivot.add(face);
-    const eyeW = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
-    const eyeB = this._mat(new THREE.MeshStandardMaterial({ color: 0x2a1830, roughness: 0.15 }));
-    const shine = this._mat(new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    const eyeG = this._geo(new THREE.SphereGeometry(0.13, 20, 16));
-    const pupG = this._geo(new THREE.SphereGeometry(0.085, 18, 14));
-    const shG  = this._geo(new THREE.SphereGeometry(0.03, 10, 8));
-    this.eyes = [];
-    for (const s of [-1, 1]) {
-      const eye = new THREE.Group();
-      eye.position.set(0.2 * s, 0.08, 0);
-      const w = new THREE.Mesh(eyeG, eyeW); w.scale.set(1, 1.2, 0.6);
-      const p = new THREE.Mesh(pupG, eyeB); p.position.set(0, -0.01, -0.06); p.scale.set(1, 1.2, 0.55);
-      const h = new THREE.Mesh(shG, shine); h.position.set(0.035, 0.05, -0.11);
-      eye.add(w, p, h);
-      face.add(eye);
-      this.eyes.push(eye);
-    }
-    const blush = this._mat(new THREE.MeshBasicMaterial({ color: 0xff5f9e, transparent: true, opacity: 0.45 }));
-    const blG = this._geo(new THREE.CircleGeometry(0.075, 20));
-    for (const s of [-1, 1]) {
-      const b = new THREE.Mesh(blG, blush);
-      b.position.set(0.34 * s, -0.1, -0.012); b.rotation.y = Math.PI; b.scale.y = 0.65;
-      face.add(b);
-    }
-    const mouth = new THREE.Mesh(this._geo(new THREE.TorusGeometry(0.065, 0.017, 8, 20, Math.PI)), eyeB);
-    mouth.position.set(0, -0.12, -0.01); mouth.rotation.set(0, Math.PI, Math.PI);
-    face.add(mouth);
 
     // Burbuja escudo (iridiscente)
     this.shieldMesh = new THREE.Mesh(this._geo(new THREE.SphereGeometry(0.98, 32, 24)), this._mat(new THREE.MeshPhysicalMaterial({
@@ -341,6 +303,407 @@ export class Dash3D {
     pivot.add(this.shieldMesh);
 
     this.scene.add(hero);
+    let id = null;
+    try { id = localStorage.getItem('dash3d_hero'); } catch (e) { /* sin storage */ }
+    this.setHero(this.chars[id] ? id : CHARACTERS[0].id);
+  }
+
+  setHero(id) {
+    if (!this.chars[id]) return;
+    this.heroId = id;
+    for (const k in this.chars) this.chars[k].rig.visible = k === id;
+    this.heroParts = this.chars[id];
+    try { localStorage.setItem('dash3d_hero', id); } catch (e) { /* sin storage */ }
+  }
+
+  _mesher(rig) {
+    return (g, m, x = 0, y = 0, z = 0, parent = rig, shadow = true) => {
+      const o = new THREE.Mesh(g, m);
+      o.position.set(x, y, z);
+      o.castShadow = shadow;
+      parent.add(o);
+      return o;
+    };
+  }
+
+  // Ojitos brillantes (compartidos por la nena y Labubu): blanco + iris + pupila + brillo
+  _eyes(face, P, { x, y, z, r, iris, scale = 1 }) {
+    const eyeW = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+    const irisM = this._mat(new THREE.MeshStandardMaterial({ color: iris, roughness: 0.2 }));
+    const eyeB = this._mat(new THREE.MeshStandardMaterial({ color: 0x1e1230, roughness: 0.15 }));
+    const shine = this._mat(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const eyeG = this._geo(new THREE.SphereGeometry(r, 22, 16));
+    const irisG = this._geo(new THREE.SphereGeometry(r * 0.76, 20, 14));
+    const pupG = this._geo(new THREE.SphereGeometry(r * 0.42, 14, 10));
+    const shG  = this._geo(new THREE.SphereGeometry(r * 0.21, 10, 8));
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Group();
+      eye.position.set(x * s, y, z);
+      eye.scale.setScalar(scale);
+      const w = new THREE.Mesh(eyeG, eyeW); w.scale.set(0.95, 1.15, 0.5);
+      const ir = new THREE.Mesh(irisG, irisM); ir.position.set(0, -r * 0.08, -r * 0.26); ir.scale.set(1, 1.18, 0.45);
+      const p = new THREE.Mesh(pupG, eyeB); p.position.set(0, -r * 0.06, -r * 0.52); p.scale.set(1, 1.15, 0.4);
+      const h = new THREE.Mesh(shG, shine); h.position.set(r * 0.27 * s, r * 0.4, -r * 0.63);
+      eye.add(w, ir, p, h);
+      face.add(eye);
+      P.eyes.push(eye);
+    }
+  }
+
+  // ── Nena: pelo largo ondulado castaño claro y pijama celeste de lunares ──
+  _build_nena(rig, mesh, P) {
+    const skin = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0xf6d2b6, roughness: 0.55, sheen: 0.4, sheenColor: new THREE.Color(0xffe6dc), envMapIntensity: 0.4,
+    }));
+    const hairM = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0xb98a5e, roughness: 0.55, sheen: 1, sheenRoughness: 0.35,
+      sheenColor: new THREE.Color(0xffe2b8), envMapIntensity: 0.45,
+    }));
+    const hairDark = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0x9a6c45, roughness: 0.6, sheen: 0.8, sheenColor: new THREE.Color(0xf0cfa0), envMapIntensity: 0.4,
+    }));
+    // Tela del pijama: celeste con lunares blancos y grises (textura dibujada)
+    let dots = null;
+    if (typeof document !== 'undefined') {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 128;
+      const g = cv.getContext('2d');
+      g.fillStyle = '#a9d6f2'; g.fillRect(0, 0, 128, 128);
+      const put = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+        const x = i * 32 + (j % 2) * 16 + 8, y = j * 32 + 8;
+        put(x, y, 5, '#ffffff');
+        put(x + 16, y + 16, 3, '#8fb4cc');
+      }
+      dots = new THREE.CanvasTexture(cv);
+      dots.colorSpace = THREE.SRGBColorSpace;
+      dots.wrapS = dots.wrapT = THREE.RepeatWrapping;
+      dots.repeat.set(3, 2);
+      dots.anisotropy = 4;
+      this._disposables.push(dots);
+    }
+    const pj = this._mat(new THREE.MeshPhysicalMaterial({
+      color: dots ? 0xffffff : 0xa9d6f2, map: dots, roughness: 0.85, sheen: 0.6,
+      sheenColor: new THREE.Color(0xeaf6ff), envMapIntensity: 0.35,
+    }));
+
+    // ── Piernas del pantalón + pies descalzos ──
+    const legG = this._geo(new THREE.CapsuleGeometry(0.085, 0.2, 6, 14));
+    const footG = this._geo(new THREE.SphereGeometry(0.07, 16, 10));
+    for (const s of [-1, 1]) {
+      const hip = new THREE.Group();
+      hip.position.set(0.1 * s, 0.4, 0);
+      rig.add(hip);
+      mesh(legG, pj, 0, -0.15, 0, hip);
+      const f = mesh(footG, skin, 0, -0.35, -0.03, hip);
+      f.scale.set(0.9, 0.6, 1.5);
+      P.legs.push(hip);
+    }
+    // ── Remera del pijama (torno, un poquito acampanada) ──
+    const shirt = [
+      [0.001, 0.36], [0.22, 0.36], [0.25, 0.4], [0.235, 0.5], [0.2, 0.66],
+      [0.19, 0.76], [0.15, 0.84], [0.08, 0.88], [0.001, 0.885],
+    ].map(([x, y]) => new THREE.Vector2(x, y));
+    mesh(this._geo(new THREE.LatheGeometry(shirt, 40)), pj);
+    mesh(this._geo(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 16)), skin, 0, 0.9, 0);   // cuello
+    // ── Brazos con mangas largas y manitos ──
+    const armG = this._geo(new THREE.CapsuleGeometry(0.065, 0.22, 6, 14));
+    const handG = this._geo(new THREE.SphereGeometry(0.065, 16, 12));
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Group();
+      sh.position.set(0.19 * s, 0.8, 0);
+      sh.rotation.z = 0.25 * s;
+      rig.add(sh);
+      mesh(armG, pj, 0, -0.15, 0, sh);
+      mesh(handG, skin, 0, -0.32, 0, sh);
+      P.arms.push(sh);
+    }
+
+    // ── Cabeza ──
+    const head = P.head = new THREE.Group();
+    head.position.y = 1.2;
+    rig.add(head);
+    const skull = mesh(this._geo(new THREE.SphereGeometry(0.36, 40, 30)), skin, 0, 0, 0, head);
+    skull.scale.set(1, 0.98, 0.95);
+    // orejitas
+    const earG = this._geo(new THREE.SphereGeometry(0.06, 14, 10));
+    for (const s of [-1, 1]) { const e = mesh(earG, skin, 0.35 * s, -0.03, 0.02, head); e.scale.set(0.5, 1, 0.8); }
+    // casquete de pelo (cubre arriba, costados y nuca, deja la cara libre)
+    const cap = mesh(this._geo(new THREE.SphereGeometry(0.39, 40, 28, 0, Math.PI * 2, 0, Math.PI * 0.62)), hairM, 0, 0.02, 0.03, head);
+    cap.rotation.x = 0.55;
+    cap.scale.set(1.02, 1, 1.02);
+    // flequillo: mechones redondeados sobre la frente
+    const bangG = this._geo(new THREE.SphereGeometry(0.12, 18, 12));
+    for (const [x, y, rz] of [[-0.2, 0.2, 0.5], [-0.07, 0.25, 0.2], [0.07, 0.25, -0.2], [0.2, 0.2, -0.5]]) {
+      const b = mesh(bangG, hairM, x, y, -0.26, head, false);
+      b.scale.set(1, 0.62, 0.55); b.rotation.z = rz;
+    }
+    // Melena larga ondulada: mechones que caen por la espalda hasta la cintura
+    // y se mecen al correr (cada uno es un grupo que rota desde la cabeza)
+    const lockG = this._geo(new THREE.CapsuleGeometry(0.075, 0.5, 6, 12));
+    const curlG = this._geo(new THREE.SphereGeometry(0.095, 14, 10));
+    const N_L = 9;
+    for (let i = 0; i < N_L; i++) {
+      const t = i / (N_L - 1), a = (t - 0.5) * 2.5;           // abanico de -72° a +72° por atrás
+      const lock = new THREE.Group();
+      lock.position.set(Math.sin(a) * 0.3, 0.05, Math.cos(a) * 0.26);
+      lock.rotation.set(-0.1 - Math.abs(a) * 0.05, 0, Math.sin(a) * 0.2);   // un poco hacia atrás y afuera
+      head.add(lock);
+      const m = i % 2 ? hairDark : hairM;
+      const len = 0.9 - Math.abs(a) * 0.12;
+      const seg = mesh(lockG, m, 0, -0.32, 0, lock); seg.scale.y = len / 0.65;
+      // ondas: bultitos alternados a lo largo del mechón
+      for (let k = 0; k < 3; k++) {
+        const cu = mesh(curlG, m, (k % 2 ? 1 : -1) * 0.03, -0.16 - k * 0.2 * len / 0.65, 0.02, lock, false);
+        cu.scale.set(0.8, 1.1, 0.75);
+      }
+      mesh(curlG, m, 0, -0.08 - len * 0.72, 0.02, lock, false).scale.set(0.85, 0.9, 0.8);
+      lock.userData.base = lock.rotation.x;
+      lock.userData.phase = i * 0.7;
+      P.hair.push(lock);
+    }
+    // Carita
+    const face = new THREE.Group();
+    face.position.z = -0.3;
+    head.add(face);
+    this._eyes(face, P, { x: 0.13, y: 0.0, z: -0.02, r: 0.085, iris: 0x6b4128 });
+    const browG = this._geo(new THREE.CapsuleGeometry(0.008, 0.05, 4, 8));
+    const brow = this._mat(new THREE.MeshStandardMaterial({ color: 0x8a5a38, roughness: 0.6 }));
+    for (const s of [-1, 1]) {
+      const b = mesh(browG, brow, 0.13 * s, 0.11, -0.035, face, false);
+      b.rotation.z = Math.PI / 2 + 0.15 * s;
+    }
+    mesh(this._geo(new THREE.SphereGeometry(0.018, 10, 8)), skin, 0, -0.07, -0.058, face, false);
+    const blush = this._mat(new THREE.MeshBasicMaterial({ color: 0xff8fa8, transparent: true, opacity: 0.45, depthWrite: false }));
+    const blG = this._geo(new THREE.CircleGeometry(0.05, 20));
+    for (const s of [-1, 1]) {
+      const b = mesh(blG, blush, 0.2 * s, -0.1, -0.005, face, false);
+      b.rotation.set(0, Math.PI - 0.6 * s, 0); b.scale.y = 0.6;
+    }
+    const lips = this._mat(new THREE.MeshStandardMaterial({ color: 0xd9587a, roughness: 0.4 }));
+    const mouth = mesh(this._geo(new THREE.TorusGeometry(0.045, 0.012, 8, 20, Math.PI)), lips, 0, -0.14, -0.035, face, false);
+    mouth.rotation.set(0.25, Math.PI, Math.PI);
+  }
+
+  // ── Labubu (el del runner 2D "Corre Labubu corre") ──
+  // Capucha violeta de peluche con orejas de gato, carita color piel, ojos
+  // grandes, sonrisa de dientes en zigzag y trajecito de volados.
+  _build_labubu(rig, mesh, P) {
+    // Peluche: sheen da el brillo aterciopelado en los bordes
+    const fur = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0x6a2fd0, roughness: 0.8, sheen: 0.7, sheenRoughness: 0.5,
+      sheenColor: new THREE.Color(0xb890ff), envMapIntensity: 0.35,
+    }));
+    const furLight = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0x9a6ae6, roughness: 0.78, sheen: 0.6, sheenColor: new THREE.Color(0xd8c0ff), envMapIntensity: 0.35,
+    }));
+    const furDark = this._mat(new THREE.MeshStandardMaterial({ color: 0x3e1a82, roughness: 0.85 }));
+    const skin = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0xf3cfb0, roughness: 0.55, sheen: 0.4, sheenColor: new THREE.Color(0xffe8e0), envMapIntensity: 0.4,
+    }));
+
+    // ── Cuerpo: vestidito de tres volados (torno + ondas) ──
+    const prof = [
+      [0.001, 0.3], [0.33, 0.3], [0.37, 0.34], [0.33, 0.4], [0.25, 0.46],
+      [0.31, 0.49], [0.3, 0.55], [0.23, 0.62], [0.27, 0.65], [0.26, 0.7],
+      [0.2, 0.8], [0.15, 0.9], [0.001, 0.93],
+    ].map(([x, y]) => new THREE.Vector2(x, y));
+    const bodyG = new THREE.LatheGeometry(prof, 48);
+    const pos = bodyG.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const r = Math.hypot(x, z);
+      if (r < 0.01) continue;
+      const k = 1 + Math.max(0, r - 0.22) * 0.55 * Math.sin(Math.atan2(z, x) * 9 + y * 20);
+      pos.setX(i, x * k); pos.setZ(i, z * k);
+    }
+    bodyG.computeVertexNormals();
+    mesh(this._geo(bodyG), fur);
+
+    // ── Piernas y pies (se balancean al correr) ──
+    const legG = this._geo(new THREE.CapsuleGeometry(0.085, 0.14, 6, 14));
+    const footG = this._geo(new THREE.SphereGeometry(0.1, 18, 12));
+    P.legs = [];
+    for (const s of [-1, 1]) {
+      const hip = new THREE.Group();
+      hip.position.set(0.13 * s, 0.36, 0);
+      rig.add(hip);
+      mesh(legG, fur, 0, -0.13, 0, hip);
+      const f = mesh(footG, furLight, 0, -0.29, -0.04, hip);
+      f.scale.set(1, 0.7, 1.45);
+      P.legs.push(hip);
+    }
+    // ── Bracitos con puños ──
+    const armG = this._geo(new THREE.CapsuleGeometry(0.075, 0.2, 6, 14));
+    const fistG = this._geo(new THREE.SphereGeometry(0.095, 18, 14));
+    P.arms = [];
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Group();
+      sh.position.set(0.21 * s, 0.8, 0);
+      sh.rotation.z = 0.35 * s;
+      rig.add(sh);
+      mesh(armG, fur, 0, -0.15, 0, sh);
+      mesh(fistG, furLight, 0, -0.3, 0, sh);
+      P.arms.push(sh);
+    }
+
+    // ── Cabeza: capucha + orejas de gato ──
+    const head = P.head = new THREE.Group();
+    head.position.y = 1.2;
+    rig.add(head);
+    const hood = mesh(this._geo(new THREE.SphereGeometry(0.45, 40, 30)), fur, 0, 0, 0, head);
+    hood.scale.set(1.02, 0.94, 0.95);
+    // Oreja: cono de torno con la punta curvita, adentro violeta oscuro mirando al frente
+    const earProf = [[0.001, 0.44], [0.035, 0.41], [0.08, 0.32], [0.13, 0.17], [0.165, 0.05], [0.17, 0]]
+      .map(([x, y]) => new THREE.Vector2(x, y));
+    const earG = this._geo(new THREE.LatheGeometry(earProf, 32));
+    const innerG = this._geo(new THREE.LatheGeometry(earProf.map(v => new THREE.Vector2(v.x * 0.62, v.y * 0.8)), 16));
+    P.ears = [];
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Group();
+      ear.position.set(0.25 * s, 0.24, 0.02);
+      ear.rotation.z = -0.42 * s;
+      head.add(ear);
+      const e = mesh(earG, fur, 0, 0, 0, ear);
+      e.scale.z = 0.7;
+      const inn = mesh(innerG, furDark, 0, 0.04, -0.055, ear, false);
+      inn.scale.z = 0.35;
+      P.ears.push(ear);
+    }
+
+    // ── Carita (mira hacia adelante, -z) ──
+    const face = P.face = new THREE.Group();
+    face.position.z = -0.3;
+    head.add(face);
+    const faceM = mesh(this._geo(new THREE.SphereGeometry(0.31, 36, 24)), skin, 0, -0.03, 0, face, false);
+    faceM.scale.set(1.05, 0.9, 0.5);
+    // borde de la capucha alrededor de la cara
+    const rim = mesh(this._geo(new THREE.TorusGeometry(0.315, 0.055, 12, 40)), fur, 0, -0.03, -0.035, face);
+    rim.scale.set(1.05, 0.9, 1);
+
+    const eyeW = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+    const iris = this._mat(new THREE.MeshStandardMaterial({ color: 0x6b54c8, roughness: 0.2 }));
+    const eyeB = this._mat(new THREE.MeshStandardMaterial({ color: 0x1e1230, roughness: 0.15 }));
+    const shine = this._mat(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const eyeG = this._geo(new THREE.SphereGeometry(0.095, 22, 16));
+    const irisG = this._geo(new THREE.SphereGeometry(0.072, 20, 14));
+    const pupG = this._geo(new THREE.SphereGeometry(0.04, 14, 10));
+    const shG  = this._geo(new THREE.SphereGeometry(0.02, 10, 8));
+    P.eyes = [];
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Group();
+      eye.position.set(0.125 * s, 0.04, -0.135);
+      const w = new THREE.Mesh(eyeG, eyeW); w.scale.set(0.95, 1.15, 0.5);
+      const ir = new THREE.Mesh(irisG, iris); ir.position.set(0, -0.008, -0.025); ir.scale.set(1, 1.18, 0.45);
+      const p = new THREE.Mesh(pupG, eyeB); p.position.set(0, -0.006, -0.05); p.scale.set(1, 1.15, 0.4);
+      const h = new THREE.Mesh(shG, shine); h.position.set(0.026 * s, 0.038, -0.06);
+      eye.add(w, ir, p, h);
+      face.add(eye);
+      P.eyes.push(eye);
+    }
+    // cejitas
+    const browG = this._geo(new THREE.CapsuleGeometry(0.009, 0.05, 4, 8));
+    const brow = this._mat(new THREE.MeshStandardMaterial({ color: 0x6b3e2e, roughness: 0.6 }));
+    for (const s of [-1, 1]) {
+      const b = mesh(browG, brow, 0.13 * s, 0.165, -0.105, face, false);
+      b.rotation.z = Math.PI / 2 + 0.25 * s;
+    }
+    // naricita
+    mesh(this._geo(new THREE.SphereGeometry(0.018, 10, 8)), skin, 0, -0.035, -0.158, face, false);
+    // cachetes
+    const blush = this._mat(new THREE.MeshBasicMaterial({ color: 0xff8fa8, transparent: true, opacity: 0.4, depthWrite: false }));
+    const blG = this._geo(new THREE.CircleGeometry(0.045, 20));
+    for (const s of [-1, 1]) {
+      const b = mesh(blG, blush, 0.21 * s, -0.07, -0.118, face, false);
+      b.rotation.set(0, Math.PI - 0.55 * s, 0); b.scale.y = 0.6;
+    }
+    // Sonrisa con dientes en zigzag: medialuna oscura + dos filas de triangulitos
+    const MW = 0.14, N_T = 8;
+    const top = x => -0.012 + 0.03 * (x / MW) ** 2;                         // comisuras arriba
+    const bot = x => top(x) - 0.085 * Math.sqrt(Math.max(0, 1 - (x / MW) ** 2));
+    const smile = new THREE.Shape();
+    smile.moveTo(-MW, top(-MW));
+    for (let i = 1; i <= 20; i++) { const x = -MW + (2 * MW * i) / 20; smile.lineTo(x, top(x)); }
+    for (let i = 19; i >= 1; i--) { const x = -MW + (2 * MW * i) / 20; smile.lineTo(x, bot(x)); }
+    smile.closePath();
+    const mouthM = mesh(this._geo(new THREE.ShapeGeometry(smile, 1)),
+      this._mat(new THREE.MeshBasicMaterial({ color: 0x3b1c48, side: THREE.DoubleSide })), 0, -0.1, -0.152, face, false);
+    const teeth = [];
+    const span = MW * 0.9, tw = (2 * span) / N_T;
+    for (let i = 0; i < N_T; i++) {
+      const x0 = -span + tw * i, x1 = x0 + tw, xm = (x0 + x1) / 2;
+      const up = new THREE.Shape();                       // fila de arriba (apuntan abajo)
+      up.moveTo(x0, top(x0) + 0.004); up.lineTo(x1, top(x1) + 0.004);
+      up.lineTo(xm, top(xm) - 0.03); up.closePath();
+      teeth.push(up);
+      if (i > 0 && i < N_T - 1) {                          // fila de abajo (apuntan arriba)
+        const lo = new THREE.Shape();
+        lo.moveTo(x0, bot(x0) - 0.004); lo.lineTo(xm, bot(xm) + 0.028); lo.lineTo(x1, bot(x1) - 0.004); lo.closePath();
+        teeth.push(lo);
+      }
+    }
+    const teethM = new THREE.Mesh(this._geo(new THREE.ShapeGeometry(teeth)),
+      this._mat(new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })));
+    teethM.position.z = 0.002;     // hacia afuera (la boca se gira 180°)
+    mouthM.add(teethM);
+    mouthM.rotation.y = Math.PI;   // la forma mira a +z; la cara, a -z
+    mouthM.rotation.x = 0.12;      // acompaña la curva de la cara
+  }
+
+  // ── Conejito: el cubito saltarín original ──
+  _build_conejito(rig, mesh, P) {
+    const skin = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0xff5fae, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.12,
+      sheen: 0.3, sheenColor: new THREE.Color(0xffffff), envMapIntensity: 0.6,
+    }));
+    const box = new THREE.Group();
+    box.position.y = 0.5;
+    rig.add(box);
+    mesh(this._geo(new RoundedBoxGeometry(1, 1, 1, 6, 0.26)), skin, 0, 0, 0, box);
+    // Orejitas de conejo
+    const earG = this._geo(new THREE.CapsuleGeometry(0.11, 0.36, 8, 16));
+    const innerMat = this._mat(new THREE.MeshStandardMaterial({ color: 0xffd0e6, roughness: 0.6 }));
+    const innerG = this._geo(new THREE.CapsuleGeometry(0.055, 0.26, 6, 12));
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Group();
+      ear.position.set(0.24 * s, 0.5, 0.05);
+      mesh(earG, skin, 0, 0.26, 0, ear);
+      const inn = mesh(innerG, innerMat, 0, 0.26, -0.07, ear, false); inn.scale.z = 0.6;
+      ear.rotation.z = -0.22 * s;
+      box.add(ear);
+      P.ears.push(ear);
+    }
+    // Colita
+    const white = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }));
+    mesh(this._geo(new THREE.SphereGeometry(0.16, 20, 14)), white, 0, -0.18, 0.52, box, false);
+    // Carita (mira hacia adelante, -z)
+    const face = new THREE.Group();
+    face.position.z = -0.5;
+    box.add(face);
+    const eyeW = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+    const eyeB = this._mat(new THREE.MeshStandardMaterial({ color: 0x2a1830, roughness: 0.15 }));
+    const shine = this._mat(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const eyeG = this._geo(new THREE.SphereGeometry(0.13, 20, 16));
+    const pupG = this._geo(new THREE.SphereGeometry(0.085, 18, 14));
+    const shG  = this._geo(new THREE.SphereGeometry(0.03, 10, 8));
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Group();
+      eye.position.set(0.2 * s, 0.08, 0);
+      const w = new THREE.Mesh(eyeG, eyeW); w.scale.set(1, 1.2, 0.6);
+      const p = new THREE.Mesh(pupG, eyeB); p.position.set(0, -0.01, -0.06); p.scale.set(1, 1.2, 0.55);
+      const h = new THREE.Mesh(shG, shine); h.position.set(0.035, 0.05, -0.11);
+      eye.add(w, p, h);
+      face.add(eye);
+      P.eyes.push(eye);
+    }
+    const blush = this._mat(new THREE.MeshBasicMaterial({ color: 0xff5f9e, transparent: true, opacity: 0.45 }));
+    const blG = this._geo(new THREE.CircleGeometry(0.075, 20));
+    for (const s of [-1, 1]) {
+      const b = mesh(blG, blush, 0.34 * s, -0.1, -0.012, face, false);
+      b.rotation.y = Math.PI; b.scale.y = 0.65;
+    }
+    const mouth = mesh(this._geo(new THREE.TorusGeometry(0.065, 0.017, 8, 20, Math.PI)), eyeB, 0, -0.12, -0.01, face, false);
+    mouth.rotation.set(0, Math.PI, Math.PI);
   }
 
   _initDecor() {
@@ -855,7 +1218,7 @@ export class Dash3D {
       const t = clamp(this.flip / this.flipDur, 0, 1);
       p.rotation.x = -Math.PI * 2 * smooth(t);
     } else {
-      p.rotation.x = this.state === 'run' ? -0.06 : 0;
+      p.rotation.x = this.state === 'run' ? -0.12 : 0;
     }
     if (this.state !== 'over') p.rotation.z = this.tilt * 0.35;
     // Rebote al correr + aplastar/estirar
@@ -864,20 +1227,49 @@ export class Dash3D {
     const idle = this.state === 'ready' ? Math.abs(Math.sin(this._t * 3.2)) * 0.25 : 0;
     const sq = this.squash;
     p.scale.set(1 + sq * 0.35, 1 - sq * 0.45, 1 + sq * 0.35);
-    p.position.y = 0.5 - sq * 0.22 + bob + idle;
+    p.position.y = HERO_CY - sq * HERO_CY * 0.45 + bob + idle;
+    // Piernas y brazos: trote al correr, bolita en el aire, saludo al esperar
+    const P = this.heroParts;
+    const ph = this._t * 13;
+    const running = this.state === 'run' && this.onGround;
+    for (let i = 0; i < 2; i++) {
+      const s = i ? 1 : -1;
+      let leg, armX, armZ;
+      if (running)            { leg = Math.sin(ph) * 0.85 * s; armX = -Math.sin(ph) * 0.9 * s; armZ = 0.35; }
+      else if (!this.onGround) { leg = 0.9; armX = 2.5; armZ = 0.5; }
+      else if (this.state === 'ready') {
+        leg = 0; armX = i ? 2.7 + Math.sin(this._t * 7) * 0.3 : -0.1; armZ = i ? 0.5 : 0.25;
+      } else                  { leg = 0; armX = 0; armZ = 0.3; }
+      const k = Math.min(1, dt * 18);
+      const L = P.legs[i], A = P.arms[i];
+      if (L) L.rotation.x += (leg - L.rotation.x) * k;
+      if (A) {
+        A.rotation.x += (armX - A.rotation.x) * k;
+        A.rotation.z += (armZ * s - A.rotation.z) * k;
+      }
+    }
+    if (P.head) P.head.rotation.z = running ? Math.sin(ph) * 0.06 : 0;
+    // Pelo: flamea hacia atrás al correr, se levanta en el aire
+    for (const lock of P.hair) {
+      const u = lock.userData;
+      const target = running ? u.base - 0.28 + Math.sin(ph + u.phase) * 0.09
+        : !this.onGround ? u.base - 0.55
+        : u.base + Math.sin(this._t * 2.4 + u.phase) * 0.04;
+      lock.rotation.x += (target - lock.rotation.x) * Math.min(1, dt * 10);
+    }
     // Orejas: se sacuden con el movimiento
-    const flap = this.onGround ? Math.sin(this._t * 13) * 0.12 : -0.5;
-    this.ears[0].rotation.x = this.ears[1].rotation.x = 0.15 + flap;
+    const flap = this.onGround ? Math.sin(ph) * 0.12 : -0.35;
+    for (const e of P.ears) e.rotation.x = 0.1 + flap;
     // Parpadeo
     const blink = (this._t % 3.4) < 0.12 ? 0.1 : 1;
-    this.eyes[0].scale.y = this.eyes[1].scale.y = blink;
+    for (const e of P.eyes) e.scale.y = blink;
     // Invulnerable: parpadea
     h.visible = !(this.invuln > 0 && this.state === 'run' && Math.floor(this.invuln * 12) % 2 === 0);
     // Escudo
     this.shieldMesh.visible = this.shield > 0 && (this.shield > 1.5 || Math.floor(this.shield * 10) % 2 === 0);
     if (this.shieldMesh.visible) {
       const s = 1 + Math.sin(this._t * 6) * 0.04;
-      this.shieldMesh.scale.setScalar(s);
+      this.shieldMesh.scale.set(s, s * 1.08, s);
     }
     // Estela de chispitas
     if (this.state === 'run' && Math.random() < dt * 30) {
@@ -1030,6 +1422,12 @@ export class Dash3D {
     cam.lookAt(look);
     const fov = this._baseFov + (this.speed - SPEED0) * 0.45 * k;
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    const shift = Math.round(this._introShift * (1 - k) * this._vw);
+    if (shift !== this._shiftNow) {
+      this._shiftNow = shift;
+      if (shift) cam.setViewOffset(this._vw, this._vh, shift, 0, this._vw, this._vh);
+      else cam.clearViewOffset();
+    }
     this.sky.position.copy(cam.position);
     this.stars.position.copy(cam.position);
   }
@@ -1053,10 +1451,22 @@ export class Dash3D {
     if (!kind) { e.classList.add('hidden'); return; }
     e.classList.remove('hidden');
     if (kind === 'ready') {
-      e.innerHTML = `<div class="d3-title">Dash 3D</div>
+      e.innerHTML = `<div class="d3-title">Sky Run</div>
+        <div class="d3-pick">${CHARACTERS.map(c => `<button class="d3-char${c.id === this.heroId ? ' on' : ''}"
+          data-hero="${c.id}"><span>${c.emoji}</span>${c.name}</button>`).join('')}</div>
         <div class="d3-sub">Tocá para empezar</div>
-        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril<br>⬆️ tocá para saltar · ⭐ = escudo</div>
+        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ tocá para saltar · ⭐ = escudo</div>
         ${this.best ? `<div class="d3-best">Récord: ${this.best} m</div>` : ''}`;
+      // Elegir personaje (sin arrancar la carrera)
+      for (const b of e.querySelectorAll('.d3-char')) {
+        b.addEventListener('pointerdown', ev => ev.stopPropagation());
+        b.addEventListener('click', ev => {
+          ev.stopPropagation();
+          this.setHero(b.dataset.hero);
+          this.squash = -0.6;            // saltito de presentación
+          for (const o of e.querySelectorAll('.d3-char')) o.classList.toggle('on', o === b);
+        });
+      }
     } else {
       e.innerHTML = `<div class="d3-title">${this.newBest ? '🏆 ¡Nuevo récord!' : '¡Uy, chocaste!'}</div>
         <div class="d3-stats"><span>📏 ${this.finalDist} m</span><span>🪙 ${this.coins}</span></div>
@@ -1107,6 +1517,11 @@ export class Dash3D {
     this._baseFov = w / h < 1 ? 78 : w / h < 1.4 ? 66 : 58;
     this.camera.fov = this._baseFov;
     this.camera.updateProjectionMatrix();
+    // Pantalla ancha y bajita (celular acostado): el cartel de inicio va a la
+    // derecha, así que en la presentación corremos al personaje a la izquierda
+    this._vw = w; this._vh = h;
+    this._introShift = w / h > 1.5 && h < 560 ? 0.22 : 0;
+    this._shiftNow = -1;
   }
 
   // Si el equipo no llega a ~40 fps, bajamos calidad (primero bloom, después resolución)
