@@ -266,6 +266,11 @@
         <div class="hub-name">Heladería Labubu</div>
         <div class="hub-desc">Pintá helados y serví</div>
       </button>
+      <button class="hub-card dash3d" id="uno-dash3d">
+        <div class="hub-emoji">🐰</div>
+        <div class="hub-name">Dash 3D</div>
+        <div class="hub-desc">Corré y saltá en un mundo 3D de caramelo</div>
+      </button>
     </div>
   </div>
 
@@ -743,12 +748,27 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.73.4</div>
+  <div id="app-version">v2.74.0</div>
 
   <!-- Galaga controls -->
   <div id="dash-ui" class="hidden">
     <button id="dash-help" class="game-help-btn" title="Cómo se juega">❓</button>
     <button id="dash-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+  </div>
+
+  <!-- Dash 3D (Three.js): el canvas WebGL lo crea Dash3D.js -->
+  <div id="dash3d-ui" class="hidden">
+    <button id="dash3d-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+    <div id="dash3d-hud">
+      <span id="dash3d-dist">0 m</span>
+      <span id="dash3d-coins">🪙 0</span>
+      <span id="dash3d-hearts">💖💖💖</span>
+    </div>
+    <div id="dash3d-toast"></div>
+    <div id="dash3d-msg" class="hidden"></div>
+    <button id="dash3d-left"  class="dash3d-btn" title="Izquierda">◀</button>
+    <button id="dash3d-right" class="dash3d-btn" title="Derecha">▶</button>
+    <button id="dash3d-jump"  class="dash3d-btn" title="Saltar">⬆</button>
   </div>
 
   <div id="galaga-ui" class="hidden">
@@ -767,6 +787,9 @@
     </div>
   </div>
 
+  <script type="importmap">
+    { "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }
+  </script>
   <script type="module" src="/js/game.js"></script>
   <script>
     // Service Worker
@@ -851,7 +874,7 @@
         'hole_best', 'cocina_best', 'match3_best',
         'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
         'pasteleria_state', 'pizzeria_state', 'panaderia_money', 'panaderia_meta',
-        'vestidor_look', 'dash_best',
+        'vestidor_look', 'dash_best', 'dash3d_best',
       ];
       keys.forEach(k => localStorage.removeItem(k));
       location.reload();
