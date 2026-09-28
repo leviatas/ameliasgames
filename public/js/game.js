@@ -49,7 +49,7 @@ let match3   = null;
 let hole     = null;
 let hole2    = null;
 let galaga   = null;
-let dash3d   = null;   // Dash 3D (Three.js, se carga bajo demanda)
+let dash3d   = null;   // Sky Run (Dash3D.js, Three.js, se carga bajo demanda)
 let dash3dLoading = 0;  // token para cancelar una carga si se sale antes
 let theater  = null;
 let helado   = null;
@@ -600,7 +600,7 @@ function exitGalaga() {
   showHub('uno-submenu');
 }
 
-// ── Dash 3D — runner en 3D real (Three.js se importa recién al entrar) ─────────
+// ── Sky Run (Dash3D.js) — runner en 3D real (Three.js se importa recién al entrar) ─────────
 async function launchDash3D() {
   if (isTouch) forceLandscape();
   document.getElementById('hub-screen').classList.add('hidden');
@@ -610,7 +610,7 @@ async function launchDash3D() {
   ui.classList.remove('hidden');
   const msg = document.getElementById('dash3d-msg');
   msg.classList.remove('hidden');
-  const step = t => { msg.innerHTML = `<div class="d3-title">Dash 3D</div><div class="d3-sub">${t}</div>`; };
+  const step = t => { msg.innerHTML = `<div class="d3-title">Sky Run</div><div class="d3-sub">${t}</div>`; };
   const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what)), ms))]);
   mode = 'dash3d';
@@ -635,7 +635,7 @@ async function launchDash3D() {
     dash3d = game;
     dash3d.showReady();
   } catch (err) {
-    console.error('Dash 3D:', err);
+    console.error('Sky Run:', err);
     if (!alive()) return;
     const why = !window.WebGLRenderingContext ? 'este navegador no tiene WebGL'
       : !(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')) ? 'el navegador es muy viejo (actualizalo)'
@@ -1104,7 +1104,7 @@ function gameLoop(now) {
   if (mode === 'dash3d') {
     if (dash3d) {
       try { dash3d.update(delta); dash3d.render(); }
-      catch (err) { console.error('Dash 3D:', err); dash3d.showError(err); dash3d = null; }
+      catch (err) { console.error('Sky Run:', err); dash3d.showError(err); dash3d = null; }
     }
     return;
   }
@@ -1785,7 +1785,7 @@ window.addEventListener('keyup', e => {
   hole2ApplyKeys();
 });
 
-// ── Dash 3D controls ─────────────────────────────────────────────────────────
+// ── Sky Run (Dash 3D) controls ──────────────────────────────────────────────────────
 const d3Exit = document.getElementById('dash3d-exit');
 if (d3Exit) d3Exit.addEventListener('click', exitDash3D);
 [['dash3d-left', () => dash3d && dash3d.move(-1)], ['dash3d-right', () => dash3d && dash3d.move(1)],

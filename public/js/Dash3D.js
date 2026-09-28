@@ -1,5 +1,5 @@
-// ── Dash 3D — runner en 3D real (Three.js / WebGL) ──────────────────────────
-// Labubu (en 3D) corre por una pista de caramelo flotando entre las nubes.
+// ── Sky Run (Dash3D.js) — runner en 3D real (Three.js / WebGL) ──────────────────────────
+// La nena, Labubu o el conejito (a elección) corren por una pista de caramelo flotando entre las nubes.
 // ◀ ▶ (o deslizar) cambia de carril, ⬆ / tocar salta. Pasteles y conos se
 // saltan, las gelatinas altas se esquivan. Monedas → billetera global.
 //
@@ -42,6 +42,12 @@ const THEMES = [
   { name: '🌿 Menta fresca', skyTop: 0x2fb4e0, skyBot: 0xc4f7e6, sun: 0xffffff, sunI: 2.2,
     hemiSky: 0xdcfff4, hemiGnd: 0x78c8aa, hemiI: 0.85, tileA: 0x4fd0a8, tileB: 0xd4fbec,
     base: 0x2f8a70, rail: 0xffffff, cloud: 0xffffff, night: 0 },
+];
+
+const CHARACTERS = [
+  { id: 'nena',     name: 'Nena',     emoji: '👧' },
+  { id: 'labubu',   name: 'Labubu',   emoji: '💜' },
+  { id: 'conejito', name: 'Conejito', emoji: '🐰' },
 ];
 
 const CANDY = [0xff7eb6, 0xb58cff, 0x6fd6ff, 0xffd84d, 0x7fe0a8, 0xff9f6b];
@@ -268,27 +274,223 @@ export class Dash3D {
   }
 
   _initHero() {
-    // Labubu en 3D (el mismo personaje del runner 2D "Corre Labubu corre"):
-    // capucha violeta de peluche con orejas de gato, carita color piel, ojos
-    // grandes, sonrisa de dientes en zigzag y trajecito de volados.
-    // Todo cuelga de `rig` con el origen en los pies; `pivot` está a la altura
-    // del centro del cuerpo para que la voltereta y el aplastar giren ahí.
+    // Tres personajes a elegir en la pantalla de inicio. Cada uno se arma en su
+    // propio `rig` (origen en los pies) y expone las partes que se animan:
+    // legs / arms / head / ears / eyes / hair (las que no tiene, vacías).
+    // `pivot` está a la altura del centro del cuerpo: la voltereta y el
+    // aplastar giran ahí.
     const hero = this.hero = new THREE.Group();
     const pivot = this.heroPivot = new THREE.Group();
     pivot.position.y = HERO_CY;
     hero.add(pivot);
-    const rig = new THREE.Group();
-    rig.position.y = -HERO_CY;
-    pivot.add(rig);
-    const mesh = (g, m, x = 0, y = 0, z = 0, parent = rig, shadow = true) => {
+    this.chars = {};
+    for (const c of CHARACTERS) {
+      const rig = new THREE.Group();
+      rig.position.y = -HERO_CY;
+      rig.visible = false;
+      pivot.add(rig);
+      const P = { rig, legs: [], arms: [], head: null, ears: [], eyes: [], hair: [] };
+      this['_build_' + c.id](rig, this._mesher(rig), P);
+      this.chars[c.id] = P;
+    }
+
+    // Burbuja escudo (iridiscente)
+    this.shieldMesh = new THREE.Mesh(this._geo(new THREE.SphereGeometry(0.98, 32, 24)), this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0x9fe8ff, transparent: true, opacity: 0.28, roughness: 0.05, iridescence: 1, iridescenceIOR: 1.6,
+      clearcoat: 1, depthWrite: false, emissive: 0x3aa8ff, emissiveIntensity: 0.25,
+    })));
+    this.shieldMesh.visible = false;
+    pivot.add(this.shieldMesh);
+
+    this.scene.add(hero);
+    let id = null;
+    try { id = localStorage.getItem('dash3d_hero'); } catch (e) { /* sin storage */ }
+    this.setHero(this.chars[id] ? id : CHARACTERS[0].id);
+  }
+
+  setHero(id) {
+    if (!this.chars[id]) return;
+    this.heroId = id;
+    for (const k in this.chars) this.chars[k].rig.visible = k === id;
+    this.heroParts = this.chars[id];
+    try { localStorage.setItem('dash3d_hero', id); } catch (e) { /* sin storage */ }
+  }
+
+  _mesher(rig) {
+    return (g, m, x = 0, y = 0, z = 0, parent = rig, shadow = true) => {
       const o = new THREE.Mesh(g, m);
       o.position.set(x, y, z);
       o.castShadow = shadow;
       parent.add(o);
       return o;
     };
+  }
+
+  // Ojitos brillantes (compartidos por la nena y Labubu): blanco + iris + pupila + brillo
+  _eyes(face, P, { x, y, z, r, iris, scale = 1 }) {
+    const eyeW = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+    const irisM = this._mat(new THREE.MeshStandardMaterial({ color: iris, roughness: 0.2 }));
+    const eyeB = this._mat(new THREE.MeshStandardMaterial({ color: 0x1e1230, roughness: 0.15 }));
+    const shine = this._mat(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const eyeG = this._geo(new THREE.SphereGeometry(r, 22, 16));
+    const irisG = this._geo(new THREE.SphereGeometry(r * 0.76, 20, 14));
+    const pupG = this._geo(new THREE.SphereGeometry(r * 0.42, 14, 10));
+    const shG  = this._geo(new THREE.SphereGeometry(r * 0.21, 10, 8));
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Group();
+      eye.position.set(x * s, y, z);
+      eye.scale.setScalar(scale);
+      const w = new THREE.Mesh(eyeG, eyeW); w.scale.set(0.95, 1.15, 0.5);
+      const ir = new THREE.Mesh(irisG, irisM); ir.position.set(0, -r * 0.08, -r * 0.26); ir.scale.set(1, 1.18, 0.45);
+      const p = new THREE.Mesh(pupG, eyeB); p.position.set(0, -r * 0.06, -r * 0.52); p.scale.set(1, 1.15, 0.4);
+      const h = new THREE.Mesh(shG, shine); h.position.set(r * 0.27 * s, r * 0.4, -r * 0.63);
+      eye.add(w, ir, p, h);
+      face.add(eye);
+      P.eyes.push(eye);
+    }
+  }
+
+  // ── Nena: pelo largo ondulado castaño claro y pijama celeste de lunares ──
+  _build_nena(rig, mesh, P) {
+    const skin = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0xf6d2b6, roughness: 0.55, sheen: 0.4, sheenColor: new THREE.Color(0xffe6dc), envMapIntensity: 0.4,
+    }));
+    const hairM = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0xb98a5e, roughness: 0.55, sheen: 1, sheenRoughness: 0.35,
+      sheenColor: new THREE.Color(0xffe2b8), envMapIntensity: 0.45,
+    }));
+    const hairDark = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0x9a6c45, roughness: 0.6, sheen: 0.8, sheenColor: new THREE.Color(0xf0cfa0), envMapIntensity: 0.4,
+    }));
+    // Tela del pijama: celeste con lunares blancos y grises (textura dibujada)
+    let dots = null;
+    if (typeof document !== 'undefined') {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 128;
+      const g = cv.getContext('2d');
+      g.fillStyle = '#a9d6f2'; g.fillRect(0, 0, 128, 128);
+      const put = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+        const x = i * 32 + (j % 2) * 16 + 8, y = j * 32 + 8;
+        put(x, y, 5, '#ffffff');
+        put(x + 16, y + 16, 3, '#8fb4cc');
+      }
+      dots = new THREE.CanvasTexture(cv);
+      dots.colorSpace = THREE.SRGBColorSpace;
+      dots.wrapS = dots.wrapT = THREE.RepeatWrapping;
+      dots.repeat.set(3, 2);
+      dots.anisotropy = 4;
+      this._disposables.push(dots);
+    }
+    const pj = this._mat(new THREE.MeshPhysicalMaterial({
+      color: dots ? 0xffffff : 0xa9d6f2, map: dots, roughness: 0.85, sheen: 0.6,
+      sheenColor: new THREE.Color(0xeaf6ff), envMapIntensity: 0.35,
+    }));
+
+    // ── Piernas del pantalón + pies descalzos ──
+    const legG = this._geo(new THREE.CapsuleGeometry(0.085, 0.2, 6, 14));
+    const footG = this._geo(new THREE.SphereGeometry(0.07, 16, 10));
+    for (const s of [-1, 1]) {
+      const hip = new THREE.Group();
+      hip.position.set(0.1 * s, 0.4, 0);
+      rig.add(hip);
+      mesh(legG, pj, 0, -0.15, 0, hip);
+      const f = mesh(footG, skin, 0, -0.35, -0.03, hip);
+      f.scale.set(0.9, 0.6, 1.5);
+      P.legs.push(hip);
+    }
+    // ── Remera del pijama (torno, un poquito acampanada) ──
+    const shirt = [
+      [0.001, 0.36], [0.22, 0.36], [0.25, 0.4], [0.235, 0.5], [0.2, 0.66],
+      [0.19, 0.76], [0.15, 0.84], [0.08, 0.88], [0.001, 0.885],
+    ].map(([x, y]) => new THREE.Vector2(x, y));
+    mesh(this._geo(new THREE.LatheGeometry(shirt, 40)), pj);
+    mesh(this._geo(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 16)), skin, 0, 0.9, 0);   // cuello
+    // ── Brazos con mangas largas y manitos ──
+    const armG = this._geo(new THREE.CapsuleGeometry(0.065, 0.22, 6, 14));
+    const handG = this._geo(new THREE.SphereGeometry(0.065, 16, 12));
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Group();
+      sh.position.set(0.19 * s, 0.8, 0);
+      sh.rotation.z = 0.25 * s;
+      rig.add(sh);
+      mesh(armG, pj, 0, -0.15, 0, sh);
+      mesh(handG, skin, 0, -0.32, 0, sh);
+      P.arms.push(sh);
+    }
+
+    // ── Cabeza ──
+    const head = P.head = new THREE.Group();
+    head.position.y = 1.2;
+    rig.add(head);
+    const skull = mesh(this._geo(new THREE.SphereGeometry(0.36, 40, 30)), skin, 0, 0, 0, head);
+    skull.scale.set(1, 0.98, 0.95);
+    // orejitas
+    const earG = this._geo(new THREE.SphereGeometry(0.06, 14, 10));
+    for (const s of [-1, 1]) { const e = mesh(earG, skin, 0.35 * s, -0.03, 0.02, head); e.scale.set(0.5, 1, 0.8); }
+    // casquete de pelo (cubre arriba, costados y nuca, deja la cara libre)
+    const cap = mesh(this._geo(new THREE.SphereGeometry(0.39, 40, 28, 0, Math.PI * 2, 0, Math.PI * 0.62)), hairM, 0, 0.02, 0.03, head);
+    cap.rotation.x = 0.55;
+    cap.scale.set(1.02, 1, 1.02);
+    // flequillo: mechones redondeados sobre la frente
+    const bangG = this._geo(new THREE.SphereGeometry(0.12, 18, 12));
+    for (const [x, y, rz] of [[-0.2, 0.2, 0.5], [-0.07, 0.25, 0.2], [0.07, 0.25, -0.2], [0.2, 0.2, -0.5]]) {
+      const b = mesh(bangG, hairM, x, y, -0.26, head, false);
+      b.scale.set(1, 0.62, 0.55); b.rotation.z = rz;
+    }
+    // Melena larga ondulada: mechones que caen por la espalda hasta la cintura
+    // y se mecen al correr (cada uno es un grupo que rota desde la cabeza)
+    const lockG = this._geo(new THREE.CapsuleGeometry(0.075, 0.5, 6, 12));
+    const curlG = this._geo(new THREE.SphereGeometry(0.095, 14, 10));
+    const N_L = 9;
+    for (let i = 0; i < N_L; i++) {
+      const t = i / (N_L - 1), a = (t - 0.5) * 2.5;           // abanico de -72° a +72° por atrás
+      const lock = new THREE.Group();
+      lock.position.set(Math.sin(a) * 0.3, 0.05, Math.cos(a) * 0.26);
+      lock.rotation.set(-0.1 - Math.abs(a) * 0.05, 0, Math.sin(a) * 0.2);   // un poco hacia atrás y afuera
+      head.add(lock);
+      const m = i % 2 ? hairDark : hairM;
+      const len = 0.9 - Math.abs(a) * 0.12;
+      const seg = mesh(lockG, m, 0, -0.32, 0, lock); seg.scale.y = len / 0.65;
+      // ondas: bultitos alternados a lo largo del mechón
+      for (let k = 0; k < 3; k++) {
+        const cu = mesh(curlG, m, (k % 2 ? 1 : -1) * 0.03, -0.16 - k * 0.2 * len / 0.65, 0.02, lock, false);
+        cu.scale.set(0.8, 1.1, 0.75);
+      }
+      mesh(curlG, m, 0, -0.08 - len * 0.72, 0.02, lock, false).scale.set(0.85, 0.9, 0.8);
+      lock.userData.base = lock.rotation.x;
+      lock.userData.phase = i * 0.7;
+      P.hair.push(lock);
+    }
+    // Carita
+    const face = new THREE.Group();
+    face.position.z = -0.3;
+    head.add(face);
+    this._eyes(face, P, { x: 0.13, y: 0.0, z: -0.02, r: 0.085, iris: 0x6b4128 });
+    const browG = this._geo(new THREE.CapsuleGeometry(0.008, 0.05, 4, 8));
+    const brow = this._mat(new THREE.MeshStandardMaterial({ color: 0x8a5a38, roughness: 0.6 }));
+    for (const s of [-1, 1]) {
+      const b = mesh(browG, brow, 0.13 * s, 0.11, -0.035, face, false);
+      b.rotation.z = Math.PI / 2 + 0.15 * s;
+    }
+    mesh(this._geo(new THREE.SphereGeometry(0.018, 10, 8)), skin, 0, -0.07, -0.058, face, false);
+    const blush = this._mat(new THREE.MeshBasicMaterial({ color: 0xff8fa8, transparent: true, opacity: 0.45, depthWrite: false }));
+    const blG = this._geo(new THREE.CircleGeometry(0.05, 20));
+    for (const s of [-1, 1]) {
+      const b = mesh(blG, blush, 0.2 * s, -0.1, -0.005, face, false);
+      b.rotation.set(0, Math.PI - 0.6 * s, 0); b.scale.y = 0.6;
+    }
+    const lips = this._mat(new THREE.MeshStandardMaterial({ color: 0xd9587a, roughness: 0.4 }));
+    const mouth = mesh(this._geo(new THREE.TorusGeometry(0.045, 0.012, 8, 20, Math.PI)), lips, 0, -0.14, -0.035, face, false);
+    mouth.rotation.set(0.25, Math.PI, Math.PI);
+  }
+
+  // ── Labubu (el del runner 2D "Corre Labubu corre") ──
+  // Capucha violeta de peluche con orejas de gato, carita color piel, ojos
+  // grandes, sonrisa de dientes en zigzag y trajecito de volados.
+  _build_labubu(rig, mesh, P) {
     // Peluche: sheen da el brillo aterciopelado en los bordes
-    const fur = this.heroMat = this._mat(new THREE.MeshPhysicalMaterial({
+    const fur = this._mat(new THREE.MeshPhysicalMaterial({
       color: 0x6a2fd0, roughness: 0.8, sheen: 0.7, sheenRoughness: 0.5,
       sheenColor: new THREE.Color(0xb890ff), envMapIntensity: 0.35,
     }));
@@ -321,7 +523,7 @@ export class Dash3D {
     // ── Piernas y pies (se balancean al correr) ──
     const legG = this._geo(new THREE.CapsuleGeometry(0.085, 0.14, 6, 14));
     const footG = this._geo(new THREE.SphereGeometry(0.1, 18, 12));
-    this.legs = [];
+    P.legs = [];
     for (const s of [-1, 1]) {
       const hip = new THREE.Group();
       hip.position.set(0.13 * s, 0.36, 0);
@@ -329,12 +531,12 @@ export class Dash3D {
       mesh(legG, fur, 0, -0.13, 0, hip);
       const f = mesh(footG, furLight, 0, -0.29, -0.04, hip);
       f.scale.set(1, 0.7, 1.45);
-      this.legs.push(hip);
+      P.legs.push(hip);
     }
     // ── Bracitos con puños ──
     const armG = this._geo(new THREE.CapsuleGeometry(0.075, 0.2, 6, 14));
     const fistG = this._geo(new THREE.SphereGeometry(0.095, 18, 14));
-    this.arms = [];
+    P.arms = [];
     for (const s of [-1, 1]) {
       const sh = new THREE.Group();
       sh.position.set(0.21 * s, 0.8, 0);
@@ -342,11 +544,11 @@ export class Dash3D {
       rig.add(sh);
       mesh(armG, fur, 0, -0.15, 0, sh);
       mesh(fistG, furLight, 0, -0.3, 0, sh);
-      this.arms.push(sh);
+      P.arms.push(sh);
     }
 
     // ── Cabeza: capucha + orejas de gato ──
-    const head = this.head = new THREE.Group();
+    const head = P.head = new THREE.Group();
     head.position.y = 1.2;
     rig.add(head);
     const hood = mesh(this._geo(new THREE.SphereGeometry(0.45, 40, 30)), fur, 0, 0, 0, head);
@@ -356,7 +558,7 @@ export class Dash3D {
       .map(([x, y]) => new THREE.Vector2(x, y));
     const earG = this._geo(new THREE.LatheGeometry(earProf, 32));
     const innerG = this._geo(new THREE.LatheGeometry(earProf.map(v => new THREE.Vector2(v.x * 0.62, v.y * 0.8)), 16));
-    this.ears = [];
+    P.ears = [];
     for (const s of [-1, 1]) {
       const ear = new THREE.Group();
       ear.position.set(0.25 * s, 0.24, 0.02);
@@ -366,11 +568,11 @@ export class Dash3D {
       e.scale.z = 0.7;
       const inn = mesh(innerG, furDark, 0, 0.04, -0.055, ear, false);
       inn.scale.z = 0.35;
-      this.ears.push(ear);
+      P.ears.push(ear);
     }
 
     // ── Carita (mira hacia adelante, -z) ──
-    const face = this.face = new THREE.Group();
+    const face = P.face = new THREE.Group();
     face.position.z = -0.3;
     head.add(face);
     const faceM = mesh(this._geo(new THREE.SphereGeometry(0.31, 36, 24)), skin, 0, -0.03, 0, face, false);
@@ -387,7 +589,7 @@ export class Dash3D {
     const irisG = this._geo(new THREE.SphereGeometry(0.072, 20, 14));
     const pupG = this._geo(new THREE.SphereGeometry(0.04, 14, 10));
     const shG  = this._geo(new THREE.SphereGeometry(0.02, 10, 8));
-    this.eyes = [];
+    P.eyes = [];
     for (const s of [-1, 1]) {
       const eye = new THREE.Group();
       eye.position.set(0.125 * s, 0.04, -0.135);
@@ -397,7 +599,7 @@ export class Dash3D {
       const h = new THREE.Mesh(shG, shine); h.position.set(0.026 * s, 0.038, -0.06);
       eye.add(w, ir, p, h);
       face.add(eye);
-      this.eyes.push(eye);
+      P.eyes.push(eye);
     }
     // cejitas
     const browG = this._geo(new THREE.CapsuleGeometry(0.009, 0.05, 4, 8));
@@ -446,16 +648,62 @@ export class Dash3D {
     mouthM.add(teethM);
     mouthM.rotation.y = Math.PI;   // la forma mira a +z; la cara, a -z
     mouthM.rotation.x = 0.12;      // acompaña la curva de la cara
+  }
 
-    // Burbuja escudo (iridiscente)
-    this.shieldMesh = new THREE.Mesh(this._geo(new THREE.SphereGeometry(0.98, 32, 24)), this._mat(new THREE.MeshPhysicalMaterial({
-      color: 0x9fe8ff, transparent: true, opacity: 0.28, roughness: 0.05, iridescence: 1, iridescenceIOR: 1.6,
-      clearcoat: 1, depthWrite: false, emissive: 0x3aa8ff, emissiveIntensity: 0.25,
-    })));
-    this.shieldMesh.visible = false;
-    pivot.add(this.shieldMesh);
-
-    this.scene.add(hero);
+  // ── Conejito: el cubito saltarín original ──
+  _build_conejito(rig, mesh, P) {
+    const skin = this._mat(new THREE.MeshPhysicalMaterial({
+      color: 0xff5fae, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.12,
+      sheen: 0.3, sheenColor: new THREE.Color(0xffffff), envMapIntensity: 0.6,
+    }));
+    const box = new THREE.Group();
+    box.position.y = 0.5;
+    rig.add(box);
+    mesh(this._geo(new RoundedBoxGeometry(1, 1, 1, 6, 0.26)), skin, 0, 0, 0, box);
+    // Orejitas de conejo
+    const earG = this._geo(new THREE.CapsuleGeometry(0.11, 0.36, 8, 16));
+    const innerMat = this._mat(new THREE.MeshStandardMaterial({ color: 0xffd0e6, roughness: 0.6 }));
+    const innerG = this._geo(new THREE.CapsuleGeometry(0.055, 0.26, 6, 12));
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Group();
+      ear.position.set(0.24 * s, 0.5, 0.05);
+      mesh(earG, skin, 0, 0.26, 0, ear);
+      const inn = mesh(innerG, innerMat, 0, 0.26, -0.07, ear, false); inn.scale.z = 0.6;
+      ear.rotation.z = -0.22 * s;
+      box.add(ear);
+      P.ears.push(ear);
+    }
+    // Colita
+    const white = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }));
+    mesh(this._geo(new THREE.SphereGeometry(0.16, 20, 14)), white, 0, -0.18, 0.52, box, false);
+    // Carita (mira hacia adelante, -z)
+    const face = new THREE.Group();
+    face.position.z = -0.5;
+    box.add(face);
+    const eyeW = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+    const eyeB = this._mat(new THREE.MeshStandardMaterial({ color: 0x2a1830, roughness: 0.15 }));
+    const shine = this._mat(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const eyeG = this._geo(new THREE.SphereGeometry(0.13, 20, 16));
+    const pupG = this._geo(new THREE.SphereGeometry(0.085, 18, 14));
+    const shG  = this._geo(new THREE.SphereGeometry(0.03, 10, 8));
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Group();
+      eye.position.set(0.2 * s, 0.08, 0);
+      const w = new THREE.Mesh(eyeG, eyeW); w.scale.set(1, 1.2, 0.6);
+      const p = new THREE.Mesh(pupG, eyeB); p.position.set(0, -0.01, -0.06); p.scale.set(1, 1.2, 0.55);
+      const h = new THREE.Mesh(shG, shine); h.position.set(0.035, 0.05, -0.11);
+      eye.add(w, p, h);
+      face.add(eye);
+      P.eyes.push(eye);
+    }
+    const blush = this._mat(new THREE.MeshBasicMaterial({ color: 0xff5f9e, transparent: true, opacity: 0.45 }));
+    const blG = this._geo(new THREE.CircleGeometry(0.075, 20));
+    for (const s of [-1, 1]) {
+      const b = mesh(blG, blush, 0.34 * s, -0.1, -0.012, face, false);
+      b.rotation.y = Math.PI; b.scale.y = 0.65;
+    }
+    const mouth = mesh(this._geo(new THREE.TorusGeometry(0.065, 0.017, 8, 20, Math.PI)), eyeB, 0, -0.12, -0.01, face, false);
+    mouth.rotation.set(0, Math.PI, Math.PI);
   }
 
   _initDecor() {
@@ -981,6 +1229,7 @@ export class Dash3D {
     p.scale.set(1 + sq * 0.35, 1 - sq * 0.45, 1 + sq * 0.35);
     p.position.y = HERO_CY - sq * HERO_CY * 0.45 + bob + idle;
     // Piernas y brazos: trote al correr, bolita en el aire, saludo al esperar
+    const P = this.heroParts;
     const ph = this._t * 13;
     const running = this.state === 'run' && this.onGround;
     for (let i = 0; i < 2; i++) {
@@ -992,17 +1241,28 @@ export class Dash3D {
         leg = 0; armX = i ? 2.7 + Math.sin(this._t * 7) * 0.3 : -0.1; armZ = i ? 0.5 : 0.25;
       } else                  { leg = 0; armX = 0; armZ = 0.3; }
       const k = Math.min(1, dt * 18);
-      this.legs[i].rotation.x += (leg - this.legs[i].rotation.x) * k;
-      this.arms[i].rotation.x += (armX - this.arms[i].rotation.x) * k;
-      this.arms[i].rotation.z += (armZ * s - this.arms[i].rotation.z) * k;
+      const L = P.legs[i], A = P.arms[i];
+      if (L) L.rotation.x += (leg - L.rotation.x) * k;
+      if (A) {
+        A.rotation.x += (armX - A.rotation.x) * k;
+        A.rotation.z += (armZ * s - A.rotation.z) * k;
+      }
     }
-    this.head.rotation.z = running ? Math.sin(ph) * 0.06 : 0;
+    if (P.head) P.head.rotation.z = running ? Math.sin(ph) * 0.06 : 0;
+    // Pelo: flamea hacia atrás al correr, se levanta en el aire
+    for (const lock of P.hair) {
+      const u = lock.userData;
+      const target = running ? u.base - 0.28 + Math.sin(ph + u.phase) * 0.09
+        : !this.onGround ? u.base - 0.55
+        : u.base + Math.sin(this._t * 2.4 + u.phase) * 0.04;
+      lock.rotation.x += (target - lock.rotation.x) * Math.min(1, dt * 10);
+    }
     // Orejas: se sacuden con el movimiento
     const flap = this.onGround ? Math.sin(ph) * 0.12 : -0.35;
-    this.ears[0].rotation.x = this.ears[1].rotation.x = 0.1 + flap;
+    for (const e of P.ears) e.rotation.x = 0.1 + flap;
     // Parpadeo
     const blink = (this._t % 3.4) < 0.12 ? 0.1 : 1;
-    this.eyes[0].scale.y = this.eyes[1].scale.y = blink;
+    for (const e of P.eyes) e.scale.y = blink;
     // Invulnerable: parpadea
     h.visible = !(this.invuln > 0 && this.state === 'run' && Math.floor(this.invuln * 12) % 2 === 0);
     // Escudo
@@ -1162,6 +1422,12 @@ export class Dash3D {
     cam.lookAt(look);
     const fov = this._baseFov + (this.speed - SPEED0) * 0.45 * k;
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    const shift = Math.round(this._introShift * (1 - k) * this._vw);
+    if (shift !== this._shiftNow) {
+      this._shiftNow = shift;
+      if (shift) cam.setViewOffset(this._vw, this._vh, shift, 0, this._vw, this._vh);
+      else cam.clearViewOffset();
+    }
     this.sky.position.copy(cam.position);
     this.stars.position.copy(cam.position);
   }
@@ -1185,10 +1451,22 @@ export class Dash3D {
     if (!kind) { e.classList.add('hidden'); return; }
     e.classList.remove('hidden');
     if (kind === 'ready') {
-      e.innerHTML = `<div class="d3-title">Dash 3D</div>
+      e.innerHTML = `<div class="d3-title">Sky Run</div>
+        <div class="d3-pick">${CHARACTERS.map(c => `<button class="d3-char${c.id === this.heroId ? ' on' : ''}"
+          data-hero="${c.id}"><span>${c.emoji}</span>${c.name}</button>`).join('')}</div>
         <div class="d3-sub">Tocá para empezar</div>
-        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril<br>⬆️ tocá para saltar · ⭐ = escudo</div>
+        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ tocá para saltar · ⭐ = escudo</div>
         ${this.best ? `<div class="d3-best">Récord: ${this.best} m</div>` : ''}`;
+      // Elegir personaje (sin arrancar la carrera)
+      for (const b of e.querySelectorAll('.d3-char')) {
+        b.addEventListener('pointerdown', ev => ev.stopPropagation());
+        b.addEventListener('click', ev => {
+          ev.stopPropagation();
+          this.setHero(b.dataset.hero);
+          this.squash = -0.6;            // saltito de presentación
+          for (const o of e.querySelectorAll('.d3-char')) o.classList.toggle('on', o === b);
+        });
+      }
     } else {
       e.innerHTML = `<div class="d3-title">${this.newBest ? '🏆 ¡Nuevo récord!' : '¡Uy, chocaste!'}</div>
         <div class="d3-stats"><span>📏 ${this.finalDist} m</span><span>🪙 ${this.coins}</span></div>
@@ -1239,6 +1517,11 @@ export class Dash3D {
     this._baseFov = w / h < 1 ? 78 : w / h < 1.4 ? 66 : 58;
     this.camera.fov = this._baseFov;
     this.camera.updateProjectionMatrix();
+    // Pantalla ancha y bajita (celular acostado): el cartel de inicio va a la
+    // derecha, así que en la presentación corremos al personaje a la izquierda
+    this._vw = w; this._vh = h;
+    this._introShift = w / h > 1.5 && h < 560 ? 0.22 : 0;
+    this._shiftNow = -1;
   }
 
   // Si el equipo no llega a ~40 fps, bajamos calidad (primero bloom, después resolución)
