@@ -44,6 +44,14 @@ const THEMES = [
     base: 0x2f8a70, rail: 0xffffff, cloud: 0xffffff, night: 0 },
 ];
 
+// Dificultad: multiplica la velocidad de carrera (Normal = la original)
+const DIFFICULTIES = [
+  { id: 'facil',   name: 'Fácil',   emoji: '🐢', mul: 0.5, bestKey: 'dash3d_best_facil' },
+  { id: 'normal',  name: 'Normal',  emoji: '🏃', mul: 1,   bestKey: 'dash3d_best' },
+  { id: 'dificil', name: 'Difícil', emoji: '🚀', mul: 2,   bestKey: 'dash3d_best_dificil' },
+];
+const DIFF_BY_ID = Object.fromEntries(DIFFICULTIES.map(d => [d.id, d]));
+
 const CHARACTERS = [
   { id: 'nena',     name: 'Nena',     emoji: '👧' },
   { id: 'labubu',   name: 'Labubu',   emoji: '💜' },
@@ -104,7 +112,9 @@ function softDotTexture() {
 export class Dash3D {
   constructor(canvas) {
     this.hostCanvas = canvas;
-    this.best = +(localStorage.getItem('dash3d_best') || 0);
+    let diff = null;
+    try { diff = localStorage.getItem('dash3d_diff'); } catch (e) { /* sin storage */ }
+    this.setDifficulty(DIFF_BY_ID[diff] ? diff : 'normal');
     this._disposables = [];
     this._t = 0;
     this._initRenderer();
@@ -306,6 +316,15 @@ export class Dash3D {
     let id = null;
     try { id = localStorage.getItem('dash3d_hero'); } catch (e) { /* sin storage */ }
     this.setHero(this.chars[id] ? id : CHARACTERS[0].id);
+  }
+
+  setDifficulty(id) {
+    const d = DIFF_BY_ID[id];
+    if (!d) return;
+    this.diff = d;
+    this.best = 0;
+    try { this.best = +(localStorage.getItem(d.bestKey) || 0); } catch (e) { /* sin storage */ }
+    try { localStorage.setItem('dash3d_diff', id); } catch (e) { /* sin storage */ }
   }
 
   setHero(id) {
@@ -920,7 +939,7 @@ export class Dash3D {
     this.objs = [];
     this.state = 'ready';
     this.dist = 0;
-    this.speed = SPEED0;
+    this.speed = SPEED0 * this.diff.mul;
     this.lane = 1; this.hx = 0;
     this.hy = 0; this.vy = 0; this.onGround = true;
     this.flip = 0; this.flipDur = 0.7;
@@ -952,30 +971,48 @@ export class Dash3D {
   }
 
   // ── Entrada ──────────────────────────────────────────────────────────────
+  // Swipes: ⬅️ ➡️ cambian de carril, ⬆️ salta; un toque corto también salta.
+  // Se pueden encadenar swipes sin levantar el dedo (izq-der-arriba…): tras
+  // cada gesto el ancla sigue al dedo mientras vaya en la misma dirección (un
+  // swipe largo es UN carril) y el próximo gesto cuenta desde donde dobla.
   _initInput() {
-    let sx = 0, sy = 0, st = 0, done = true;
+    let id = null, sx = 0, sy = 0, st = 0, last = null;
+    const th = () => clamp(Math.min(window.innerWidth, window.innerHeight) * 0.06, 22, 44);
+    // Devuelve true si el desplazamiento desde el ancla es un swipe nuevo (y lo ejecuta)
+    const gesture = (x, y) => {
+      const dx = x - sx, dy = y - sy, t = th();
+      const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy < 0 ? 'u' : 'd');
+      if (dir === last) { sx = x; sy = y; return false; }
+      if (Math.abs(dx) > t && (dir === 'r' || dir === 'l')) this.move(dx > 0 ? 1 : -1);
+      else if (-dy > t && dir === 'u') this.jump();
+      else return false;
+      sx = x; sy = y; last = dir;
+      return true;
+    };
     this._pd = e => {
-      sx = e.clientX; sy = e.clientY; st = performance.now(); done = false;
       e.preventDefault();
+      if (id !== null) return;            // un solo dedo manda
+      id = e.pointerId; sx = e.clientX; sy = e.clientY; st = performance.now(); last = null;
     };
     this._pm = e => {
-      if (done) return;
-      const dx = e.clientX - sx, dy = e.clientY - sy;
-      const th = 28;
-      if (Math.abs(dx) > th && Math.abs(dx) > Math.abs(dy)) { done = true; this.move(dx > 0 ? 1 : -1); }
-      else if (dy < -th && Math.abs(dy) > Math.abs(dx)) { done = true; this.jump(); }
+      if (e.pointerId !== id) return;
+      gesture(e.clientX, e.clientY);
     };
     this._pu = e => {
-      if (done) return;
-      done = true;
+      if (e.pointerId !== id) return;
+      id = null;
+      // un "flick" rápido puede llegar sin pointermove intermedios: se evalúa al soltar
+      if (gesture(e.clientX, e.clientY) || last) return;
       if (performance.now() - st < 450) {
         const r = this.el.getBoundingClientRect();
         this.pointer(e.clientX - r.left, e.clientY - r.top);
       }
     };
+    this._pc = e => { if (e.pointerId === id) id = null; };
     this.el.addEventListener('pointerdown', this._pd);
     window.addEventListener('pointermove', this._pm);
     window.addEventListener('pointerup', this._pu);
+    window.addEventListener('pointercancel', this._pc);
   }
 
   // Tap: arranca / salta (la entrada estándar de los mini-juegos)
@@ -1064,7 +1101,7 @@ export class Dash3D {
     }
   }
 
-  _speedAt(d) { return clamp(SPEED0 + d * 0.0065, SPEED0, SPEED_MAX); }
+  _speedAt(d) { return clamp(SPEED0 + d * 0.0065, SPEED0, SPEED_MAX) * this.diff.mul; }
 
   // ── Update ───────────────────────────────────────────────────────────────
   update(dt) {
@@ -1179,7 +1216,7 @@ export class Dash3D {
     this.vy = 9; this.onGround = false;
     const m = this.finalDist = Math.floor(this.dist);
     this.newBest = m > this.best;
-    if (this.newBest) { this.best = m; try { localStorage.setItem('dash3d_best', String(m)); } catch (e) {} }
+    if (this.newBest) { this.best = m; try { localStorage.setItem(this.diff.bestKey, String(m)); } catch (e) {} }
   }
 
   _updateObjs(dt) {
@@ -1420,7 +1457,7 @@ export class Dash3D {
       this.shake = Math.max(0, this.shake - dt * 1.4);
     }
     cam.lookAt(look);
-    const fov = this._baseFov + (this.speed - SPEED0) * 0.45 * k;
+    const fov = this._baseFov + (this.speed / this.diff.mul - SPEED0) * 0.45 * k;
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
     const shift = Math.round(this._introShift * (1 - k) * this._vw);
     if (shift !== this._shiftNow) {
@@ -1454,23 +1491,34 @@ export class Dash3D {
       e.innerHTML = `<div class="d3-title">Sky Run</div>
         <div class="d3-pick">${CHARACTERS.map(c => `<button class="d3-char${c.id === this.heroId ? ' on' : ''}"
           data-hero="${c.id}"><span>${c.emoji}</span>${c.name}</button>`).join('')}</div>
+        <div class="d3-pick d3-diffs">${DIFFICULTIES.map(d => `<button class="d3-char d3-diff${d.id === this.diff.id ? ' on' : ''}"
+          data-diff="${d.id}"><span>${d.emoji}</span>${d.name}</button>`).join('')}</div>
         <div class="d3-sub">Tocá para empezar</div>
-        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ tocá para saltar · ⭐ = escudo</div>
-        ${this.best ? `<div class="d3-best">Récord: ${this.best} m</div>` : ''}`;
+        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ deslizá arriba o tocá para saltar · ⭐ = escudo</div>
+        <div class="d3-best">${this.best ? `Récord (${this.diff.name}): ${this.best} m` : ''}</div>`;
+      // Elegir dificultad (sin arrancar la carrera)
+      for (const b of e.querySelectorAll('.d3-diff')) {
+        b.addEventListener('pointerdown', ev => ev.stopPropagation());
+        b.addEventListener('click', ev => {
+          ev.stopPropagation();
+          this.setDifficulty(b.dataset.diff);
+          this.reset();                  // regenera la pista con la separación de la nueva velocidad
+        });
+      }
       // Elegir personaje (sin arrancar la carrera)
-      for (const b of e.querySelectorAll('.d3-char')) {
+      for (const b of e.querySelectorAll('.d3-char:not(.d3-diff)')) {
         b.addEventListener('pointerdown', ev => ev.stopPropagation());
         b.addEventListener('click', ev => {
           ev.stopPropagation();
           this.setHero(b.dataset.hero);
           this.squash = -0.6;            // saltito de presentación
-          for (const o of e.querySelectorAll('.d3-char')) o.classList.toggle('on', o === b);
+          for (const o of e.querySelectorAll('.d3-char:not(.d3-diff)')) o.classList.toggle('on', o === b);
         });
       }
     } else {
       e.innerHTML = `<div class="d3-title">${this.newBest ? '🏆 ¡Nuevo récord!' : '¡Uy, chocaste!'}</div>
         <div class="d3-stats"><span>📏 ${this.finalDist} m</span><span>🪙 ${this.coins}</span></div>
-        <div class="d3-best">Récord: ${this.best} m</div>
+        <div class="d3-best">Récord (${this.diff.name}): ${this.best} m</div>
         <button id="dash3d-again" class="d3-again">↻ Otra vez</button>`;
       const b = $('dash3d-again');
       if (b) b.addEventListener('click', ev => { ev.stopPropagation(); this.reset(); this.start(); });
@@ -1548,6 +1596,7 @@ export class Dash3D {
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('pointermove', this._pm);
     window.removeEventListener('pointerup', this._pu);
+    window.removeEventListener('pointercancel', this._pc);
     this.el.removeEventListener('pointerdown', this._pd);
     for (const d of this._disposables) { try { d.dispose(); } catch (e) {} }
     try { this.envTex.dispose(); } catch (e) {}
