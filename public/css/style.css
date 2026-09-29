@@ -789,6 +789,12 @@ body {
 /* ── Hub card — Dash 3D ── */
 .hub-card.dash { background: linear-gradient(135deg, #12324F 0%, #1F7A8C 55%, #43C6AC 100%); color: #EAFBFF; }
 .hub-card.dash:hover { border-color: #43C6AC; box-shadow: 0 18px 40px rgba(67,198,172,0.45); }
+/* A #dash-ui le faltaba esta regla: sin ella el div nunca se oculta (display:none) y sus
+   botones (position:absolute, z-index:26) quedan flotando fijos sobre TODO el sitio,
+   robándose el click de "← Menú" de cualquier otro juego (ver nota de .hidden más abajo). */
+#dash-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+#dash-ui.hidden { display: none; }
+#dash-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
 
 .hub-card.mob { background: linear-gradient(135deg, #1A0838 0%, #3C1070 100%); color: #D8C8FF; }
 .hub-card.mob:hover { border-color: #8A50FF; box-shadow: 0 18px 40px rgba(120,60,255,0.45); }
@@ -1434,6 +1440,97 @@ body {
   #dash3d-msg .d3-title { font-size: 1.6rem; }
   #dash3d-msg .d3-sub { font-size: 1.05rem; }
   #dash3d-msg .d3-help { font-size: 0.8rem; margin-top: 6px; }
+}
+
+/* ── Cocina con Viole 3D (CocinaViole3D.js, Three.js) ── */
+.hub-card.cocinaviole3d { background: linear-gradient(135deg, #FFD9A0 0%, #FF9F5A 55%, #FF6FA8 100%); color: #4A2410; }
+.hub-card.cocinaviole3d:hover { border-color: #FF7A3D; box-shadow: 0 18px 40px rgba(255,122,61,0.4); }
+#cocinaviole3d-canvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20;
+  display: block; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#cocinaviole3d-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none;
+  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif; }
+#cocinaviole3d-ui.hidden { display: none; }
+#cocinaviole3d-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#cv3-hud { position: absolute; top: 14px; left: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+#cv3-hud span {
+  padding: 7px 14px; border-radius: 999px; font-weight: 800; font-size: 1.05rem; color: #7A3A10;
+  background: rgba(255,255,255,0.78); backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(120,60,20,0.18);
+}
+#cv3-order {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; max-width: min(440px, 92vw);
+  padding: 10px 16px; border-radius: 16px; background: rgba(255,255,255,0.92);
+  border: 3px solid #E48FB0; box-shadow: 0 8px 22px rgba(120,40,80,0.18);
+}
+#cv3-order:empty { display: none; }
+.cv3-order-emoji { font-size: 2.1rem; line-height: 1; }
+.cv3-order-info { flex: 0 0 auto; }
+.cv3-order-label { font-size: 0.72rem; font-weight: 900; color: #A23A66; letter-spacing: 0.04em; }
+.cv3-order-name { font-size: 1.05rem; font-weight: 800; color: #22304A; white-space: nowrap; }
+.cv3-order-need { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.cv3-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  min-width: 34px; padding: 2px 4px; border-radius: 10px; opacity: 0.45;
+  background: rgba(0,0,0,0.05); transition: opacity 0.2s, background 0.2s;
+}
+.cv3-chip.done { opacity: 1; background: rgba(43,138,62,0.16); }
+.cv3-chip-icon { font-size: 1.3rem; line-height: 1.1; }
+.cv3-chip-state { font-size: 0.55rem; font-weight: 800; color: #6a5a4a; text-transform: uppercase; }
+#cv3-hint {
+  position: absolute; top: 76px; left: 50%; transform: translateX(-50%);
+  max-width: min(420px, 90vw); padding: 6px 16px; border-radius: 999px;
+  background: rgba(255,143,176,0.94); color: #fff; font-weight: 800; font-size: 0.85rem;
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 6px 16px rgba(180,40,90,0.3);
+}
+#cv3-hint:empty { display: none; }
+#cv3-toast {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, calc(-50% - 10px));
+  padding: 12px 26px; border-radius: 999px; font-weight: 900; font-size: 1.3rem; color: #fff;
+  background: linear-gradient(135deg, rgba(43,138,62,0.92), rgba(120,200,90,0.92));
+  box-shadow: 0 10px 26px rgba(30,100,40,0.35); opacity: 0; white-space: nowrap;
+}
+#cv3-toast.show { animation: cv3toast 1.8s ease forwards; }
+@keyframes cv3toast {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% - 4px)) scale(0.9); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  25% { transform: translate(-50%, -50%) scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 8px)); }
+}
+#cv3-reject {
+  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.6);
+  font-size: 2.6rem; font-weight: 900; color: #DC2828; opacity: 0; transition: none;
+}
+#cv3-reject.show { animation: cv3reject 0.4s ease; }
+@keyframes cv3reject {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+#cocinaviole3d-msg {
+  position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%);
+  min-width: min(360px, 86vw); padding: 18px 26px; border-radius: 26px; text-align: center;
+  color: #7A3A10; background: rgba(255,255,255,0.82); backdrop-filter: blur(10px);
+  box-shadow: 0 14px 40px rgba(140,70,20,0.25);
+}
+#cocinaviole3d-msg.hidden { display: none; }
+.cv3-msg-title { font-size: 1.9rem; font-weight: 900;
+  background: linear-gradient(90deg, #FF9F5A, #FF6FA8, #FFC83A); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.cv3-msg-sub { font-size: 1.15rem; font-weight: 800; margin-top: 4px; animation: d3pulse 1.2s ease-in-out infinite; }
+.cv3-msg-help { font-size: 0.9rem; margin-top: 10px; opacity: 0.8; line-height: 1.5; }
+@media (min-aspect-ratio: 3/2) and (max-height: 560px) {
+  #cv3-order { top: 8px; padding: 7px 12px; gap: 6px; }
+  .cv3-order-name { font-size: 0.9rem; }
+  .cv3-chip-icon { font-size: 1.1rem; }
+  #cv3-hint { top: 58px; font-size: 0.75rem; padding: 5px 12px; }
+  #cocinaviole3d-msg { left: auto; right: 3%; top: 50%; bottom: auto; transform: translateY(-50%);
+    min-width: 0; width: min(46vw, 380px); padding: 12px 16px; }
+  .cv3-msg-title { font-size: 1.4rem; }
+  .cv3-msg-sub { font-size: 1rem; }
 }
 
 /* ── Guardia de arranque (error visible en "Cargando...") ── */

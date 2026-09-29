@@ -8,7 +8,7 @@ const CHEF_FRAMES = ['/assets/labubu_0.png', '/assets/labubu_1.png', '/assets/la
 let CHEF_READY = false, _cl = 0;
 CHEF_FRAMES.forEach(im => { im.onload = () => { if (++_cl === CHEF_FRAMES.length) CHEF_READY = true; }; });
 
-const ING = {
+export const ING = {
   tomate:    { raw: '🍅', name: 'Tomate' },
   lechuga:   { raw: '🥬', name: 'Lechuga' },
   zanahoria: { raw: '🥕', name: 'Zanahoria' },
@@ -39,15 +39,15 @@ const ING = {
   lentejas:  { raw: '🫘', boiled: '🫘', name: 'Lentejas' },
 };
 
-const CHOPPABLE        = ['tomate','lechuga','zanahoria','queso','cebolla','manzana','pan','jamon'];
-const BOILABLE         = ['papa','huevo','maiz','calabaza','agua','pasta','arroz','lentejas'];
-const FRYABLE_FROM_RAW = ['carne','chorizo','pollo','huevo','papa','camarones','masa'];
+export const CHOPPABLE        = ['tomate','lechuga','zanahoria','queso','cebolla','manzana','pan','jamon'];
+export const BOILABLE         = ['papa','huevo','maiz','calabaza','agua','pasta','arroz','lentejas'];
+export const FRYABLE_FROM_RAW = ['carne','chorizo','pollo','huevo','papa','camarones','masa'];
 // arroz: MUST be boiled first, THEN can be fried (2-step mechanic)
-const FRYABLE_FROM_BOILED = ['papa', 'arroz'];
-const BLENDABLE        = ['manzana','leche'];
-const BAKEABLE         = ['masa','carne','pollo','papa','zanahoria','calabaza','mezcla'];
+export const FRYABLE_FROM_BOILED = ['papa', 'arroz'];
+export const BLENDABLE        = ['manzana','leche'];
+export const BAKEABLE         = ['masa','carne','pollo','papa','zanahoria','calabaza','mezcla'];
 
-const RECIPES = [
+export const RECIPES = [
   // ── Updated existing ─────────────────────────────────────────────────────
   { name: 'Ensalada',           emoji: '🥗',  need: [['tomate','chopped'], ['lechuga','chopped']] },
   { name: 'Sándwich',           emoji: '🥪',  need: [['pan','raw'], ['tomate','chopped'], ['queso','chopped']] },
@@ -90,7 +90,40 @@ const RECIPES = [
   { name: 'Pastel de vainilla', emoji: '🎂',  need: [['mezcla','baked'], ['dulce','raw'], ['chispitas','raw']] },
 ];
 
-const PROC_DUR = 1.1;
+export const PROC_DUR = 1.1;
+
+// Layout compartido por la versión 2D y la 3D (CocinaViole3D.js): 8 estaciones de
+// proceso + 4 filas de canastas de ingredientes, en coordenadas normalizadas 0..1.
+export function buildStationLayout() {
+  // 8 processing stations — evenly spaced across 0.09–0.91
+  const ST = 0.82 / 7;
+  const nx = i => 0.09 + i * ST;
+  const stations = [
+    { id: 'chop',  kind: 'chop',  icon: '🔪', label: 'Cortar',  nx: nx(0), ny: 0.34 },
+    { id: 'boil',  kind: 'boil',  icon: '🫕', label: 'Hervir',  nx: nx(1), ny: 0.34 },
+    { id: 'fry',   kind: 'fry',   icon: '🥘', label: 'Freír',   nx: nx(2), ny: 0.34 },
+    { id: 'bake',  kind: 'bake',  icon: '🔥', label: 'Hornear', nx: nx(3), ny: 0.34 },
+    { id: 'blend', kind: 'blend', icon: '🥤', label: 'Licuar',  nx: nx(4), ny: 0.34 },
+    { id: 'plate', kind: 'plate', icon: '🍽️', label: 'Plato',   nx: nx(5), ny: 0.34 },
+    { id: 'mix',   kind: 'mix',   icon: '🥣', label: 'Mezclar', nx: nx(6), ny: 0.34 },
+    { id: 'trash', kind: 'trash', icon: '🗑️', label: 'Tirar',   nx: nx(7), ny: 0.34 },
+  ];
+  // Ingredient rows — rows A-C use 6-column grid; row D has 7 items with tighter step
+  const rowA = ['tomate','lechuga','zanahoria','queso','cebolla','manzana'];
+  const rowB = ['pan','masa','carne','chorizo','pollo','huevo'];
+  const rowC = ['papa','maiz','calabaza','agua','leche','dulce'];
+  const rowD = ['pasta','arroz','camarones','jamon','lentejas','harina','chispitas'];
+  const STEP  = 0.82 / 5;        // 6-column grid (rows A-C)
+  const STEPD = 0.82 / 6;        // 7 items in row D (slightly tighter)
+  const place = (list, ny, st) => list.forEach((base, i) => {
+    stations.push({ id: 'b_' + base, kind: 'basket', base, nx: 0.09 + i * (st ?? STEP), ny });
+  });
+  place(rowA, 0.62);
+  place(rowB, 0.72);
+  place(rowC, 0.82);
+  place(rowD, 0.91, STEPD);
+  return stations;
+}
 
 export class Cocina {
   constructor(canvas) {
@@ -124,33 +157,7 @@ export class Cocina {
   }
 
   _buildStations() {
-    // 8 processing stations — evenly spaced across 0.09–0.91
-    const ST = 0.82 / 7;
-    const nx = i => 0.09 + i * ST;
-    this.stations = [
-      { id: 'chop',  kind: 'chop',  icon: '🔪', label: 'Cortar',  nx: nx(0), ny: 0.34 },
-      { id: 'boil',  kind: 'boil',  icon: '🫕', label: 'Hervir',  nx: nx(1), ny: 0.34 },
-      { id: 'fry',   kind: 'fry',   icon: '🥘', label: 'Freír',   nx: nx(2), ny: 0.34 },
-      { id: 'bake',  kind: 'bake',  icon: '🔥', label: 'Hornear', nx: nx(3), ny: 0.34 },
-      { id: 'blend', kind: 'blend', icon: '🥤', label: 'Licuar',  nx: nx(4), ny: 0.34 },
-      { id: 'plate', kind: 'plate', icon: '🍽️', label: 'Plato',   nx: nx(5), ny: 0.34 },
-      { id: 'mix',   kind: 'mix',   icon: '🥣', label: 'Mezclar', nx: nx(6), ny: 0.34 },
-      { id: 'trash', kind: 'trash', icon: '🗑️', label: 'Tirar',   nx: nx(7), ny: 0.34 },
-    ];
-    // Ingredient rows — rows A-C use 6-column grid; row D has 7 items with tighter step
-    const rowA = ['tomate','lechuga','zanahoria','queso','cebolla','manzana'];
-    const rowB = ['pan','masa','carne','chorizo','pollo','huevo'];
-    const rowC = ['papa','maiz','calabaza','agua','leche','dulce'];
-    const rowD = ['pasta','arroz','camarones','jamon','lentejas','harina','chispitas'];
-    const STEP  = 0.82 / 5;        // 6-column grid (rows A-C)
-    const STEPD = 0.82 / 6;        // 7 items in row D (slightly tighter)
-    const place = (list, ny, st) => list.forEach((base, i) => {
-      this.stations.push({ id: 'b_' + base, kind: 'basket', base, nx: 0.09 + i * (st ?? STEP), ny });
-    });
-    place(rowA, 0.62);
-    place(rowB, 0.72);
-    place(rowC, 0.82);
-    place(rowD, 0.91, STEPD);
+    this.stations = buildStationLayout();
   }
 
   _geom() {

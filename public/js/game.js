@@ -62,6 +62,8 @@ let galaga   = null;
 let dash     = null;
 let dash3d   = null;   // Sky Run (Dash3D.js, Three.js, se carga bajo demanda)
 let dash3dLoading = 0;  // token para cancelar una carga si se sale antes
+let cocina3d = null;   // Cocina con Viole 3D (CocinaViole3D.js, Three.js, se carga bajo demanda)
+let cocina3dLoading = 0;  // token para cancelar una carga si se sale antes
 let theater  = null;
 let helado   = null;
 let panaderia = null;
@@ -343,6 +345,8 @@ function showHub(menuId = 'hub-screen') {
   if (dash)   { dash.destroy();   dash = null; }
   if (dash3d) { dash3d.destroy(); dash3d = null; }
   dash3dLoading++;
+  if (cocina3d) { cocina3d.destroy(); cocina3d = null; }
+  cocina3dLoading++;
   hideHoleSubmenu();
   hideUnoSubmenu();
   hideVersusSubmenu();
@@ -391,6 +395,7 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('galaga-ui').classList.add('hidden');
   document.getElementById('dash-ui').classList.add('hidden');
   document.getElementById('dash3d-ui').classList.add('hidden');
+  document.getElementById('cocinaviole3d-ui').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('online-setup').classList.add('hidden');
@@ -728,6 +733,58 @@ async function launchDash3D() {
 }
 function exitDash3D() {
   document.getElementById('dash3d-ui').classList.add('hidden');
+  showHub('uno-submenu');
+}
+
+// ── Cocina con Viole 3D (CocinaViole3D.js) — misma cocina, en 3D real (Three.js) ──────────
+async function launchCocinaViole3D() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  const ui = document.getElementById('cocinaviole3d-ui');
+  ui.classList.remove('hidden');
+  const msg = document.getElementById('cocinaviole3d-msg');
+  msg.classList.remove('hidden');
+  const step = t => { msg.innerHTML = `<div class="cv3-msg-title">Cocina con Viole 3D</div><div class="cv3-msg-sub">${t}</div>`; };
+  const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+  const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what)), ms))]);
+  mode = 'cocinaviole3d';
+  const token = ++cocina3dLoading;
+  const alive = () => token === cocina3dLoading && mode === 'cocinaviole3d';
+  let stage = 'descarga';
+  try {
+    step('Descargando la cocina 3D…');
+    const { CocinaViole3D } = await withTimeout(import('./CocinaViole3D.js'), 45000, 'la descarga tardó demasiado');
+    if (!alive()) return;
+    stage = 'armado';
+    step('Armando la cocina…');
+    await nextFrame();
+    if (!alive()) return;
+    const game = new CocinaViole3D(canvas);
+    if (!alive()) { game.destroy(); return; }
+    stage = 'shaders';
+    step('Preparando luces y colores…');
+    await nextFrame();
+    await game.warmup();
+    if (!alive()) { game.destroy(); return; }
+    cocina3d = game;
+    cocina3d.showReady();
+  } catch (err) {
+    console.error('Cocina con Viole 3D:', err);
+    if (!alive()) return;
+    const why = !window.WebGLRenderingContext ? 'este navegador no tiene WebGL'
+      : !(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')) ? 'el navegador es muy viejo (actualizalo)'
+      : String((err && err.message) || err);
+    msg.innerHTML = `<div class="cv3-msg-title">Ups 😿</div><div class="cv3-msg-sub">No se pudo abrir el 3D</div>
+      <div class="cv3-msg-help">Falló en: ${stage}<br><small>${why.replace(/</g, '&lt;')}</small></div>`;
+    return;
+  }
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitCocinaViole3D() {
+  document.getElementById('cocinaviole3d-ui').classList.add('hidden');
   showHub('uno-submenu');
 }
 
@@ -1213,6 +1270,13 @@ function gameLoop(now) {
     if (dash3d) {
       try { dash3d.update(delta); dash3d.render(); }
       catch (err) { console.error('Sky Run:', err); dash3d.showError(err); dash3d = null; }
+    }
+    return;
+  }
+  if (mode === 'cocinaviole3d') {
+    if (cocina3d) {
+      try { cocina3d.update(delta); cocina3d.render(); }
+      catch (err) { console.error('Cocina con Viole 3D:', err); cocina3d.showError(err); cocina3d = null; }
     }
     return;
   }
@@ -1854,6 +1918,34 @@ window.addEventListener('keydown', e => {
   else if (e.code === 'Enter') { dash3d.start(); e.preventDefault(); }
 });
 
+// ── Cocina con Viole 3D controls ─────────────────────────────────────────────────────
+const cv3Exit = document.getElementById('cocinaviole3d-exit');
+if (cv3Exit) cv3Exit.addEventListener('click', exitCocinaViole3D);
+const cocina3dKeys = { up: false, down: false, left: false, right: false };
+function cocina3dApplyKeys() {
+  if (cocina3d) cocina3d.setDir((cocina3dKeys.right ? 1 : 0) - (cocina3dKeys.left ? 1 : 0), (cocina3dKeys.down ? 1 : 0) - (cocina3dKeys.up ? 1 : 0));
+}
+window.addEventListener('keydown', e => {
+  if (mode !== 'cocinaviole3d') return;
+  if (e.code === 'Escape') { exitCocinaViole3D(); return; }
+  if (!cocina3d) return;
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') cocina3dKeys.up = true;
+  else if (e.code === 'ArrowDown' || e.code === 'KeyS') cocina3dKeys.down = true;
+  else if (e.code === 'ArrowLeft' || e.code === 'KeyA') cocina3dKeys.left = true;
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') cocina3dKeys.right = true;
+  else return;
+  e.preventDefault(); cocina3dApplyKeys();
+});
+window.addEventListener('keyup', e => {
+  if (mode !== 'cocinaviole3d' || !cocina3d) return;
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') cocina3dKeys.up = false;
+  else if (e.code === 'ArrowDown' || e.code === 'KeyS') cocina3dKeys.down = false;
+  else if (e.code === 'ArrowLeft' || e.code === 'KeyA') cocina3dKeys.left = false;
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') cocina3dKeys.right = false;
+  else return;
+  cocina3dApplyKeys();
+});
+
 // ── Galaga controls ───────────────────────────────────────────────────────────
 const gExit = document.getElementById('galaga-exit');
 if (gExit) gExit.addEventListener('click', exitGalaga);
@@ -2485,7 +2577,8 @@ if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); documen
  ['uno-panaderia', launchPanaderia], ['uno-vestidor', () => launchVestidor()],
  ['uno-runner', launchRunner], ['uno-cocina', launchCocina],
  ['uno-hole', showHoleSubmenu], ['uno-helado', launchHelado],
- ['uno-dash', launchDash], ['uno-dash3d', launchDash3D]].forEach(([id, launch]) => {
+ ['uno-dash', launchDash], ['uno-dash3d', launchDash3D],
+ ['uno-cocinaviole3d', launchCocinaViole3D]].forEach(([id, launch]) => {
   const btn = document.getElementById(id);
   if (!btn) return;
   const go = () => { hideUnoSubmenu(); launch(); };

@@ -271,6 +271,11 @@
         <div class="hub-name">Sky Run</div>
         <div class="hub-desc">Corré entre las nubes en 3D: elegí a la nena, Labubu o el conejito</div>
       </button>
+      <button class="hub-card cocinaviole3d" id="uno-cocinaviole3d">
+        <div class="hub-emoji">🍳</div>
+        <div class="hub-name">Cocina con Viole 3D</div>
+        <div class="hub-desc">La misma cocina de Viole, ahora en 3D: caminá y cociná</div>
+      </button>
     </div>
   </div>
 
@@ -748,7 +753,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.75.1</div>
+  <div id="app-version">v2.76.0</div>
 
   <!-- Galaga controls -->
   <div id="dash-ui" class="hidden">
@@ -769,6 +774,20 @@
     <button id="dash3d-left"  class="dash3d-btn" title="Izquierda">◀</button>
     <button id="dash3d-right" class="dash3d-btn" title="Derecha">▶</button>
     <button id="dash3d-jump"  class="dash3d-btn" title="Saltar">⬆</button>
+  </div>
+
+  <!-- Cocina con Viole 3D (CocinaViole3D.js, Three.js): el canvas WebGL lo crea la clase -->
+  <div id="cocinaviole3d-ui" class="hidden">
+    <button id="cocinaviole3d-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+    <div id="cv3-hud">
+      <span id="cv3-score">🍽️ 0</span>
+      <span id="cv3-best">Mejor: 0</span>
+    </div>
+    <div id="cv3-order"></div>
+    <div id="cv3-hint"></div>
+    <div id="cv3-toast"></div>
+    <div id="cv3-reject">✗</div>
+    <div id="cocinaviole3d-msg" class="hidden"></div>
   </div>
 
   <div id="galaga-ui" class="hidden">
@@ -923,6 +942,7 @@
         'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
         'pasteleria_state', 'pizzeria_state', 'panaderia_money', 'panaderia_meta',
         'vestidor_look', 'dash_best', 'dash3d_best', 'dash3d_best_facil', 'dash3d_best_dificil',
+        'cocina3d_best',
       ];
       keys.forEach(k => localStorage.removeItem(k));
       location.reload();
