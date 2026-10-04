@@ -28,6 +28,10 @@ const HEARTS   = 3;
 const HERO_CY  = 0.8;              // altura del centro de giro del héroe
 const N_DECOR  = 26, DECOR_GAP = 7;
 const DECOR_SPAN = N_DECOR * DECOR_GAP;
+const MAGNET_T = 6, ROCKET_T = 4, ROCKET_MUL = 1.6;   // duración de los poderes nuevos (s) y boost del cohete
+const BOSS_DIST = 900;              // metros entre apariciones del jefe
+const BOSS_AHEAD = 13;               // cuántos metros por delante corre (se aleja a la par de la jugadora)
+const BOSS_GEMS = 10;                // gemas para vencerlo
 
 const THEMES = [
   { name: '🍭 Algodón de azúcar', skyTop: 0x4f9dff, skyBot: 0xffc6e2, sun: 0xfff0d8, sunI: 2.2,
@@ -56,6 +60,7 @@ const CHARACTERS = [
   { id: 'nena',     name: 'Nena',     emoji: '👧' },
   { id: 'labubu',   name: 'Labubu',   emoji: '💜' },
   { id: 'conejito', name: 'Conejito', emoji: '🐰' },
+  { id: 'plomero',  name: 'Plomero',  emoji: '🔧' },
 ];
 
 const CANDY = [0xff7eb6, 0xb58cff, 0x6fd6ff, 0xffd84d, 0x7fe0a8, 0xff9f6b];
@@ -115,6 +120,8 @@ export class Dash3D {
     let diff = null;
     try { diff = localStorage.getItem('dash3d_diff'); } catch (e) { /* sin storage */ }
     this.setDifficulty(DIFF_BY_ID[diff] ? diff : 'normal');
+    this.bossWins = 0;
+    try { this.bossWins = +(localStorage.getItem('dash3d_boss_wins') || 0) || 0; } catch (e) { /* sin storage */ }
     this._disposables = [];
     this._t = 0;
     this._initRenderer();
@@ -123,6 +130,7 @@ export class Dash3D {
     this._initHero();
     this._initDecor();
     this._initFx();
+    this._initBoss();
     this._initInput();
     this._onResize = () => this._resize();
     window.addEventListener('resize', this._onResize);
@@ -725,6 +733,62 @@ export class Dash3D {
     mouth.rotation.set(0, Math.PI, Math.PI);
   }
 
+  // ── Plomero: bigote, gorra y overol (arquetipo clásico de plomero de videojuego,
+  // sin nombre ni logo de ninguna marca) ──────────────────────────────────────
+  _build_plomero(rig, mesh, P) {
+    const skin = this._mat(new THREE.MeshPhysicalMaterial({ color: 0xf3c8a0, roughness: 0.55, sheen: 0.3, sheenColor: new THREE.Color(0xffe0c0), envMapIntensity: 0.4 }));
+    const overalls = this._mat(new THREE.MeshPhysicalMaterial({ color: 0x2f5fc0, roughness: 0.7, sheen: 0.3, sheenColor: new THREE.Color(0x6a90e0), envMapIntensity: 0.35 }));
+    const shirt = this._mat(new THREE.MeshPhysicalMaterial({ color: 0xe8342f, roughness: 0.65, sheen: 0.4, sheenColor: new THREE.Color(0xff8a80), envMapIntensity: 0.35 }));
+    const glove = this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
+    const shoe = this._mat(new THREE.MeshStandardMaterial({ color: 0x5a3420, roughness: 0.6 }));
+    const buttonM = this._mat(new THREE.MeshStandardMaterial({ color: 0xffd23f, metalness: 0.5, roughness: 0.3 }));
+    const capM = this._mat(new THREE.MeshPhysicalMaterial({ color: 0xe8342f, roughness: 0.55, sheen: 0.3, sheenColor: new THREE.Color(0xff8a80), envMapIntensity: 0.35 }));
+    const mustacheM = this._mat(new THREE.MeshStandardMaterial({ color: 0x3a2318, roughness: 0.7 }));
+
+    // Piernas del overol + zapatones
+    const legG = this._geo(new THREE.CapsuleGeometry(0.1, 0.22, 6, 14));
+    const shoeG = this._geo(new THREE.SphereGeometry(0.1, 16, 10));
+    for (const s of [-1, 1]) {
+      const hip = new THREE.Group(); hip.position.set(0.12 * s, 0.4, 0); rig.add(hip);
+      mesh(legG, overalls, 0, -0.16, 0, hip);
+      const f = mesh(shoeG, shoe, 0, -0.36, -0.04, hip); f.scale.set(1, 0.65, 1.5);
+      P.legs.push(hip);
+    }
+    // Torso: camisa roja + peto celeste con tiras y botones
+    mesh(this._geo(new THREE.CapsuleGeometry(0.21, 0.3, 8, 14)), shirt, 0, 0.7, 0, rig);
+    mesh(this._geo(new RoundedBoxGeometry(0.3, 0.3, 0.1, 2, 0.06)), overalls, 0, 0.68, -0.18, rig, false);
+    for (const s of [-1, 1]) {
+      const strap = mesh(this._geo(new THREE.BoxGeometry(0.07, 0.3, 0.06)), overalls, 0.13 * s, 0.9, -0.14, rig, false);
+      strap.rotation.x = -0.3;
+    }
+    const buttonG = this._geo(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 10));
+    for (const s of [-1, 1]) mesh(buttonG, buttonM, 0.1 * s, 0.78, -0.23, rig, false).rotation.x = Math.PI / 2;
+    // Brazos con manoplas blancas
+    const armG = this._geo(new THREE.CapsuleGeometry(0.075, 0.22, 6, 14));
+    const handG = this._geo(new THREE.SphereGeometry(0.085, 16, 12));
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Group(); sh.position.set(0.23 * s, 0.82, 0); sh.rotation.z = 0.3 * s; rig.add(sh);
+      mesh(armG, shirt, 0, -0.15, 0, sh);
+      mesh(handG, glove, 0, -0.32, 0, sh);
+      P.arms.push(sh);
+    }
+    // Cabeza + orejas + gorra con visera
+    const head = P.head = new THREE.Group(); head.position.y = 1.22; rig.add(head);
+    const skull = mesh(this._geo(new THREE.SphereGeometry(0.34, 36, 26)), skin, 0, 0, 0, head);
+    skull.scale.set(1, 0.98, 0.95);
+    const earG = this._geo(new THREE.SphereGeometry(0.055, 12, 10));
+    for (const s of [-1, 1]) { const e = mesh(earG, skin, 0.33 * s, -0.04, 0.02, head); e.scale.set(0.5, 1, 0.8); }
+    mesh(this._geo(new THREE.SphereGeometry(0.37, 32, 22, 0, Math.PI * 2, 0, Math.PI * 0.52)), capM, 0, 0.03, 0, head);
+    const brim = mesh(this._geo(new THREE.CylinderGeometry(0.22, 0.22, 0.03, 24, 1, false, 0, Math.PI)), capM, 0, -0.06, -0.2, head, false);
+    brim.rotation.x = -0.1;
+    // Carita + bigote
+    const face = new THREE.Group(); face.position.z = -0.28; head.add(face);
+    this._eyes(face, P, { x: 0.12, y: 0.02, z: -0.01, r: 0.07, iris: 0x4a3020 });
+    mesh(this._geo(new THREE.SphereGeometry(0.06, 14, 10)), skin, 0, -0.08, -0.07, face, false);
+    const mustG = this._geo(new THREE.CapsuleGeometry(0.035, 0.14, 4, 10));
+    for (const s of [-1, 1]) { const m = mesh(mustG, mustacheM, 0.08 * s, -0.14, -0.08, face, false); m.rotation.z = 0.5 * s; }
+  }
+
   _initDecor() {
     const g = {
       cloud: this._geo(cloudGeometry()),
@@ -848,6 +912,18 @@ export class Dash3D {
       coin:   this._geo(coinGeometry()),
       star:   this._geo((() => { const s = new THREE.ExtrudeGeometry(starShape(0.55, 0.24), { depth: 0.14, bevelEnabled: true,
                 bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 4, curveSegments: 4 }); s.center(); return s; })()),
+      // ── Bichito (se mata solo al tocarlo) ──
+      enemyBody: this._geo(new THREE.SphereGeometry(0.4, 20, 16)),
+      enemyFoot: this._geo(new THREE.SphereGeometry(0.14, 12, 10)),
+      // ── Poder: imán (atrae monedas) ──
+      magnetArc: this._geo(new THREE.TorusGeometry(0.28, 0.09, 12, 24, Math.PI)),
+      magnetTip: this._geo(new THREE.CylinderGeometry(0.1, 0.1, 0.14, 16)),
+      // ── Poder: cohete (velocidad + invencibilidad) ──
+      rocketBody: this._geo(new THREE.CapsuleGeometry(0.17, 0.36, 8, 16)),
+      rocketNose: this._geo(new THREE.ConeGeometry(0.17, 0.26, 16)),
+      rocketFin:  this._geo(new THREE.ConeGeometry(0.14, 0.22, 4)),
+      // ── Gema del jefe ──
+      bossGem: this._geo(new THREE.OctahedronGeometry(0.32, 0)),
     };
     this.M = {
       cream:  this._mat(new THREE.MeshPhysicalMaterial({ color: 0xfffaf4, roughness: 0.55, sheen: 1, sheenColor: new THREE.Color(0xffffff) })),
@@ -862,9 +938,71 @@ export class Dash3D {
       padRing:this._mat(new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.9, 0.9) })),
       coin:   this._mat(new THREE.MeshStandardMaterial({ color: 0xffc83d, metalness: 1, roughness: 0.22, emissive: 0xb86b00, emissiveIntensity: 0.35 })),
       star:   this._mat(new THREE.MeshStandardMaterial({ color: 0xfff080, metalness: 0.5, roughness: 0.2, emissive: 0xffb000, emissiveIntensity: 0.9 })),
+      enemyBody:  this._mat(new THREE.MeshPhysicalMaterial({ color: 0x8fe06a, roughness: 0.3, clearcoat: 0.7, emissive: 0x4a9a2a, emissiveIntensity: 0.15 })),
+      enemyFoot:  this._mat(new THREE.MeshStandardMaterial({ color: 0x5fae3a, roughness: 0.5 })),
+      magnetArc:  this._mat(new THREE.MeshStandardMaterial({ color: 0xe0304a, roughness: 0.3, metalness: 0.4 })),
+      magnetTip:  this._mat(new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.3 })),
+      rocketBody: this._mat(new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.25, clearcoat: 0.6 })),
+      rocketNose: this._mat(new THREE.MeshPhysicalMaterial({ color: 0xff4d6a, roughness: 0.25, clearcoat: 0.6 })),
+      rocketFin:  this._mat(new THREE.MeshStandardMaterial({ color: 0x4da6ff, roughness: 0.4 })),
+      bossGem:    this._mat(new THREE.MeshStandardMaterial({ color: 0xffe066, metalness: 0.3, roughness: 0.15, emissive: 0xffaa00, emissiveIntensity: 1.1 })),
     };
-    this.pool = { cake: [], cone: [], jelly: [], pad: [], coin: [], star: [] };
+    this.pool = { cake: [], cone: [], jelly: [], pad: [], coin: [], star: [], enemy: [], magnet: [], rocket: [], bossgem: [] };
     this.objs = [];
+  }
+
+  // ── Jefe: aparece cada BOSS_DIST metros, corre adelante (se aleja a la par) y hay que
+  // juntarle BOSS_GEMS gemas para vencerlo ─────────────────────────────────────
+  _initBoss() {
+    const G = {
+      body:  this._geo(new RoundedBoxGeometry(3.2, 4.0, 1.7, 5, 0.9)),
+      eye:   this._geo(new THREE.SphereGeometry(0.46, 22, 16)),
+      pupil: this._geo(new THREE.SphereGeometry(0.24, 16, 12)),
+      brow:  this._geo(new THREE.BoxGeometry(0.64, 0.14, 0.14)),
+      mouth: this._geo(new RoundedBoxGeometry(1.1, 0.3, 0.2, 2, 0.1)),
+      crownBase:  this._geo(new THREE.CylinderGeometry(1.15, 1.25, 0.32, 24)),
+      crownSpike: this._geo(new THREE.ConeGeometry(0.22, 0.5, 12)),
+    };
+    const M = this.BM = {
+      body:  this._mat(new THREE.MeshPhysicalMaterial({ color: 0xb858ff, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.1,
+        emissive: 0x6a1fb0, emissiveIntensity: 0.18 })),
+      eyeW:  this._mat(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })),
+      pupil: this._mat(new THREE.MeshStandardMaterial({ color: 0xff3050, roughness: 0.2, emissive: 0xff2040, emissiveIntensity: 0.5 })),
+      brow:  this._mat(new THREE.MeshStandardMaterial({ color: 0x3a1050, roughness: 0.6 })),
+      mouth: this._mat(new THREE.MeshStandardMaterial({ color: 0x2a0a3a, roughness: 0.6 })),
+      crown: this._mat(new THREE.MeshStandardMaterial({ color: 0xffd23f, metalness: 0.7, roughness: 0.25, emissive: 0xaa7700, emissiveIntensity: 0.3 })),
+    };
+    const boss = this.boss = new THREE.Group();
+    const mesh = (g, m, x = 0, y = 0, z = 0, parent = boss, shadow = true) => {
+      const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.castShadow = shadow; parent.add(o); return o;
+    };
+    this.bossBody = mesh(G.body, M.body, 0, 2, 0);
+    for (const s of [-1, 1]) {        // ojitos y cejas mirando hacia +z (de donde viene la jugadora)
+      mesh(G.eye, M.eyeW, 0.75 * s, 2.7, 0.78).scale.set(0.95, 1.1, 0.6);
+      mesh(G.pupil, M.pupil, 0.75 * s, 2.65, 1.08, boss, false).scale.z = 0.6;
+      const brow = mesh(G.brow, M.brow, 0.75 * s, 3.18, 0.82, boss, false);
+      brow.rotation.z = 0.35 * s;
+    }
+    mesh(G.mouth, M.mouth, 0, 1.55, 0.95, boss, false);
+    mesh(G.crownBase, M.crown, 0, 4.05, 0);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      mesh(G.crownSpike, M.crown, Math.cos(a) * 0.95, 4.35, Math.sin(a) * 0.95, boss, false);
+    }
+    boss.visible = false;
+    this.scene.add(boss);
+  }
+
+  // Corre adelante de la jugadora (se mantiene a BOSS_AHEAD m) y zigzaguea entre carriles
+  _updateBoss(dt) {
+    if (!this.boss || !this.boss.visible) return;
+    const bossZ = -this.dist - BOSS_AHEAD;
+    this.boss.position.z += (bossZ - this.boss.position.z) * Math.min(1, dt * 4);
+    this.boss.position.x = Math.sin(this._t * 0.8) * LANE_W * 0.9;
+    this.bossBody.position.y = 2 + Math.sin(this._t * 2) * 0.18;
+    const flash = this._bossFlash > 0 ? this._bossFlash / 0.3 : 0;
+    this.boss.scale.setScalar(1 + flash * 0.18);
+    if (this.BM) this.BM.body.emissiveIntensity = 0.18 + flash * 1.6;
   }
 
   _makeObj(type) {
@@ -907,6 +1045,31 @@ export class Dash3D {
     } else if (type === 'star') {
       add(G.star, M.star, 0, 0, 0);
       Object.assign(d, { hw: 0.8, h: 0, hd: 0.8 });
+    } else if (type === 'enemy') {
+      const b = add(G.enemyBody, M.enemyBody, 0, 0.42, 0);
+      d.body = b;
+      for (const s of [-1, 1]) {
+        const e = add(G.jEye, M.eyeW, 0.16 * s, 0.56, 0.28, false); e.scale.z = 0.55;
+        const p = add(G.jPup, M.eyeB, 0.16 * s, 0.54, 0.36, false); p.scale.z = 0.55;
+      }
+      add(G.enemyFoot, M.enemyFoot, -0.18, 0.08, 0, false);
+      add(G.enemyFoot, M.enemyFoot, 0.18, 0.08, 0, false);
+      Object.assign(d, { hw: 0.55, h: 0.84, hd: 0.5, enemy: true });
+    } else if (type === 'magnet') {
+      const arc = add(G.magnetArc, M.magnetArc, 0, 0.8, 0);
+      arc.rotation.z = Math.PI;
+      add(G.magnetTip, M.magnetTip, -0.28, 0.52, 0, false);
+      add(G.magnetTip, M.magnetTip, 0.28, 0.52, 0, false);
+      Object.assign(d, { hw: 0.8, h: 0, hd: 0.8 });
+    } else if (type === 'rocket') {
+      add(G.rocketBody, M.rocketBody, 0, 0.75, 0);
+      add(G.rocketNose, M.rocketNose, 0, 1.08, 0);
+      for (const s of [-1, 1]) { const f = add(G.rocketFin, M.rocketFin, 0.14 * s, 0.52, 0, false); f.rotation.z = -0.9 * s; f.rotation.x = Math.PI / 2; }
+      Object.assign(d, { hw: 0.8, h: 0, hd: 0.8 });
+    } else if (type === 'bossgem') {
+      const g = add(G.bossGem, M.bossGem, 0, 0, 0);
+      d.body = g;
+      Object.assign(d, { hw: 0.8, h: 0, hd: 0.8 });
     }
     o.userData = d;
     return o;
@@ -947,6 +1110,13 @@ export class Dash3D {
     this.hearts = HEARTS;
     this.invuln = 0;
     this.shield = 0;
+    this.magnet = 0;
+    this.rocket = 0;
+    this.bossPhase = false;
+    this.bossHp = 0; this.bossHpMax = 0;
+    this.nextBossDist = BOSS_DIST;
+    this._bossFlash = 0;
+    if (this.boss) this.boss.visible = false;
     this.squash = 0;
     this.shake = 0;
     this.overT = 0;
@@ -963,6 +1133,7 @@ export class Dash3D {
     this._ensureRows();
     this._msg('ready');
     this._updateHud(true);
+    this._updateBossHud(true);
   }
 
   start() {
@@ -1057,24 +1228,29 @@ export class Dash3D {
     const r = Math.random();
     const lanes = [0, 1, 2].sort(() => Math.random() - 0.5);
     const jumpable = () => (Math.random() < 0.55 ? 'cake' : 'cone');
-    if (r < 0.07 && d > 200) {             // estrella → escudo
-      this._spawn('star', lanes[0], d, 1.1);
+    if (r < 0.1 && d > 200) {              // poder: escudo, imán o cohete
+      this._spawn(pick(['star', 'magnet', 'rocket']), lanes[0], d, 1.1);
       this._coinLine(lanes[1], d - 4, 4);
       return;
     }
-    if (r < 0.17) {                        // trampolín + arco de monedas en el aire
+    if (r < 0.2) {                         // trampolín + arco de monedas en el aire
       this._spawn('pad', lanes[0], d);
       this._coinArc(lanes[0], d, PAD_V, 9);
       if (Math.random() < 0.6) this._spawn(jumpable(), lanes[1], d + 3);
       return;
     }
-    if (r < 0.42) {                        // un obstáculo saltable con arco de monedas
+    if (r < 0.45) {                        // un obstáculo saltable con arco de monedas
       this._spawn(jumpable(), lanes[0], d);
       this._coinArc(lanes[0], d, JUMP_V, 7);
       if (Math.random() < 0.35 + lvl * 0.4) this._spawn('jelly', lanes[1], d);
       return;
     }
-    if (r < 0.7) {                         // dos gelatinas: hay que ir al carril libre
+    if (r < 0.61) {                        // bichitos: se matan solos al tocarlos caminando/corriendo
+      const n = Math.random() < 0.4 ? 2 : 1;
+      for (let i = 0; i < n; i++) this._spawn('enemy', lanes[i], d + i * 1.5);
+      return;
+    }
+    if (r < 0.81) {                        // dos gelatinas: hay que ir al carril libre
       this._spawn('jelly', lanes[0], d);
       this._spawn('jelly', lanes[1], d);
       this._coinLine(lanes[2], d - 5, 5);
@@ -1103,6 +1279,64 @@ export class Dash3D {
 
   _speedAt(d) { return clamp(SPEED0 + d * 0.0065, SPEED0, SPEED_MAX) * this.diff.mul; }
 
+  // ── Imán: atrae las monedas cercanas mientras this.magnet > 0 ───────────────
+  _magnetPull(dt) {
+    if (this.magnet <= 0) return;
+    const px = this.hx, pz = this.dist, R = 9, PULL = 10;
+    for (const o of this.objs) {
+      const d = o.userData;
+      if (!d.alive || d.type !== 'coin') continue;
+      const ddx = px - o.position.x, ddz = pz - d.dist;
+      const dist2 = ddx * ddx + ddz * ddz;
+      if (dist2 > R * R || dist2 < 1e-6) continue;
+      const k = Math.min(1, PULL * dt);
+      o.position.x += ddx * k;
+      d.dist += ddz * k;
+      o.position.z = -d.dist;
+      d.y += (0.75 - d.y) * Math.min(1, dt * 6);
+    }
+  }
+
+  // ── Fase del jefe ────────────────────────────────────────────────────────
+  _startBossPhase() {
+    this.bossPhase = true;
+    this.bossHp = BOSS_GEMS;
+    this.bossHpMax = BOSS_GEMS;
+    this.boss.visible = true;
+    this.boss.position.set(0, 0, -this.dist - BOSS_AHEAD);
+    this.boss.scale.setScalar(1);
+    this._nextBossGem = this.dist + 10;
+    this._toast('👹 ¡Apareció el Jefe! Juntá las gemas ✨');
+    this._updateBossHud(true);
+  }
+  _ensureBossGems() {
+    while (this._nextBossGem < this.dist + N_ROWS * TILE_L - 12) {
+      const lane = (Math.random() * 3) | 0;
+      this._spawn('bossgem', lane, this._nextBossGem, 1 + Math.sin(this._nextBossGem) * 0.15);
+      this._nextBossGem += rand(5, 8);
+    }
+  }
+  _collectBossGem(o) {
+    const d = o.userData;
+    this._burst(o.position.x, d.y, o.position.z, 16, [2.2, 1.8, 0.4], 4, 0.5, 0.08);
+    this._free(o);
+    if (!this.bossPhase) return;
+    this.bossHp = Math.max(0, this.bossHp - 1);
+    this._bossFlash = 0.3;
+    this._updateBossHud();
+    if (this.bossHp <= 0) this._defeatBoss();
+  }
+  _defeatBoss() {
+    this.bossPhase = false;
+    this.boss.visible = false;
+    this.nextBossDist = this.dist + BOSS_DIST;
+    this._burst(this.boss.position.x, 2.2, this.boss.position.z, 70, [2.4, 1.8, 0.6], 7, 1.0, 0.13);
+    this.bossWins = (this.bossWins || 0) + 1;
+    try { localStorage.setItem('dash3d_boss_wins', String(this.bossWins)); } catch (e) { /* sin storage */ }
+    this._toast(`🏆 ¡Venciste al Jefe! (${this.bossWins})`);
+    this._updateBossHud(true);
+  }
+
   // ── Update ───────────────────────────────────────────────────────────────
   update(dt) {
     dt = clamp(dt || 0, 0, 0.05);   // el primer frame puede venir negativo (rAF vs. performance.now)
@@ -1110,7 +1344,7 @@ export class Dash3D {
     this._adaptQuality(dt);
 
     if (this.state === 'run') {
-      this.speed = this._speedAt(this.dist);
+      this.speed = this._speedAt(this.dist) * (this.rocket > 0 ? ROCKET_MUL : 1);
       this.dist += this.speed * dt;
     } else if (this.state === 'over') {
       this.overT += dt;
@@ -1139,13 +1373,20 @@ export class Dash3D {
     this.coyote = this.onGround ? 0.1 : Math.max(0, this.coyote - dt);
     this.invuln = Math.max(0, this.invuln - dt);
     if (this.shield > 0) { this.shield = Math.max(0, this.shield - dt); }
+    if (this.magnet > 0) this.magnet = Math.max(0, this.magnet - dt);
+    if (this.rocket > 0) this.rocket = Math.max(0, this.rocket - dt);
+    if (this._bossFlash > 0) this._bossFlash = Math.max(0, this._bossFlash - dt);
 
     if (this.state === 'run') {
+      if (!this.bossPhase && this.dist >= this.nextBossDist) this._startBossPhase();
+      if (this.bossPhase) this._ensureBossGems();
       this._ensureRows();
+      this._magnetPull(dt);
       this._collide();
     }
     this._updateObjs(dt);
     this._updateHero(dt);
+    this._updateBoss(dt);
     this._updateTheme();
     this._updateWorld(dt);
     this._updateParticles(dt);
@@ -1185,6 +1426,32 @@ export class Dash3D {
         }
         continue;
       }
+      if (d.type === 'enemy') {                 // se mata solo al tocarlo, no hace falta saltar
+        if (dx < d.hw + 0.4 && dz < d.hd + 0.4) this._defeatEnemy(o);
+        continue;
+      }
+      if (d.type === 'magnet') {
+        if (dx < 0.9 && dz < 0.9 && Math.abs(d.y - (this.hy + 0.5)) < 1.2) {
+          this.magnet = MAGNET_T;
+          this._burst(o.position.x, d.y, o.position.z, 22, [2.2, 0.6, 0.7], 5, 0.6, 0.09);
+          this._toast('🧲 ¡Imán!');
+          this._free(o);
+        }
+        continue;
+      }
+      if (d.type === 'rocket') {
+        if (dx < 0.9 && dz < 0.9 && Math.abs(d.y - (this.hy + 0.5)) < 1.2) {
+          this.rocket = ROCKET_T;
+          this._burst(o.position.x, d.y, o.position.z, 22, [2.4, 1.2, 0.3], 6, 0.6, 0.09);
+          this._toast('🚀 ¡Cohete!');
+          this._free(o);
+        }
+        continue;
+      }
+      if (d.type === 'bossgem') {
+        if (dx < 0.85 && dz < 0.85 && Math.abs(d.y - (this.hy + 0.5)) < 1.2) this._collectBossGem(o);
+        continue;
+      }
       // obstáculo sólido: AABB 3D, un poco generosa (es para chicos)
       if (dx < d.hw + 0.36 && dz < d.hd + 0.36 && this.hy < d.h - 0.2) this._hit(o);
     }
@@ -1195,6 +1462,10 @@ export class Dash3D {
     const col = d.type === 'cone' ? [2, 1.2, 0.4] : d.mat ? d.mat.color.toArray() : [1, 0.6, 0.8];
     this._burst(o.position.x, d.h * 0.5, o.position.z, 30, col, 6, 0.8, 0.13);
     this._free(o);
+    if (this.rocket > 0) {           // el cohete arrasa los obstáculos sin gastarse
+      this.shake = Math.max(this.shake, 0.12);
+      return;
+    }
     if (this.shield > 0) {           // la burbuja absorbe el golpe
       this.shield = 0;
       this._burst(this.hx, this.hy + 0.5, -this.dist, 24, [0.8, 1.8, 2.4], 5, 0.6, 0.09);
@@ -1207,6 +1478,13 @@ export class Dash3D {
     this.invuln = 1.6;
     this.speed *= 0.8;
     if (this.hearts <= 0) this._gameOver();
+  }
+
+  _defeatEnemy(o) {
+    this._burst(o.position.x, 0.5, o.position.z, 18, [0.6, 1.8, 0.5], 4, 0.5, 0.08);
+    this.enemiesDefeated = (this.enemiesDefeated || 0) + 1;
+    this.coins++; addCoins(1);
+    this._free(o);
   }
 
   _gameOver() {
@@ -1248,9 +1526,15 @@ export class Dash3D {
   _updateHero(dt) {
     const h = this.hero, p = this.heroPivot;
     h.position.set(this.hx, this.hy, -this.dist);
-    // Giro completo en el aire (homenaje a Geometry Dash, pero siempre cae parado)
+    // Giro completo en el aire (homenaje a Geometry Dash); al tocar el piso frena y se
+    // endereza en vez de seguir girando para siempre en la pantalla de "game over".
     if (this.state === 'over') {
-      p.rotation.x -= dt * 6; p.rotation.z += dt * 3;
+      if (!this.onGround) { p.rotation.x -= dt * 6; p.rotation.z += dt * 3; }
+      else {
+        const k = Math.min(1, dt * 6);
+        p.rotation.x += (0 - p.rotation.x) * k;
+        p.rotation.z += (0 - p.rotation.z) * k;
+      }
     } else if (!this.onGround) {
       const t = clamp(this.flip / this.flipDur, 0, 1);
       p.rotation.x = -Math.PI * 2 * smooth(t);
@@ -1308,10 +1592,11 @@ export class Dash3D {
       const s = 1 + Math.sin(this._t * 6) * 0.04;
       this.shieldMesh.scale.set(s, s * 1.08, s);
     }
-    // Estela de chispitas
-    if (this.state === 'run' && Math.random() < dt * 30) {
-      this._burst(this.hx + rand(-0.3, 0.3), this.hy + rand(0.2, 0.9), -this.dist + 0.6, 1,
-        pick([[2, 1.2, 1.8], [1.6, 1.4, 2.4], [2.2, 2, 1.2]]), 0.6, 0.5, 0.05, 0);
+    // Estela de chispitas (más densa e intensa con el cohete)
+    if (this.state === 'run' && Math.random() < dt * (this.rocket > 0 ? 90 : 30)) {
+      const col = this.rocket > 0 ? pick([[2.4, 1.2, 0.3], [2.2, 1.6, 0.2], [2, 0.8, 0.2]]) : pick([[2, 1.2, 1.8], [1.6, 1.4, 2.4], [2.2, 2, 1.2]]);
+      this._burst(this.hx + rand(-0.3, 0.3), this.hy + rand(0.2, 0.9), -this.dist + 0.6, this.rocket > 0 ? 2 : 1,
+        col, this.rocket > 0 ? 1.4 : 0.6, 0.5, 0.06, 0);
     }
   }
 
@@ -1481,6 +1766,14 @@ export class Dash3D {
       if (e) e.textContent = '💖'.repeat(Math.max(0, this.hearts)) + '🤍'.repeat(HEARTS - Math.max(0, this.hearts));
     }
   }
+  _updateBossHud(force) {
+    const e = $('dash3d-boss');
+    if (!e) return;
+    if (!this.bossPhase) { if (force) e.classList.add('hidden'); return; }
+    e.classList.remove('hidden');
+    const fill = e.querySelector('.d3-boss-fill');
+    if (fill) fill.style.width = (this.bossHpMax ? this.bossHp / this.bossHpMax : 0) * 100 + '%';
+  }
 
   _msg(kind) {
     const e = $('dash3d-msg');
@@ -1494,8 +1787,10 @@ export class Dash3D {
         <div class="d3-pick d3-diffs">${DIFFICULTIES.map(d => `<button class="d3-char d3-diff${d.id === this.diff.id ? ' on' : ''}"
           data-diff="${d.id}"><span>${d.emoji}</span>${d.name}</button>`).join('')}</div>
         <div class="d3-sub">Tocá para empezar</div>
-        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ deslizá arriba o tocá para saltar · ⭐ = escudo</div>
-        <div class="d3-best">${this.best ? `Récord (${this.diff.name}): ${this.best} m` : ''}</div>`;
+        <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ deslizá arriba o tocá para saltar
+          <br>⭐ escudo · 🧲 imán · 🚀 cohete · 👾 tocá a los bichitos para derrotarlos
+          <br>👹 cada ${BOSS_DIST} m aparece un jefe: juntá sus gemas ✨ para vencerlo</div>
+        <div class="d3-best">${this.best ? `Récord (${this.diff.name}): ${this.best} m` : ''}${this.bossWins ? `<br>🏆 Jefes vencidos: ${this.bossWins}` : ''}</div>`;
       // Elegir dificultad (sin arrancar la carrera)
       for (const b of e.querySelectorAll('.d3-diff')) {
         b.addEventListener('pointerdown', ev => ev.stopPropagation());

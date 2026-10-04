@@ -331,6 +331,7 @@ function showHub(menuId = 'hub-screen') {
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   inGame = false;
   mode   = 'exterior';
+  document.body.classList.remove('dash3d-portrait-ok');
   _resetNetState();
   runner = null;
   cocina = null;
@@ -686,7 +687,8 @@ function exitDash() {
 
 // ── Sky Run (Dash3D.js) — runner en 3D real (Three.js se importa recién al entrar) ─────────
 async function launchDash3D() {
-  if (isTouch) forceLandscape();
+  if (isTouch) forcePortrait();
+  document.body.classList.add('dash3d-portrait-ok');
   document.getElementById('hub-screen').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -2124,10 +2126,10 @@ function syncCustActive() {
   document.querySelectorAll('.cust-color').forEach(s => s.classList.toggle('active', look[s.dataset.cat] === s.dataset.color));
 }
 
-// ── Force landscape on touch devices (fullscreen + orientation lock) ─────────
+// ── Force an orientation on touch devices (fullscreen + orientation lock) ────
 const isTouch = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
-function forceLandscape() {
-  const lock = () => { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{}); } catch (e) {} };
+function forceOrientation(orientation) {
+  const lock = () => { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock(orientation).catch(()=>{}); } catch (e) {} };
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
   try {
@@ -2137,6 +2139,8 @@ function forceLandscape() {
     } else lock();
   } catch (e) { lock(); }
 }
+function forceLandscape() { forceOrientation('landscape'); }
+function forcePortrait() { forceOrientation('portrait'); }
 if (isTouch) window.addEventListener('pointerdown', () => forceLandscape(), { once: true });
 
 // ── Selection screen UI ───────────────────────────────────────────────────

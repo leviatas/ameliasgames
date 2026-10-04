@@ -960,8 +960,11 @@ body {
 }
 
 /* ── Landscape-by-default: prompt rotation in portrait on phones ── */
+/* Sky Run es la excepción: se juega parada (ver forcePortrait() en game.js), así que con
+   body.dash3d-portrait-ok no pedimos rotar aunque el resto de los juegos sean landscape. */
 #rotate-overlay { display: none; }
 @media (orientation: portrait) and (max-width: 920px) {
+  body.dash3d-portrait-ok #rotate-overlay { display: none; }
   #rotate-overlay {
     display: flex;
     position: fixed; inset: 0; z-index: 500;
@@ -1374,6 +1377,19 @@ body {
   background: rgba(255,255,255,0.72); backdrop-filter: blur(6px);
   box-shadow: 0 4px 14px rgba(80,40,120,0.18);
 }
+#dash3d-boss {
+  position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+  width: min(260px, 70vw); padding: 7px 14px; border-radius: 16px; text-align: center;
+  background: rgba(40,10,60,0.55); backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(40,10,60,0.3);
+}
+#dash3d-boss.hidden { display: none; }
+.d3-boss-name { font-weight: 900; font-size: 0.85rem; color: #ffd6f4; margin-bottom: 3px; }
+.d3-boss-bar { height: 10px; border-radius: 999px; background: rgba(255,255,255,0.25); overflow: hidden; }
+.d3-boss-fill {
+  height: 100%; width: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #ff3050, #ffd23f); transition: width 0.25s ease;
+}
+#dash3d-boss:not(.hidden) ~ #dash3d-toast { top: 112px; }
 #dash3d-toast {
   position: absolute; top: 70px; left: 50%; transform: translate(-50%, -10px);
   padding: 10px 22px; border-radius: 999px; font-weight: 800; font-size: 1.2rem; color: #fff;
@@ -1408,7 +1424,7 @@ body {
 }
 #dash3d-msg .d3-again:active { transform: scale(0.95); }
 @keyframes d3pulse { 50% { opacity: 0.55; } }
-#dash3d-msg .d3-pick { display: flex; justify-content: center; gap: 8px; margin: 8px 0 2px; }
+#dash3d-msg .d3-pick { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; }
 #dash3d-msg .d3-char {
   display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 76px;
   padding: 6px 10px; border-radius: 16px; cursor: pointer; font: inherit; font-size: 0.85rem; font-weight: 800;
