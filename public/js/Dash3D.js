@@ -132,6 +132,7 @@ export class Dash3D {
     this._initDecor();
     this._initFx();
     this._initBoss();
+    this._initDizzyStars();
     this._initInput();
     this._onResize = () => this._resize();
     window.addEventListener('resize', this._onResize);
@@ -1015,6 +1016,21 @@ export class Dash3D {
     };
   }
 
+  // Estrellitas del knock-out (reusan la geometría/material de la estrella de poder): un
+  // anillito que da vueltas, se prende sólo cuando está tirada en el piso tras chocar.
+  _initDizzyStars() {
+    const group = this.dizzyStars = new THREE.Group();
+    group.visible = false;
+    this.hero.add(group);
+    this._dizzyMeshes = [];
+    for (let i = 0; i < 3; i++) {
+      const m = new THREE.Mesh(this.G.star, this.M.star);
+      m.scale.setScalar(0.32);
+      group.add(m);
+      this._dizzyMeshes.push(m);
+    }
+  }
+
   _makeObj(type) {
     const G = this.G, M = this.M;
     const o = new THREE.Group();
@@ -1375,6 +1391,7 @@ export class Dash3D {
           this.hy = 0; this.vy = 0; this.onGround = true; this.squash = 0.35;
           this._burst(this.hx, 0.05, -this.dist + 0.3, 10, [1, 0.95, 1], 2.6, 0.45, 0.1);
           if (this.jumpBuf > 0 && this.state === 'run') this._doJump(JUMP_V);
+          if (this.state === 'over') this._downSide = Math.sign(this.heroPivot.rotation.z) || 1;
         }
       }
       this.jumpBuf = Math.max(0, this.jumpBuf - dt);
@@ -1593,9 +1610,11 @@ export class Dash3D {
     if (this.state === 'over') {
       if (!this.onGround) { p.rotation.x -= dt * 6; p.rotation.z += dt * 3; }
       else {
+        // queda tirada de costado (no parada) para el efecto de estrellitas dando vueltas
         const k = Math.min(1, dt * 6);
+        const targetZ = (this._downSide || 1) * Math.PI / 2;
         p.rotation.x += (0 - p.rotation.x) * k;
-        p.rotation.z += (0 - p.rotation.z) * k;
+        p.rotation.z += (targetZ - p.rotation.z) * k;
       }
     } else if (!this.onGround) {
       const t = clamp(this.flip / this.flipDur, 0, 1);
@@ -1610,7 +1629,25 @@ export class Dash3D {
     const idle = this.state === 'ready' ? Math.abs(Math.sin(this._t * 3.2)) * 0.25 : 0;
     const sq = this.squash;
     p.scale.set(1 + sq * 0.35, 1 - sq * 0.45, 1 + sq * 0.35);
-    p.position.y = HERO_CY - sq * HERO_CY * 0.45 + bob + idle;
+    if (this.state === 'over' && this.onGround) {
+      p.position.y += (0.32 - p.position.y) * Math.min(1, dt * 6);
+    } else {
+      p.position.y = HERO_CY - sq * HERO_CY * 0.45 + bob + idle;
+    }
+    // Estrellitas dando vueltas (knock-out clásico) mientras está tirada en el piso
+    if (this.dizzyStars) {
+      const show = this.state === 'over' && this.onGround;
+      this.dizzyStars.visible = show;
+      if (show) {
+        const cx = -(this._downSide || 1) * 0.75, cy = 0.78, r = 0.5;
+        for (let i = 0; i < this._dizzyMeshes.length; i++) {
+          const a = this._t * 3.2 + (i / this._dizzyMeshes.length) * Math.PI * 2;
+          const m = this._dizzyMeshes[i];
+          m.position.set(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.55, 0.15 + Math.sin(a) * 0.1);
+          m.rotation.z = a * 2.5;
+        }
+      }
+    }
     // Piernas y brazos: trote al correr, bolita en el aire, saludo al esperar
     const P = this.heroParts;
     const ph = this._t * 13;
