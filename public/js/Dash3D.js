@@ -30,7 +30,8 @@ const N_DECOR  = 26, DECOR_GAP = 7;
 const DECOR_SPAN = N_DECOR * DECOR_GAP;
 const MAGNET_T = 6, ROCKET_T = 4, ROCKET_MUL = 1.6;   // duración de los poderes nuevos (s) y boost del cohete
 const BOSS_DIST = 900;              // metros entre apariciones del jefe
-const BOSS_AHEAD = 13;               // cuántos metros por delante corre (se aleja a la par de la jugadora)
+const BOSS_AHEAD = 26;               // cuántos metros por delante flota (se aleja a la par de la jugadora)
+const BOSS_HOVER_Y = 2.6;            // altura a la que flota, para que no tape toda la pantalla
 const BOSS_GEMS = 10;                // gemas para vencerlo
 
 const THEMES = [
@@ -999,10 +1000,19 @@ export class Dash3D {
     const bossZ = -this.dist - BOSS_AHEAD;
     this.boss.position.z += (bossZ - this.boss.position.z) * Math.min(1, dt * 4);
     this.boss.position.x = Math.sin(this._t * 0.8) * LANE_W * 0.9;
+    this.boss.position.y = BOSS_HOVER_Y + Math.sin(this._t * 1.3) * 0.35;   // flota en el aire
     this.bossBody.position.y = 2 + Math.sin(this._t * 2) * 0.18;
     const flash = this._bossFlash > 0 ? this._bossFlash / 0.3 : 0;
     this.boss.scale.setScalar(1 + flash * 0.18);
     if (this.BM) this.BM.body.emissiveIntensity = 0.18 + flash * 1.6;
+  }
+  // Punto (mundo) donde "está" el jefe ahora mismo, para que las gemas apunten ahí
+  _bossTargetPos() {
+    return {
+      x: this.boss.position.x,
+      y: this.boss.position.y + this.bossBody.position.y,
+      z: this.boss.position.z,
+    };
   }
 
   _makeObj(type) {
@@ -1079,6 +1089,7 @@ export class Dash3D {
     const o = this.pool[type].pop() || this._makeObj(type);
     const d = o.userData;
     d.lane = lane; d.dist = dist; d.y = y; d.alive = true; d.spin = rand(0, 6.28);
+    d.flying = false; d.homing = false;
     o.position.set(LANES[lane], y, -dist);
     o.rotation.set(0, 0, 0);
     o.scale.setScalar(1);
@@ -1303,7 +1314,7 @@ export class Dash3D {
     this.bossHp = BOSS_GEMS;
     this.bossHpMax = BOSS_GEMS;
     this.boss.visible = true;
-    this.boss.position.set(0, 0, -this.dist - BOSS_AHEAD);
+    this.boss.position.set(0, BOSS_HOVER_Y, -this.dist - BOSS_AHEAD);
     this.boss.scale.setScalar(1);
     this._nextBossGem = this.dist + 10;
     this._toast('👹 ¡Apareció el Jefe! Juntá las gemas ✨');
@@ -1316,15 +1327,13 @@ export class Dash3D {
       this._nextBossGem += rand(5, 8);
     }
   }
-  _collectBossGem(o) {
+  // Al tocarla, la gema no se resuelve al instante: queda viva y vuela sola hasta el jefe
+  // (ver el bloque `d.homing` en _updateObjs), y recién ahí le pega y le baja la vida.
+  _launchGemToBoss(o) {
     const d = o.userData;
-    this._burst(o.position.x, d.y, o.position.z, 16, [2.2, 1.8, 0.4], 4, 0.5, 0.08);
-    this._free(o);
-    if (!this.bossPhase) return;
-    this.bossHp = Math.max(0, this.bossHp - 1);
-    this._bossFlash = 0.3;
-    this._updateBossHud();
-    if (this.bossHp <= 0) this._defeatBoss();
+    d.homing = true;
+    d.homingT = 0;
+    this._burst(o.position.x, d.y, o.position.z, 8, [2.2, 1.8, 0.4], 2, 0.3, 0.05);
   }
   _defeatBoss() {
     this.bossPhase = false;
@@ -1427,7 +1436,7 @@ export class Dash3D {
         continue;
       }
       if (d.type === 'enemy') {                 // se mata solo al tocarlo, no hace falta saltar
-        if (dx < d.hw + 0.4 && dz < d.hd + 0.4) this._defeatEnemy(o);
+        if (!d.flying && dx < d.hw + 0.4 && dz < d.hd + 0.4) this._defeatEnemy(o);
         continue;
       }
       if (d.type === 'magnet') {
@@ -1449,7 +1458,7 @@ export class Dash3D {
         continue;
       }
       if (d.type === 'bossgem') {
-        if (dx < 0.85 && dz < 0.85 && Math.abs(d.y - (this.hy + 0.5)) < 1.2) this._collectBossGem(o);
+        if (!d.homing && dx < 0.85 && dz < 0.85 && Math.abs(d.y - (this.hy + 0.5)) < 1.2) this._launchGemToBoss(o);
         continue;
       }
       // obstáculo sólido: AABB 3D, un poco generosa (es para chicos)
@@ -1480,11 +1489,21 @@ export class Dash3D {
     if (this.hearts <= 0) this._gameOver();
   }
 
+  // No desaparece de golpe: sale disparado hacia arriba y atrás (ver `d.flying` en
+  // _updateObjs), como al pisar un enemigo en un plataformero clásico.
   _defeatEnemy(o) {
+    const d = o.userData;
     this._burst(o.position.x, 0.5, o.position.z, 18, [0.6, 1.8, 0.5], 4, 0.5, 0.08);
     this.enemiesDefeated = (this.enemiesDefeated || 0) + 1;
     this.coins++; addCoins(1);
-    this._free(o);
+    d.flying = true;
+    d.flyT = 0;
+    const away = (o.position.x - this.hx) || (Math.random() < 0.5 ? -1 : 1);
+    d.fvx = Math.sign(away) * rand(3, 5);
+    d.fvy = rand(7, 10);
+    d.fvz = rand(-2, 2);
+    d.frotX = rand(6, 12);
+    d.frotZ = rand(-8, 8);
   }
 
   _gameOver() {
@@ -1502,6 +1521,46 @@ export class Dash3D {
     for (let i = this.objs.length - 1; i >= 0; i--) {
       const o = this.objs[i], d = o.userData;
       if (!d.alive) { this.objs.splice(i, 1); continue; }
+      if (d.flying) {           // bichito derrotado: sale volando en vez de desaparecer de golpe
+        d.flyT += dt;
+        d.fvy -= 22 * dt;
+        o.position.x += d.fvx * dt;
+        o.position.y = Math.max(0, o.position.y + d.fvy * dt);
+        d.dist -= d.fvz * dt;
+        o.position.z = -d.dist;
+        o.rotation.x += d.frotX * dt;
+        o.rotation.z += d.frotZ * dt;
+        o.scale.setScalar(clamp(1 - d.flyT / 0.9, 0, 1));
+        if (d.flyT > 0.9) { this._free(o); this.objs.splice(i, 1); }
+        continue;
+      }
+      if (d.homing) {           // gema camino al jefe: vuela hacia él y lo golpea al llegar
+        d.homingT += dt;
+        const bt = this._bossTargetPos();
+        const cx = o.position.x, cy = d.y, cz = -d.dist;
+        const dx = bt.x - cx, dy = bt.y - cy, dz = bt.z - cz;
+        const dist = Math.hypot(dx, dy, dz);
+        if (dist < 0.7 || d.homingT > 1.3) {
+          this._burst(bt.x, bt.y, bt.z, 20, [2.2, 1.8, 0.4], 5, 0.5, 0.09);
+          if (this.bossPhase) {
+            this._bossFlash = 0.3;
+            this.bossHp = Math.max(0, this.bossHp - 1);
+            this._updateBossHud();
+            if (this.bossHp <= 0) this._defeatBoss();
+          }
+          this._free(o);
+          this.objs.splice(i, 1);
+          continue;
+        }
+        const k = Math.min(1, (14 / Math.max(0.4, dist)) * dt);
+        o.position.x += dx * k;
+        d.y += dy * k;
+        d.dist -= dz * k;
+        o.position.z = -d.dist;
+        o.position.y = d.y;
+        o.rotation.y += dt * 12; o.rotation.x += dt * 9;
+        continue;
+      }
       // lo que ya pasó se achica ("puf") para no tapar la cámara
       const gone = clamp((pz - d.dist - 1.2) / 2.5, 0, 1);
       if (gone >= 1) { this._free(o); this.objs.splice(i, 1); continue; }
@@ -1518,6 +1577,9 @@ export class Dash3D {
         o.scale.set(1 + w * 0.03, 1 - w * 0.03, 1 + w * 0.03);
       } else if (d.type === 'pad') {
         o.children[1].scale.setScalar(1 + (Math.sin(d.spin * 8) * 0.5 + 0.5) * 0.2);
+      } else if (d.type === 'bossgem') {
+        o.rotation.y = d.spin * 2.6; o.rotation.x = d.spin * 1.3;
+        o.position.y = d.y + Math.sin(d.spin * 3) * 0.12;
       }
       if (gone > 0) o.scale.multiplyScalar(1 - smooth(gone));
     }
@@ -1773,6 +1835,8 @@ export class Dash3D {
     e.classList.remove('hidden');
     const fill = e.querySelector('.d3-boss-fill');
     if (fill) fill.style.width = (this.bossHpMax ? this.bossHp / this.bossHpMax : 0) * 100 + '%';
+    const hp = e.querySelector('.d3-boss-hp');
+    if (hp) hp.textContent = `${this.bossHp}/${this.bossHpMax}`;
   }
 
   _msg(kind) {

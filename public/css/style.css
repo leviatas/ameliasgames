@@ -1383,7 +1383,9 @@ body {
   background: rgba(40,10,60,0.55); backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(40,10,60,0.3);
 }
 #dash3d-boss.hidden { display: none; }
-.d3-boss-name { font-weight: 900; font-size: 0.85rem; color: #ffd6f4; margin-bottom: 3px; }
+.d3-boss-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+.d3-boss-name { font-weight: 900; font-size: 0.85rem; color: #ffd6f4; }
+.d3-boss-hp { font-weight: 800; font-size: 0.75rem; color: #ffe8f8; opacity: 0.85; }
 .d3-boss-bar { height: 10px; border-radius: 999px; background: rgba(255,255,255,0.25); overflow: hidden; }
 .d3-boss-fill {
   height: 100%; width: 100%; border-radius: 999px;
