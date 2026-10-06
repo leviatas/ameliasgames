@@ -1551,6 +1551,96 @@ body {
   .cv3-msg-sub { font-size: 1rem; }
 }
 
+/* ── Conduce por la Ciudad (ConduceCiudad3D.js, Three.js) ── */
+.hub-card.conducir3d { background: linear-gradient(135deg, #8FE0A0 0%, #4FB0E0 55%, #6A5CE0 100%); color: #152A4A; }
+.hub-card.conducir3d:hover { border-color: #4FB0E0; box-shadow: 0 18px 40px rgba(79,176,224,0.4); }
+#conducir3d-canvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20;
+  display: block; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#conducir3d-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none;
+  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif; }
+#conducir3d-ui.hidden { display: none; }
+#conducir3d-ui button { pointer-events: all; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#cc3-hud { position: absolute; top: 14px; left: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+#cc3-hud span {
+  padding: 7px 14px; border-radius: 999px; font-weight: 800; font-size: 1.05rem; color: #15492A;
+  background: rgba(255,255,255,0.78); backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(20,80,40,0.18);
+}
+#cc3-nav {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: min(420px, 90vw);
+}
+#cc3-order {
+  padding: 8px 16px; border-radius: 14px; background: rgba(255,255,255,0.92);
+  border: 3px solid #4FB0E0; box-shadow: 0 8px 22px rgba(20,80,120,0.18);
+  font-weight: 800; font-size: 0.85rem; color: #15325A; text-align: center;
+}
+#cc3-compass {
+  display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px;
+  background: rgba(20,40,70,0.55); color: #fff; font-weight: 800; font-size: 0.78rem;
+}
+#cc3-arrow { display: inline-block; font-size: 1.2rem; transition: transform 0.15s ease; }
+#cc3-toast {
+  position: absolute; top: 96px; left: 50%; transform: translate(-50%, -10px);
+  padding: 10px 22px; border-radius: 999px; font-weight: 800; font-size: 1.1rem; color: #fff;
+  background: linear-gradient(135deg, rgba(79,176,224,0.9), rgba(106,92,224,0.9));
+  box-shadow: 0 8px 24px rgba(40,80,150,0.3); opacity: 0; white-space: nowrap; max-width: 86vw; text-align: center;
+}
+#cc3-toast.show { animation: cc3toast 2.2s ease forwards; }
+@keyframes cc3toast {
+  0% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  20% { transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+#conducir3d-msg {
+  position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%);
+  min-width: min(360px, 86vw); padding: 18px 26px; border-radius: 26px; text-align: center;
+  color: #15325A; background: rgba(255,255,255,0.82); backdrop-filter: blur(10px);
+  box-shadow: 0 14px 40px rgba(20,60,120,0.25);
+}
+#conducir3d-msg.hidden { display: none; }
+.cc3-msg-title { font-size: 1.9rem; font-weight: 900;
+  background: linear-gradient(90deg, #4FB0E0, #6A5CE0, #8FE0A0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.cc3-msg-sub { font-size: 1.15rem; font-weight: 800; margin-top: 4px; animation: d3pulse 1.2s ease-in-out infinite; }
+.cc3-msg-help { font-size: 0.85rem; margin-top: 10px; opacity: 0.8; line-height: 1.5; }
+.cc3-msg-best { font-size: 0.9rem; margin-top: 8px; font-weight: 700; opacity: 0.75; }
+.cc3-pick { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; }
+.cc3-car {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 86px;
+  padding: 6px 10px; border-radius: 16px; cursor: pointer; font: inherit; font-size: 0.8rem; font-weight: 800;
+  color: #15325A; background: rgba(255,255,255,0.6); border: 2px solid rgba(79,176,224,0.25);
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+}
+.cc3-car span { font-size: 1.6rem; line-height: 1; }
+.cc3-car.on { background: #fff; border-color: #4FB0E0; transform: scale(1.08); box-shadow: 0 6px 16px rgba(79,176,224,0.35); }
+.cc3-car:active { transform: scale(0.95); }
+.cc3-steer-btn, .cc3-pedal-btn {
+  position: absolute; bottom: 20px; width: 76px; height: 76px; border-radius: 50%;
+  font-size: 1.8rem; color: #fff; cursor: pointer; user-select: none;
+  border: 3px solid rgba(255,255,255,0.6); background: rgba(20,60,110,0.35);
+  backdrop-filter: blur(6px); box-shadow: 0 6px 18px rgba(10,40,80,0.25);
+}
+.cc3-steer-btn:active, .cc3-pedal-btn:active { transform: scale(0.92); background: rgba(20,60,110,0.55); }
+#conducir3d-left  { left: 18px; }
+#conducir3d-right { left: 106px; }
+.cc3-pedal-btn { width: 86px; height: 86px; }
+#conducir3d-brake { right: 118px; background: rgba(140,20,30,0.35); }
+#conducir3d-gas   { right: 20px; background: rgba(20,110,50,0.35); }
+@media (pointer: fine) { .cc3-steer-btn, .cc3-pedal-btn { display: none; } }
+#conducir3d-msg:not(.hidden) ~ .cc3-steer-btn, #conducir3d-msg:not(.hidden) ~ .cc3-pedal-btn { display: none; }
+@media (min-aspect-ratio: 3/2) and (max-height: 560px) {
+  #cc3-nav { top: 8px; }
+  #cc3-order { padding: 6px 12px; font-size: 0.75rem; }
+  #conducir3d-msg { left: auto; right: 3%; top: 50%; bottom: auto; transform: translateY(-50%);
+    min-width: 0; width: min(46vw, 380px); padding: 12px 16px; }
+  .cc3-msg-title { font-size: 1.4rem; }
+  .cc3-msg-sub { font-size: 1rem; }
+}
+
 /* ── Guardia de arranque (error visible en "Cargando...") ── */
 #boot-error { margin-top: 22px; max-width: 88vw; text-align: center; letter-spacing: 0; }
 #boot-error-text { font-size: 0.85rem; color: #ffd6e6; white-space: pre-wrap; word-break: break-word; }

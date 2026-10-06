@@ -64,6 +64,8 @@ let dash3d   = null;   // Sky Run (Dash3D.js, Three.js, se carga bajo demanda)
 let dash3dLoading = 0;  // token para cancelar una carga si se sale antes
 let cocina3d = null;   // Cocina con Viole 3D (CocinaViole3D.js, Three.js, se carga bajo demanda)
 let cocina3dLoading = 0;  // token para cancelar una carga si se sale antes
+let conducir3d = null;   // Conduce por la Ciudad (ConduceCiudad3D.js, Three.js, se carga bajo demanda)
+let conducir3dLoading = 0;  // token para cancelar una carga si se sale antes
 let theater  = null;
 let helado   = null;
 let panaderia = null;
@@ -348,6 +350,8 @@ function showHub(menuId = 'hub-screen') {
   dash3dLoading++;
   if (cocina3d) { cocina3d.destroy(); cocina3d = null; }
   cocina3dLoading++;
+  if (conducir3d) { conducir3d.destroy(); conducir3d = null; }
+  conducir3dLoading++;
   hideHoleSubmenu();
   hideUnoSubmenu();
   hideVersusSubmenu();
@@ -397,6 +401,7 @@ function showHub(menuId = 'hub-screen') {
   document.getElementById('dash-ui').classList.add('hidden');
   document.getElementById('dash3d-ui').classList.add('hidden');
   document.getElementById('cocinaviole3d-ui').classList.add('hidden');
+  document.getElementById('conducir3d-ui').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('select-screen').classList.add('hidden');
   document.getElementById('online-setup').classList.add('hidden');
@@ -787,6 +792,58 @@ async function launchCocinaViole3D() {
 }
 function exitCocinaViole3D() {
   document.getElementById('cocinaviole3d-ui').classList.add('hidden');
+  showHub('uno-submenu');
+}
+
+// ── Conduce por la Ciudad (ConduceCiudad3D.js) — manejo arcade en 3D (Three.js) ──────────
+async function launchConduceCiudad3D() {
+  if (isTouch) forceLandscape();
+  document.getElementById('hub-screen').classList.add('hidden');
+  document.getElementById('select-screen').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  const ui = document.getElementById('conducir3d-ui');
+  ui.classList.remove('hidden');
+  const msg = document.getElementById('conducir3d-msg');
+  msg.classList.remove('hidden');
+  const step = t => { msg.innerHTML = `<div class="cc3-msg-title">Conduce por la Ciudad</div><div class="cc3-msg-sub">${t}</div>`; };
+  const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+  const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what)), ms))]);
+  mode = 'conducir3d';
+  const token = ++conducir3dLoading;
+  const alive = () => token === conducir3dLoading && mode === 'conducir3d';
+  let stage = 'descarga';
+  try {
+    step('Descargando la ciudad 3D…');
+    const { ConduceCiudad3D } = await withTimeout(import('./ConduceCiudad3D.js'), 45000, 'la descarga tardó demasiado');
+    if (!alive()) return;
+    stage = 'armado';
+    step('Armando la ciudad…');
+    await nextFrame();
+    if (!alive()) return;
+    const game = new ConduceCiudad3D(canvas);
+    if (!alive()) { game.destroy(); return; }
+    stage = 'shaders';
+    step('Preparando luces y colores…');
+    await nextFrame();
+    await game.warmup();
+    if (!alive()) { game.destroy(); return; }
+    conducir3d = game;
+    conducir3d.showReady();
+  } catch (err) {
+    console.error('Conduce por la Ciudad:', err);
+    if (!alive()) return;
+    const why = !window.WebGLRenderingContext ? 'este navegador no tiene WebGL'
+      : !(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')) ? 'el navegador es muy viejo (actualizalo)'
+      : String((err && err.message) || err);
+    msg.innerHTML = `<div class="cc3-msg-title">Ups 😿</div><div class="cc3-msg-sub">No se pudo abrir el 3D</div>
+      <div class="cc3-msg-help">Falló en: ${stage}<br><small>${why.replace(/</g, '&lt;')}</small></div>`;
+    return;
+  }
+  lastTime = performance.now();
+  if (!animFrameId) animFrameId = requestAnimationFrame(gameLoop);
+}
+function exitConduceCiudad3D() {
+  document.getElementById('conducir3d-ui').classList.add('hidden');
   showHub('uno-submenu');
 }
 
@@ -1279,6 +1336,13 @@ function gameLoop(now) {
     if (cocina3d) {
       try { cocina3d.update(delta); cocina3d.render(); }
       catch (err) { console.error('Cocina con Viole 3D:', err); cocina3d.showError(err); cocina3d = null; }
+    }
+    return;
+  }
+  if (mode === 'conducir3d') {
+    if (conducir3d) {
+      try { conducir3d.update(delta); conducir3d.render(); }
+      catch (err) { console.error('Conduce por la Ciudad:', err); conducir3d.showError(err); conducir3d = null; }
     }
     return;
   }
@@ -1948,6 +2012,46 @@ window.addEventListener('keyup', e => {
   cocina3dApplyKeys();
 });
 
+// ── Conduce por la Ciudad controls ────────────────────────────────────────────────────
+const cc3Exit = document.getElementById('conducir3d-exit');
+if (cc3Exit) cc3Exit.addEventListener('click', exitConduceCiudad3D);
+const conducir3dKeys = { left: false, right: false, gas: false, brake: false };
+function conducir3dApplyKeys() {
+  if (!conducir3d) return;
+  conducir3d.setSteer((conducir3dKeys.right ? 1 : 0) - (conducir3dKeys.left ? 1 : 0));
+  conducir3d.setGas(conducir3dKeys.gas);
+  conducir3d.setBrake(conducir3dKeys.brake);
+}
+[['conducir3d-left', 'left'], ['conducir3d-right', 'right'], ['conducir3d-gas', 'gas'], ['conducir3d-brake', 'brake']].forEach(([id, key]) => {
+  const b = document.getElementById(id);
+  if (!b) return;
+  const down = e => { e.preventDefault(); e.stopPropagation(); conducir3dKeys[key] = true; conducir3dApplyKeys(); };
+  const up = e => { e.preventDefault(); conducir3dKeys[key] = false; conducir3dApplyKeys(); };
+  b.addEventListener('pointerdown', down);
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, up));
+});
+window.addEventListener('keydown', e => {
+  if (mode !== 'conducir3d') return;
+  if (e.code === 'Escape') { exitConduceCiudad3D(); return; }
+  if (!conducir3d) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') conducir3dKeys.left = true;
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') conducir3dKeys.right = true;
+  else if (e.code === 'ArrowUp' || e.code === 'KeyW') conducir3dKeys.gas = true;
+  else if (e.code === 'ArrowDown' || e.code === 'KeyS') conducir3dKeys.brake = true;
+  else if (e.code === 'Enter') { conducir3d.start(); return; }
+  else return;
+  e.preventDefault(); conducir3dApplyKeys();
+});
+window.addEventListener('keyup', e => {
+  if (mode !== 'conducir3d' || !conducir3d) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') conducir3dKeys.left = false;
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') conducir3dKeys.right = false;
+  else if (e.code === 'ArrowUp' || e.code === 'KeyW') conducir3dKeys.gas = false;
+  else if (e.code === 'ArrowDown' || e.code === 'KeyS') conducir3dKeys.brake = false;
+  else return;
+  conducir3dApplyKeys();
+});
+
 // ── Galaga controls ───────────────────────────────────────────────────────────
 const gExit = document.getElementById('galaga-exit');
 if (gExit) gExit.addEventListener('click', exitGalaga);
@@ -2582,7 +2686,7 @@ if (unoBack) unoBack.addEventListener('click', () => { hideUnoSubmenu(); documen
  ['uno-runner', launchRunner], ['uno-cocina', launchCocina],
  ['uno-hole', showHoleSubmenu], ['uno-helado', launchHelado],
  ['uno-dash', launchDash], ['uno-dash3d', launchDash3D],
- ['uno-cocinaviole3d', launchCocinaViole3D]].forEach(([id, launch]) => {
+ ['uno-cocinaviole3d', launchCocinaViole3D], ['uno-conducir3d', launchConduceCiudad3D]].forEach(([id, launch]) => {
   const btn = document.getElementById(id);
   if (!btn) return;
   const go = () => { hideUnoSubmenu(); launch(); };

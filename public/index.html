@@ -276,6 +276,11 @@
         <div class="hub-name">Cocina con Viole 3D</div>
         <div class="hub-desc">La misma cocina de Viole, ahora en 3D: caminá y cociná</div>
       </button>
+      <button class="hub-card conducir3d" id="uno-conducir3d">
+        <div class="hub-emoji">🚗</div>
+        <div class="hub-name">Conduce por la Ciudad</div>
+        <div class="hub-desc">Elegí un auto y hacé entregas por la ciudad en 3D</div>
+      </button>
     </div>
   </div>
 
@@ -753,7 +758,7 @@
   <canvas id="game-canvas"></canvas>
 
   <!-- App version (bumped on every change) -->
-  <div id="app-version">v2.78.3</div>
+  <div id="app-version">v2.79.0</div>
 
   <!-- Galaga controls -->
   <div id="dash-ui" class="hidden">
@@ -792,6 +797,25 @@
     <div id="cv3-toast"></div>
     <div id="cv3-reject">✗</div>
     <div id="cocinaviole3d-msg" class="hidden"></div>
+  </div>
+
+  <!-- Conduce por la Ciudad (ConduceCiudad3D.js, Three.js): el canvas WebGL lo crea la clase -->
+  <div id="conducir3d-ui" class="hidden">
+    <button id="conducir3d-exit" class="game-menu-btn" title="Volver al menú de juegos">← Menú</button>
+    <div id="cc3-hud">
+      <span id="cc3-score">📦 0</span>
+      <span id="cc3-best">Mejor: 0</span>
+    </div>
+    <div id="cc3-nav">
+      <div id="cc3-order"></div>
+      <div id="cc3-compass"><span id="cc3-arrow">⬆️</span><span id="cc3-dist"></span></div>
+    </div>
+    <div id="cc3-toast"></div>
+    <div id="conducir3d-msg" class="hidden"></div>
+    <button id="conducir3d-left"  class="cc3-steer-btn" title="Izquierda">◀</button>
+    <button id="conducir3d-right" class="cc3-steer-btn" title="Derecha">▶</button>
+    <button id="conducir3d-brake" class="cc3-pedal-btn cc3-brake" title="Frenar / retroceder">🔴</button>
+    <button id="conducir3d-gas"   class="cc3-pedal-btn cc3-gas" title="Acelerar">🟢</button>
   </div>
 
   <div id="galaga-ui" class="hidden">
@@ -946,7 +970,7 @@
         'runner_level', 'runner_hearts', 'helado_best', 'panaderia_state',
         'pasteleria_state', 'pizzeria_state', 'panaderia_money', 'panaderia_meta',
         'vestidor_look', 'dash_best', 'dash3d_best', 'dash3d_best_facil', 'dash3d_best_dificil',
-        'cocina3d_best',
+        'cocina3d_best', 'conducir3d_best', 'conducir3d_car', 'dash3d_boss_wins',
       ];
       keys.forEach(k => localStorage.removeItem(k));
       location.reload();
