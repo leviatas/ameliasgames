@@ -132,6 +132,7 @@ export class Dash3D {
     this._initDecor();
     this._initFx();
     this._initBoss();
+    this._initLightning();
     this._initDizzyStars();
     this._initInput();
     this._onResize = () => this._resize();
@@ -979,13 +980,15 @@ export class Dash3D {
       const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.castShadow = shadow; parent.add(o); return o;
     };
     this.bossBody = mesh(G.body, M.body, 0, 2, 0);
+    this.bossEyes = [];
     for (const s of [-1, 1]) {        // ojitos y cejas mirando hacia +z (de donde viene la jugadora)
-      mesh(G.eye, M.eyeW, 0.75 * s, 2.7, 0.78).scale.set(0.95, 1.1, 0.6);
+      const eye = mesh(G.eye, M.eyeW, 0.75 * s, 2.7, 0.78); eye.scale.set(0.95, 1.1, 0.6);
+      this.bossEyes.push(eye);
       mesh(G.pupil, M.pupil, 0.75 * s, 2.65, 1.08, boss, false).scale.z = 0.6;
       const brow = mesh(G.brow, M.brow, 0.75 * s, 3.18, 0.82, boss, false);
       brow.rotation.z = 0.35 * s;
     }
-    mesh(G.mouth, M.mouth, 0, 1.55, 0.95, boss, false);
+    this.bossMouth = mesh(G.mouth, M.mouth, 0, 1.55, 0.95, boss, false);
     mesh(G.crownBase, M.crown, 0, 4.05, 0);
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
@@ -995,8 +998,40 @@ export class Dash3D {
     this.scene.add(boss);
   }
 
+  // Rayo que pega cuando una gema llega al jefe: cae del cielo, bien eléctrico (blanco+rojo)
+  _initLightning() {
+    const segG = this._geo(new THREE.BoxGeometry(0.16, 0.7, 0.16));
+    const core = this._mat(new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.6, 2.9) }));
+    const edge = this._mat(new THREE.MeshBasicMaterial({ color: new THREE.Color(3.0, 0.25, 0.4) }));
+    const bolt = this.bolt = new THREE.Group();
+    const offsets = [-0.26, 0.3, -0.34, 0.24, -0.18];
+    for (let i = 0; i < 5; i++) {
+      const seg = new THREE.Mesh(segG, i % 2 ? edge : core);
+      seg.position.set(offsets[i], -i * 0.6, 0);
+      seg.rotation.z = (i % 2 ? 1 : -1) * 0.32;
+      bolt.add(seg);
+    }
+    bolt.visible = false;
+    this.scene.add(bolt);
+    this._boltT = 0;
+  }
+  // Clava el rayo sobre `target` (cae desde arriba) y lo deja prendido un instante
+  _strikeBolt(target) {
+    if (!this.bolt) return;
+    this.bolt.position.set(target.x, target.y + 2.6, target.z);
+    this.bolt.rotation.y = rand(0, 6.28);
+    this.bolt.visible = true;
+    this._boltT = 0.18;
+    this._burst(target.x, target.y, target.z, 16, [2.6, 0.25, 0.3], 5, 0.35, 0.08);
+  }
+
   // Corre adelante de la jugadora (se mantiene a BOSS_AHEAD m) y zigzaguea entre carriles
   _updateBoss(dt) {
+    if (this._boltT > 0) {
+      this._boltT -= dt;
+      this.bolt.visible = this._boltT > 0;
+      if (this.bolt.visible) this.bolt.scale.y = 0.9 + Math.sin(this._boltT * 70) * 0.25;
+    }
     if (!this.boss || !this.boss.visible) return;
     const bossZ = -this.dist - BOSS_AHEAD;
     this.boss.position.z += (bossZ - this.boss.position.z) * Math.min(1, dt * 4);
@@ -1006,6 +1041,10 @@ export class Dash3D {
     const flash = this._bossFlash > 0 ? this._bossFlash / 0.3 : 0;
     this.boss.scale.setScalar(1 + flash * 0.18);
     if (this.BM) this.BM.body.emissiveIntensity = 0.18 + flash * 1.6;
+    // Mueca de dolor: se le abre la boca, entrecierra los ojos y echa la cabeza atrás
+    this.bossBody.rotation.x = -flash * 0.35;
+    if (this.bossMouth) this.bossMouth.scale.set(1 - flash * 0.3, 1 + flash * 2.4, 1);
+    for (const e of this.bossEyes) e.scale.y = 1.1 * (1 - flash * 0.55);
   }
   // Punto (mundo) donde "está" el jefe ahora mismo, para que las gemas apunten ahí
   _bossTargetPos() {
@@ -1143,11 +1182,14 @@ export class Dash3D {
     this.bossHp = 0; this.bossHpMax = 0;
     this.nextBossDist = BOSS_DIST;
     this._bossFlash = 0;
+    this._boltT = 0;
+    if (this.bolt) this.bolt.visible = false;
     if (this.boss) this.boss.visible = false;
     this.squash = 0;
     this.shake = 0;
     this.overT = 0;
     this.camBlend = 0;
+    this._downCamT = 0;
     this.nextRow = 45;
     this.coyote = 0; this.jumpBuf = 0;
     this.tilt = 0;
@@ -1558,12 +1600,14 @@ export class Dash3D {
         const dx = bt.x - cx, dy = bt.y - cy, dz = bt.z - cz;
         const dist = Math.hypot(dx, dy, dz);
         if (dist < 0.7 || d.homingT > 1.3) {
-          this._burst(bt.x, bt.y, bt.z, 20, [2.2, 1.8, 0.4], 5, 0.5, 0.09);
           if (this.bossPhase) {
+            this._strikeBolt(bt);              // rayo rojo + mueca de dolor del jefe
             this._bossFlash = 0.3;
             this.bossHp = Math.max(0, this.bossHp - 1);
             this._updateBossHud();
             if (this.bossHp <= 0) this._defeatBoss();
+          } else {
+            this._burst(bt.x, bt.y, bt.z, 20, [2.2, 1.8, 0.4], 5, 0.5, 0.09);
           }
           this._free(o);
           this.objs.splice(i, 1);
@@ -1639,12 +1683,14 @@ export class Dash3D {
       const show = this.state === 'over' && this.onGround;
       this.dizzyStars.visible = show;
       if (show) {
-        const cx = -(this._downSide || 1) * 0.75, cy = 0.78, r = 0.5;
+        // anillo horizontal (plano X-Z) flotando arriba de la cabeza, como el clásico mareo
+        const cx = -(this._downSide || 1) * 0.75, cy = 1.05, r = 0.5;
         for (let i = 0; i < this._dizzyMeshes.length; i++) {
           const a = this._t * 3.2 + (i / this._dizzyMeshes.length) * Math.PI * 2;
           const m = this._dizzyMeshes[i];
-          m.position.set(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.55, 0.15 + Math.sin(a) * 0.1);
-          m.rotation.z = a * 2.5;
+          m.position.set(cx + Math.cos(a) * r, cy, Math.sin(a) * r);
+          m.rotation.x = Math.PI / 2;
+          m.rotation.z = a * 2;
         }
       }
     }
@@ -1831,10 +1877,25 @@ export class Dash3D {
     else if (this.state === 'over') target = 1 - smooth(clamp((this.overT - 0.3) / 1.4, 0, 1)) * 0.8;
     this.camBlend += (target - this.camBlend) * Math.min(1, dt * (this.state === 'run' ? 2.6 : 1.4));
     const k = smooth(clamp(this.camBlend, 0, 1));
-    cam.position.lerpVectors(introPos, runPos, k);
-    // Un arco por arriba durante la transición (para no atravesar al héroe)
-    cam.position.y += Math.sin(k * Math.PI) * 2.2;
+    const pos = introPos.lerp(runPos, k);
     const look = introLook.lerp(runLook, k);
+    // Al quedar tirada en el piso, la cámara apunta rápido a ella en vez de seguir
+    // mezclando lento con las cámaras de arranque/carrera.
+    if (this.state === 'over' && this.onGround) {
+      this._downCamT = Math.min(1, (this._downCamT || 0) + dt * 4.5);
+    } else {
+      this._downCamT = 0;
+    }
+    if (this._downCamT > 0) {
+      const dk = smooth(this._downCamT);
+      const downPos = new THREE.Vector3(this.hx + 2.1, 2.1, pz + 2.5);
+      const downLook = new THREE.Vector3(this.hx - 0.2, 0.55, pz);
+      pos.lerp(downPos, dk);
+      look.lerp(downLook, dk);
+    }
+    cam.position.copy(pos);
+    // Un arco por arriba durante la transición (para no atravesar al héroe)
+    cam.position.y += Math.sin(k * Math.PI) * 2.2 * (1 - (this._downCamT || 0));
     if (this.shake > 0) {
       const s = this.shake;
       cam.position.x += rand(-s, s); cam.position.y += rand(-s, s) * 0.6;
