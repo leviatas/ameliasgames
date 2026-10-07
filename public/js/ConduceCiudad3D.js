@@ -50,7 +50,7 @@ const FOOD_ITEMS   = [{ emoji: '🌭', name: 'Pancho' }, { emoji: '🍔', name: 
 const HELADO_ITEMS = [{ emoji: '🍦', name: 'Helado' }, { emoji: '🍨', name: 'Copa de helado' }];
 
 // Física arcade del auto
-const MAX_SPEED = 15, REV_SPEED = 7, ACCEL = 13, BRAKE = 20, FRICTION = 9, STEER_RATE = 2.3;
+const MAX_SPEED = 15, REV_SPEED = 7, ACCEL = 13, BRAKE = 20, FRICTION = 9, STEER_RATE = 1.85;
 const CAR_RADIUS = 1.15;
 
 export class ConduceCiudad3D {
@@ -499,7 +499,7 @@ export class ConduceCiudad3D {
     this.pos = { x: -CELL / 2, z: -CELL / 2 };   // nace en un cruce de calles, no arriba de una manzana
     this.heading = Math.PI;      // mirando hacia -z al arrancar
     this.speed = 0;
-    this.steerDir = 0; this.gas = false; this.brake = false;
+    this.steerDir = 0; this._steer = 0; this.gas = false; this.brake = false;
     this.carrying = null;
     this.order = null;
     this.state = 'ready';
@@ -542,8 +542,11 @@ export class ConduceCiudad3D {
         this.speed = Math.abs(this.speed) <= f ? 0 : this.speed - Math.sign(this.speed) * f;
       }
       this.speed = clamp(this.speed, -REV_SPEED, MAX_SPEED);
-      const turnFactor = clamp(Math.abs(this.speed) / 3, 0, 1);
-      if (this.steerDir) this.heading += this.steerDir * STEER_RATE * turnFactor * dt * (this.speed < 0 ? -1 : 1);
+      // El volante responde suave (sin saltos al tocar/soltar el botón) y nunca gira "poco":
+      // mínimo 55% de autoridad de giro parada, se afirma un toque más al tomar velocidad.
+      this._steer += (this.steerDir - this._steer) * Math.min(1, dt * 9);
+      const turnFactor = clamp(0.55 + Math.abs(this.speed) / 9, 0.55, 1);
+      this.heading += this._steer * STEER_RATE * turnFactor * dt;
       const fx = Math.sin(this.heading), fz = -Math.cos(this.heading);
       this.pos.x += fx * this.speed * dt;
       this.pos.z += fz * this.speed * dt;
@@ -601,7 +604,7 @@ export class ConduceCiudad3D {
     this.carRig.position.set(this.pos.x, 0, this.pos.z);
     this.carRig.rotation.y = this.heading;
     for (const w of this.carRig.userData.wheels || []) w.rotation.x -= this.speed * dt * 1.6;
-    const steerVis = clamp(this.steerDir * 0.5, -0.5, 0.5);
+    const steerVis = clamp(this._steer * 0.5, -0.5, 0.5);
     const wheels = this.carRig.userData.wheels;
     if (wheels && wheels.length >= 2) { wheels[0].rotation.y = steerVis; wheels[1].rotation.y = steerVis; }
     if (this.carrying) {
