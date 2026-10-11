@@ -54,6 +54,8 @@ const DIFFICULTIES = [
   { id: 'facil',   name: 'Fácil',   emoji: '🐢', mul: 0.5, bestKey: 'dash3d_best_facil' },
   { id: 'normal',  name: 'Normal',  emoji: '🏃', mul: 1,   bestKey: 'dash3d_best' },
   { id: 'dificil', name: 'Difícil', emoji: '🚀', mul: 2,   bestKey: 'dash3d_best_dificil' },
+  { id: 'ultra',   name: 'Ultra',   emoji: '🔥', mul: 3.5, bestKey: 'dash3d_best_ultra',
+    warn: '🔥 Sólo los valientes (y Tintín) se animan a este nivel' },
 ];
 const DIFF_BY_ID = Object.fromEntries(DIFFICULTIES.map(d => [d.id, d]));
 
@@ -1952,14 +1954,17 @@ export class Dash3D {
         <div class="d3-help">⬅️ ➡️ deslizá para cambiar de carril · ⬆️ deslizá arriba o tocá para saltar
           <br>⭐ escudo · 🧲 imán · 🚀 cohete · 👾 tocá a los bichitos para derrotarlos
           <br>👹 cada ${BOSS_DIST} m aparece un jefe: juntá sus gemas ✨ para vencerlo</div>
+        ${this.diff.warn ? `<div class="d3-warn">${this.diff.warn}</div>` : ''}
         <div class="d3-best">${this.best ? `Récord (${this.diff.name}): ${this.best} m` : ''}${this.bossWins ? `<br>🏆 Jefes vencidos: ${this.bossWins}` : ''}</div>`;
       // Elegir dificultad (sin arrancar la carrera)
       for (const b of e.querySelectorAll('.d3-diff')) {
         b.addEventListener('pointerdown', ev => ev.stopPropagation());
         b.addEventListener('click', ev => {
           ev.stopPropagation();
+          const d = DIFF_BY_ID[b.dataset.diff];
           this.setDifficulty(b.dataset.diff);
           this.reset();                  // regenera la pista con la separación de la nueva velocidad
+          if (d && d.warn) this._toast(d.warn);
         });
       }
       // Elegir personaje (sin arrancar la carrera)
